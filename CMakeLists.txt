@@ -14,6 +14,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(flatbuffers)
 
+# Fetch nlohmann json
+FetchContent_Declare(
+    json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(json)
+
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,10 +36,14 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${flatbuffers_SOURCE_DIR}/include
+    nlohmann_json::nlohmann_json
 )
 
 # Link against flatbuffers
-target_link_libraries(${PROJECT_NAME} PRIVATE flatbuffers)
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+    nlohmann_json::nlohmann_json 
+    flatbuffers
+)
 
 # Optional: Add compiler warnings
 if(MSVC)

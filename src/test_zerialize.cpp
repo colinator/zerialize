@@ -1,5 +1,7 @@
 #include <iostream>
 #include <zerialize/zerialize.hpp>
+#include <zerialize/zerialize_flex.hpp>
+#include <zerialize/zerialize_json.hpp>
 
 int main() {
     std::cout << "testing zerialize:" << std::endl << std::endl;
