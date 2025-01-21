@@ -29,22 +29,20 @@ public:
 
     // Zero-copy view of existing data
     FlexBuffer(std::span<const uint8_t> data)
-        : ref_(flexbuffers::GetRoot(data.data(), data.size())) {
-            std::cout << "FlexBuffer span" << std::endl;
-        }
+        : ref_(flexbuffers::GetRoot(data.data(), data.size())) { }
 
     // Zero-copy move of vector ownership
     FlexBuffer(std::vector<uint8_t>&& buf)
         : buf_(std::move(buf))
         , ref_(flexbuffers::GetRoot(buf_)) {
-            std::cout << "FlexBuffer move" << std::endl;
+            
         }
 
     // Must copy for const reference
     FlexBuffer(const std::vector<uint8_t>& buf)
         : buf_(buf)
         , ref_(flexbuffers::GetRoot(buf_)) {
-            std::cout << "FlexBuffer copy" << std::endl;
+            
         }
 
     void finish() {
@@ -87,21 +85,41 @@ class Flex {
 private:
 
     void serializeValue(flexbuffers::Builder& fbb, const char* val) {
-        std::cout << "serializeValue const char*: " << val << std::endl;
         fbb.String(val);
     }
 
-    template<typename T, 
-             typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
+    void serializeValue(flexbuffers::Builder& fbb, int val) {
+        fbb.Int(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, float val) {
+        fbb.Float(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, double val) {
+        fbb.Double(val);
+    }
+
+    template<typename T, typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
     void serializeValue(flexbuffers::Builder& fbb, T&& val) {
-        std::cout << "serializeValue string " 
-                  << (std::is_rvalue_reference_v<T&&> ? "rvalue" : "lvalue") 
-                  << ": " << val << std::endl;
         fbb.String(std::forward<T>(val));
     }
 
+    template<typename T>
+    void serializeValue(flexbuffers::Builder& fbb, std::pair<const char*, T>&& keyVal) {
+        fbb.Key(keyVal.first);
+        serializeValue(fbb, std::forward<T>(keyVal.second));
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, std::vector<std::any>&& val) {
+        fbb.Vector([&]() {
+            for (const std::any& v: val) {
+                serializeValue(fbb, v);
+            }
+        });
+    }
+
     void serializeValue(flexbuffers::Builder& fbb, const std::any& val) {
-        std::cout << "serializeValueAny: " << val.type().name() << std::endl;
         if (val.type() == typeid(int)) {
             fbb.Int(std::any_cast<int>(val));
         } else if (val.type() == typeid(double)) {
@@ -137,17 +155,15 @@ public:
     using BufferType = FlexBuffer;
 
     Flex() {
-        std::cout << "Flex constructor" << std::endl;
+
     }
 
     BufferType serialize() {
-        std::cout << "serializing nothing " << std::endl;
         FlexBuffer buffer;
         return buffer;
     }
 
     BufferType serialize(const std::any& value) {
-        std::cout << "serializing: any " << value.type().name() << std::endl;
         FlexBuffer buffer;
         serializeValue(buffer.fbb, value);
         buffer.finish();
@@ -155,7 +171,6 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::any> list) {
-        std::cout << "serializing: initializer_list" << std::endl;
         FlexBuffer buffer;
         buffer.fbb.Vector([&]() {
             for (const std::any& val : list) {
@@ -167,7 +182,6 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
-        std::cout << "serializing: initializer_list (map)" << std::endl;
         FlexBuffer buffer;
         buffer.fbb.Map([&]() {
             for (const auto& [key, val] : list) {
@@ -179,13 +193,33 @@ public:
         return buffer;
     }
 
+    template<typename ValueType>
+    BufferType serialize(ValueType&& value) {
+        FlexBuffer buffer;
+        serializeValue(buffer.fbb, std::forward<ValueType>(value));
+        buffer.finish();
+        return buffer;
+    }
+
     template<typename... ValueTypes>
     BufferType serialize(ValueTypes&&... values) {
-        std::cout << "serializing: generic " << std::endl;
         FlexBuffer buffer;
-        //buffer.fbb.Vector([&]() {
+        buffer.fbb.Vector([&]() {
             (serializeValue(buffer.fbb, std::forward<ValueTypes>(values)), ...);
-        //});
+        });
+        buffer.finish();
+        return buffer;
+    }
+
+    template<typename... ValueTypes>
+    BufferType serializeMap(ValueTypes&&... values) {
+        FlexBuffer buffer;
+        buffer.fbb.Map([&]() {
+            ([&](auto&& pair) {
+                buffer.fbb.Key(pair.first);
+                serializeValue(buffer.fbb, std::forward<decltype(pair.second)>(pair.second));
+            }(std::forward<ValueTypes>(values)), ...);
+        });
         buffer.finish();
         return buffer;
     }
@@ -219,11 +253,25 @@ typename SerializerType::BufferType serialize(std::initializer_list<std::pair<st
     return serializer.serialize(list);
 }
 
+template<typename SerializerType, typename ValueType>
+typename SerializerType::BufferType serialize(ValueType&& value) {
+    std::cout << "serialize generic one" << std::endl;
+    SerializerType serializer;
+    return serializer.serialize(std::forward<ValueType>(value));
+}
+
 template<typename SerializerType, typename... ValueTypes>
 typename SerializerType::BufferType serialize(ValueTypes&&... values) {
-    std::cout << "serialize generic " << std::endl;
+    std::cout << "serialize generic many " << std::endl;
     SerializerType serializer;
     return serializer.serialize(std::forward<ValueTypes>(values)...);
+}
+
+template<typename SerializerType, typename... ValueTypes>
+typename SerializerType::BufferType serialize(std::pair<const char*, ValueTypes>&&... values) {
+    std::cout << "serialize generic many pairs" << std::endl;
+    SerializerType serializer;
+    return serializer.serializeMap(std::forward<std::pair<const char*, ValueTypes>>(values)...);
 }
 
 }
