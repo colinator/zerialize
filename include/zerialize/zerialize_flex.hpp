@@ -151,9 +151,7 @@ public:
 
     using BufferType = FlexBuffer;
 
-    Flex() {
-
-    }
+    Flex() {}
 
     BufferType serialize() {
         FlexBuffer buffer;
