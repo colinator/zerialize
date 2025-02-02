@@ -154,11 +154,17 @@ public:
     Flex() {}
 
     BufferType serialize() {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize nothing" << std::endl;
+        }
         FlexBuffer buffer;
         return buffer;
     }
 
     BufferType serialize(const std::any& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize any: " << value.type().name() << std::endl;
+        }
         FlexBuffer buffer;
         serializeValue(buffer.fbb, value);
         buffer.finish();
@@ -166,6 +172,9 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::any> list) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize initializer list" << std::endl;
+        }
         FlexBuffer buffer;
         buffer.fbb.Vector([&]() {
             for (const std::any& val : list) {
@@ -177,6 +186,9 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize initializer list(map)" << std::endl;
+        }
         FlexBuffer buffer;
         buffer.fbb.Map([&]() {
             for (const auto& [key, val] : list) {
@@ -190,6 +202,9 @@ public:
 
     template<typename ValueType>
     BufferType serialize(ValueType&& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize value&&" << std::endl;
+        }
         FlexBuffer buffer;
         serializeValue(buffer.fbb, std::forward<ValueType>(value));
         buffer.finish();
@@ -198,6 +213,9 @@ public:
 
     template<typename... ValueTypes>
     BufferType serialize(ValueTypes&&... values) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize values &&" << std::endl;
+        }
         FlexBuffer buffer;
         buffer.fbb.Vector([&]() {
             (serializeValue(buffer.fbb, std::forward<ValueTypes>(values)), ...);
@@ -208,6 +226,9 @@ public:
 
     template<typename... ValueTypes>
     BufferType serializeMap(ValueTypes&&... values) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "FlexBuffer::serialize ValueTypes" << std::endl;
+        }
         FlexBuffer buffer;
         buffer.fbb.Map([&]() {
             ([&](auto&& pair) {
@@ -220,4 +241,10 @@ public:
     }
 };
 
-}
+
+template<>
+struct SerializerName<Flex> {
+    static constexpr const char* value = "FLEX";
+};
+
+} // namespace zerialize

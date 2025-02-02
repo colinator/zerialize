@@ -3,27 +3,77 @@
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
 
+using std::string, std::function;
+using std::cout, std::endl;
+
+using namespace zerialize;
+
+template <typename SerializerType>
+bool testit(const string& name,
+    const function<typename SerializerType::BufferType()>& serializer,
+    const function<bool(const typename SerializerType::BufferType&)>& test)
+{
+    string str = string("TEST <") + SerializerName<SerializerType>::value + "> --- " + name + " ---";
+    cout << "START " << str << std::endl;
+    auto buffer = serializer();
+    cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
+    bool res = test(buffer);
+    cout << (res ? "   OK " : " FAIL ") << str << endl << endl;
+    if (!res) {
+        throw std::runtime_error(string("test failed!!!") + str);
+    }
+    return res;
+}
+
 template <typename SerializerType>
 void testem() {
-    std::cout << "testing zerialize:" << std::endl << std::endl;
+
+    using ST = SerializerType;
+
+    std::cout << "START testing zerialize: <" << SerializerName<ST>::value << ">" << endl << endl;
+
+    testit<ST>("nothing",
+        [](){ return serialize<ST>(); },
+        [](const auto&) {
+            //cout << "v.size() == " << v.size() << endl;
+            return true;
+        });
+
+    testit<ST>("3",
+        [](){ return serialize<ST>(3); },
+        [](const auto& v) {
+            return v.asInt32() == 3;
+        });
+
+    testit<ST>("\"asdf\" (via rvalue char*)",
+        [](){ return serialize<ST>("asdf"); },
+        [](const auto& v) {
+            return v.asString() == "asdf";
+        });
+
+    testit<ST>("\"asdf\" (via rvalue temp string)",
+        [](){ return serialize<ST>(std::string{"asdf"}); },
+        [](const auto& v) {
+            return v.asString() == "asdf";
+        });
+
+    std::string s = "asdf";
+    testit<ST>("\"asdf\" (via lvalue string)",
+        [](){ std::string s = "asdf"; return serialize<ST>(s); },
+        [](const auto& v) {
+            return v.asString() == "asdf";
+        });
+    
+    testit<ST>("\"asdf\" (via const lvalue string)",
+        [](){ const std::string s = "asdf"; return serialize<ST>(s); },
+        [](const auto& v) {
+            return v.asString() == "asdf";
+        });
+
+    return;
 
     {
-        std::cout << "--- nothing ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>();
-        std::cout << v.to_string() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- 3 ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>(3);
-        std::cout << v.to_string() << std::endl;
-        std::cout << v.asInt32() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- asdf (via rvalue char*) ---" << std::endl;
+        std::cout << "--- \"asdf\" (via rvalue char*) ---" << std::endl;
         auto v = zerialize::serialize<SerializerType>("asdf");
         std::cout << v.to_string() << std::endl;
         std::cout << v.asString() << std::endl;
@@ -147,17 +197,11 @@ void testem() {
         std::cout << std::endl;
     }
 
-    std::cout << "done" << std::endl;
+     std::cout << "..END testing zerialize: <" << zerialize::SerializerName<SerializerType>::value << ">" << endl << endl;
 }
 
 int main() {
-    std::cout << "zerialize::Flex" << std::endl;
     testem<zerialize::Flex>();
-    std::cout << std::endl << std::endl;
-
-    std::cout << "zerialize::Json" << std::endl;
-    testem<zerialize::Json>();
-    std::cout << std::endl << std::endl;
-
+    //testem<zerialize::Json>();
     return 0;
 }

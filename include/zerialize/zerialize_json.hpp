@@ -146,6 +146,9 @@ public:
     Json() {}
 
     BufferType serialize() {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize()" << std::endl;
+        }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
         buffer.finish();
@@ -153,6 +156,9 @@ public:
     }
 
     BufferType serialize(const std::any& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(value)" << std::endl;
+        }
         JsonBuffer buffer;
         serializeValue(buffer.json(), value);
         buffer.finish();
@@ -160,6 +166,9 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::any> list) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(initializer_list)" << std::endl;
+        }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
         for (const std::any& val : list) {
@@ -171,6 +180,9 @@ public:
     }
 
     BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(initializer list/map)" << std::endl;
+        }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::object();
         for (const auto& [key, val] : list) {
@@ -183,6 +195,9 @@ public:
 
     template<typename ValueType>
     BufferType serialize(ValueType&& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(&&value)" << std::endl;
+        }   
         JsonBuffer buffer;
         serializeValue(buffer.json(), std::forward<ValueType>(value));
         buffer.finish();
@@ -191,6 +206,9 @@ public:
 
     template<typename... ValueTypes>
     BufferType serialize(ValueTypes&&... values) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(&&values)" << std::endl;
+        }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
         (serializeValue(buffer.json().emplace_back(), std::forward<ValueTypes>(values)), ...);
@@ -200,6 +218,9 @@ public:
 
     template<typename... ValueTypes>
     BufferType serializeMap(ValueTypes&&... values) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serializeMap(&&values)" << std::endl;
+        }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::object();
         ([&](auto&& pair) {
@@ -211,4 +232,10 @@ public:
     }
 };
 
-}
+template<>
+struct SerializerName<Json> {
+    static constexpr const char* value = "JSON";
+};
+
+} // namespace zerialize
+
