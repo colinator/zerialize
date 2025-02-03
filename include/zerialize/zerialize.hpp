@@ -89,4 +89,9 @@ typename SerializerType::BufferType serialize(std::pair<const char*, ValueTypes>
     return serializer.serializeMap(std::forward<std::pair<const char*, ValueTypes>>(values)...);
 }
 
+class DeserializationError : public std::runtime_error {
+public:
+    DeserializationError(const std::string& msg) : std::runtime_error(msg) { }
+};
+
 }

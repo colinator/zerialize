@@ -31,16 +31,12 @@ public:
     // Zero-copy move of vector ownership
     FlexBuffer(std::vector<uint8_t>&& buf)
         : buf_(std::move(buf))
-        , ref_(flexbuffers::GetRoot(buf_)) {
-            
-        }
+        , ref_(flexbuffers::GetRoot(buf_)) { }
 
     // Must copy for const reference
     FlexBuffer(const std::vector<uint8_t>& buf)
         : buf_(buf)
-        , ref_(flexbuffers::GetRoot(buf_)) {
-            
-        }
+        , ref_(flexbuffers::GetRoot(buf_)) { }
 
     void finish() {
         fbb.Finish(); 
@@ -56,25 +52,50 @@ public:
         return buf_;
     }
 
-    int32_t asInt32() const { 
+    int32_t asInt32() const {
+        if (!isInt32()) { throw DeserializationError("not an int32"); }
         return ref_.AsInt32();
     }
 
+    bool isInt32() const { 
+        return ref_.GetType() == flexbuffers::FBT_INT;
+    }
+
     double asDouble() const { 
+        if (!isDouble()) { throw DeserializationError("not a float"); }
         return ref_.AsDouble();
     }
 
-    std::string_view asString() const { 
+    bool isDouble() const { 
+        return ref_.GetType() == flexbuffers::FBT_FLOAT;
+    }
+
+    std::string_view asString() const {
+        if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
         return std::string_view(str.c_str(), str.size());
     }
 
-    FlexBuffer operator[] (const std::string& key) const { 
+    bool isString() const { 
+        return ref_.GetType() == flexbuffers::FBT_STRING;
+    }
+
+    FlexBuffer operator[] (const std::string& key) const {
+        if (!isMap()) { throw DeserializationError("not a map"); }
         return FlexBuffer(ref_.AsMap()[key]);
     }
 
-    FlexBuffer operator[] (size_t index) const { 
+    bool isMap() const { 
+        return ref_.GetType() == flexbuffers::FBT_MAP;
+    }
+
+    FlexBuffer operator[] (size_t index) const {
+        if (!isVector()) { throw DeserializationError("not a vector"); }
         return FlexBuffer(ref_.AsVector()[index]);
+    }
+
+    bool isVector() const { 
+        return ref_.GetType() == flexbuffers::FBT_VECTOR;
     }
 };
 
