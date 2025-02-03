@@ -13,7 +13,7 @@
 namespace zerialize {
 
 
-class FlexBuffer : public Buffer {
+class FlexBuffer : public DataBuffer {
 private:
     std::vector<uint8_t> buf_;
     flexbuffers::Reference ref_;

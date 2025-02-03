@@ -12,7 +12,7 @@ constexpr bool DEBUG_TRACE_CALLS = true;
 
 namespace zerialize {
 
-class Buffer {
+class DataBuffer {
 public:
     virtual const std::vector<uint8_t>& buf() const = 0;
     virtual std::string to_string() const = 0;

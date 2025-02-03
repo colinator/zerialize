@@ -11,7 +11,7 @@
 
 namespace zerialize {
 
-class JsonBuffer : public Buffer {
+class JsonBuffer : public DataBuffer {
 private:
     std::vector<uint8_t> buf_;
     nlohmann::json json_;
@@ -23,21 +23,19 @@ public:
     JsonBuffer(const nlohmann::json& j): json_(j) {}
 
     // Zero-copy view of existing data
-    JsonBuffer(std::span<const uint8_t> data) {
-        json_ = nlohmann::json::parse(data.begin(), data.end());
-    }
+    JsonBuffer(std::span<const uint8_t> data)
+        : buf_(data.begin(), data.end()),
+          json_(nlohmann::json::parse(data.begin(), data.end())) { }
 
     // Zero-copy move of vector ownership
     JsonBuffer(std::vector<uint8_t>&& buf)
-        : buf_(std::move(buf)) {
-        json_ = nlohmann::json::parse(buf_);
-    }
+        : buf_(std::move(buf)),
+          json_(nlohmann::json::parse(buf_)) { }
 
     // Must copy for const reference
     JsonBuffer(const std::vector<uint8_t>& buf)
-        : buf_(buf) {
-        json_ = nlohmann::json::parse(buf_);
-    }
+        : buf_(buf),
+          json_(nlohmann::json::parse(buf_)) { }
 
     void finish() {
         std::string str = json_.dump();
