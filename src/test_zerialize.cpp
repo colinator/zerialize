@@ -32,135 +32,142 @@ void testem() {
 
     std::cout << "START testing zerialize: <" << SerializerName<ST>::value << ">" << endl << endl;
 
+    // Passing nothing: {}   
     testit<ST>("nothing",
         [](){ return serialize<ST>(); },
         [](const auto&) {
-            //cout << "v.size() == " << v.size() << endl;
             return true;
         });
 
+    // Passing a single value: 3
     testit<ST>("3",
         [](){ return serialize<ST>(3); },
         [](const auto& v) {
             return v.asInt32() == 3;
         });
 
+    // Passing a string: "asdf" via char*
     testit<ST>("\"asdf\" (via rvalue char*)",
         [](){ return serialize<ST>("asdf"); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
+    // Passing a string: "asdf" via temp string
     testit<ST>("\"asdf\" (via rvalue temp string)",
         [](){ return serialize<ST>(std::string{"asdf"}); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
-    std::string s = "asdf";
+    // Passing a string: "asdf" via lvalue string
     testit<ST>("\"asdf\" (via lvalue string)",
         [](){ std::string s = "asdf"; return serialize<ST>(s); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
     
+    // Passing a string: "asdf" via const lvalue string
     testit<ST>("\"asdf\" (via const lvalue string)",
         [](){ const std::string s = "asdf"; return serialize<ST>(s); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
+    // Passing multiple rvalues: { 3, 5.2, "asdf" }
+    testit<SerializerType>("{ 3, 5.2, \"asdf\" } (via rvalues)",
+        [](){ return zerialize::serialize<SerializerType>(3, 5.2, "asdf"); },
+        [](const auto& v) {
+            return v[0].asInt32() == 3 &&
+                v[1].asDouble() == 5.2 &&
+                v[2].asString() == "asdf";
+        });
+
+    // Passing an initializer list: { 3, 5.2, "asdf" }
+    testit<SerializerType>("3, 5.2, \"asdf\" (via initializer list)",
+        [](){ return zerialize::serialize<SerializerType>({ 3, 5.2, "asdf" }); },
+        [](const auto& v) {
+            return v[0].asInt32() == 3 &&
+                v[1].asDouble() == 5.2 &&
+                v[2].asString() == "asdf";
+        });
+
+    // Passing multiple values including a vector: 3, 5.2, "asdf", [7, 8.2]
+    testit<SerializerType>("3, 5.2, \"asdf\", [7, 8.2]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                3, 5.2, "asdf", std::vector<std::any>{7, 8.2}
+            ); 
+        },
+        [](const auto& v) {
+            return v[0].asInt32() == 3 &&
+                v[1].asDouble() == 5.2 &&
+                v[2].asString() == "asdf" &&
+                v[3][0].asInt32() == 7 &&
+                v[3][1].asDouble() == 8.2;
+        });
+
+    // Using an initializer list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
+    testit<SerializerType>("{\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} (via initializer list)",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"a", 3}, {"b", 5.2}, {"c", "asdf"} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 3 &&
+                v["b"].asDouble() == 5.2 &&
+                v["c"].asString() == "asdf";
+        });
+
+    // Using a generic rvalue list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
+    testit<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"}",
+        [](){ 
+            return zerialize::serialize<SerializerType, int, double, std::string>(
+                {"a", 3}, {"b", 5.2}, {"c", "asdf"}
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 3 &&
+                v["b"].asDouble() == 5.2 &&
+                v["c"].asString() == "asdf";
+        });
+
+    // Using a generic rvalue list for a map with a nested vector:
+    //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
+    testit<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+        [](){ 
+            return zerialize::serialize<SerializerType, int, double, std::string, std::vector<std::any>>(
+                {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}}
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 3 &&
+                v["b"].asDouble() == 5.2 &&
+                v["c"].asString() == "asdf" &&
+                v["d"][0].asInt32() == 7 &&
+                v["d"][1].asDouble() == 8.2;
+        });
+
+    // Using an initializer list for a map with a nested vector:
+    //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
+    testit<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 3 &&
+                v["b"].asDouble() == 5.2 &&
+                v["c"].asString() == "asdf" &&
+                v["d"][0].asInt32() == 7 &&
+                v["d"][1].asDouble() == 8.2;
+        });
+
+
     return;
 
-    {
-        std::cout << "--- \"asdf\" (via rvalue char*) ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>("asdf");
-        std::cout << v.to_string() << std::endl;
-        std::cout << v.asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- asdf (via rvalue temp string) ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>(std::string{"asdf"});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v.asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- asdf (via lvalue string) ---" << std::endl;
-        std::string s = "asdf";
-        auto v = zerialize::serialize<SerializerType>(s);
-        std::cout << v.to_string() << std::endl;
-        std::cout << v.asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- asdf (via const lvalue string) ---" << std::endl;
-        const std::string s = "asdf";
-        auto v = zerialize::serialize<SerializerType>(s);
-        std::cout << v.to_string() << std::endl;
-        std::cout << v.asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- { 3, 5.2, \"asdf\" } via rvalues ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>(3, 5.2, "asdf");
-        std::cout << v.to_string() << std::endl;
-        std::cout << v[0].asInt32() << " " << v[1].asDouble() << " " << v[2].asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- { 3, 5.2, asdf } via initializer list ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>({ 3, 5.2, "asdf"});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v[0].asInt32() << " " << v[1].asDouble() << " " << v[2].asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- 3, 5.2, asdf, [7, 8.2] ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>(3, 5.2, "asdf", std::vector<std::any>{7, 8.2});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v[0].asInt32() << " " << v[1].asDouble() << " " << v[2].asString() << " " << v[3][0].asInt32() << " " << v[3][1].asDouble() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} via initializer list ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>({ {"a", 3}, {"b", 5.2}, {"c", "asdf"}});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v["a"].asInt32() << " " << v["b"].asDouble() << " " << v["c"].asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} via generic rvalue list ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType, int, double, std::string>({"a", 3}, {"b", 5.2}, {"c", "asdf"});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v["a"].asInt32() << " " << v["b"].asDouble() << " " << v["c"].asString() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]} via generic rvalue list ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType, int, double, std::string, std::vector<std::any>>({"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v["a"].asInt32() << " " << v["b"].asDouble() << " " << v["c"].asString() << " " << v["d"][0].asInt32() << " " << v["d"][1].asDouble() << std::endl;
-        std::cout << std::endl;
-    }
-
-    {
-        std::cout << "--- {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]} via initializer list ---" << std::endl;
-        auto v = zerialize::serialize<SerializerType>({{"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}}});
-        std::cout << v.to_string() << std::endl;
-        std::cout << v["a"].asInt32() << " " << v["b"].asDouble() << " " << v["c"].asString() << " " << v["d"][0].asInt32() << " " << v["d"][1].asDouble() << std::endl;
-        std::cout << std::endl;
-    }
 
     {
         std::cout << std::endl;
@@ -202,6 +209,6 @@ void testem() {
 
 int main() {
     testem<zerialize::Flex>();
-    //testem<zerialize::Json>();
+    testem<zerialize::Json>();
     return 0;
 }
