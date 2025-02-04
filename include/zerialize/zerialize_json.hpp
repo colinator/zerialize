@@ -11,7 +11,7 @@
 
 namespace zerialize {
 
-class JsonBuffer : public DataBuffer {
+class JsonBuffer : public DataBuffer<JsonBuffer> {
 private:
     std::vector<uint8_t> buf_;
     nlohmann::json json_;
@@ -50,24 +50,55 @@ public:
         return buf_;
     }
 
+    bool isInt32() const { return json_.is_number_integer(); }
+    bool isInt64() const { return json_.is_number_integer(); }
+    bool isDouble() const { return json_.is_number_float(); }
+    bool isString() const { return json_.is_string(); }
+    bool isMap() const { return json_.is_object(); }
+    bool isArray() const { return json_.is_array(); }
+
     int32_t asInt32() const { 
-        return json_.get<int32_t>();
+        if (!isInt32()) { throw DeserializationError("not an int32"); }
+        return json_.get<int32_t>(); 
     }
 
-    double asDouble() const { 
-        return json_.get<double>();
+    int64_t asInt64() const { 
+        if (!isInt64()) { throw DeserializationError("not an int64"); }
+        return json_.get<int64_t>(); 
     }
 
+    double asDouble() const {
+        if (!isDouble()) { throw DeserializationError("not a double"); }
+        return json_.get<double>(); 
+    }
+    
     std::string_view asString() const { 
-        return json_.get<std::string_view>();
+        if (!isString()) { throw DeserializationError("not a string"); }
+        return json_.get<std::string_view>(); 
+    }
+
+    std::vector<std::string_view> mapKeys() const {
+        if (!isMap()) { throw DeserializationError("not a map"); }
+        std::vector<std::string_view> keys;
+        for (const auto& it : json_.items()) {
+            keys.push_back(it.key());
+        }
+        return keys;
     }
 
     JsonBuffer operator[] (const std::string& key) const { 
-        return JsonBuffer(json_[key]);
+        if (!isMap()) { throw DeserializationError("not a map"); }
+        return JsonBuffer(json_[key]); 
     }
 
+    size_t arraySize() const {
+        if (!isArray()) { throw DeserializationError("not an array"); }
+        return json_.size();
+    }
+    
     JsonBuffer operator[] (size_t index) const { 
-        return JsonBuffer(json_[index]);
+        if (!isArray()) { throw DeserializationError("not an array"); }
+        return JsonBuffer(json_[index]); 
     }
 };
 

@@ -166,7 +166,7 @@ void testem() {
         });
 
 
-    return;
+    //return;
 
 
     {
@@ -201,6 +201,12 @@ void testem() {
         std::cout << "3. Copy construction:" << std::endl;
         auto v_copy = typename SerializerType::BufferType(v.buf());
         std::cout << v_copy["a"].asInt32() << " " << v_copy["b"].asDouble() << " " << v_copy["c"].asString() << " " << v_copy["d"][0].asInt32() << " " << v_copy["d"][1].asDouble() << std::endl;
+        std::cout << std::endl;
+        auto mapkeys = v_copy.mapKeys();
+        std::cout << "MAP KEYS: ";
+        for (auto k : mapkeys) {
+            std::cout << k << " ";
+        }
         std::cout << std::endl;
     }
 

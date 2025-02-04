@@ -13,7 +13,7 @@
 namespace zerialize {
 
 
-class FlexBuffer : public DataBuffer {
+class FlexBuffer : public DataBuffer<FlexBuffer> {
 private:
     std::vector<uint8_t> buf_;
     flexbuffers::Reference ref_;
@@ -44,6 +44,8 @@ public:
         ref_ = flexbuffers::GetRoot(buf_);
     }
 
+    // Base DataBuffer class overrides
+    
     std::string to_string() const override {
         return "FlexBuffer size: " + std::to_string(buf().size());
     }
@@ -52,22 +54,28 @@ public:
         return buf_;
     }
 
+    // Satisfy the Deserializer concept
+
+    bool isInt32() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isInt64() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isDouble() const { return ref_.GetType() == flexbuffers::FBT_FLOAT; }
+    bool isString() const { return ref_.GetType() == flexbuffers::FBT_STRING; }
+    bool isMap() const { return ref_.GetType() == flexbuffers::FBT_MAP; }
+    bool isArray() const { return ref_.GetType() == flexbuffers::FBT_VECTOR; }
+
     int32_t asInt32() const {
         if (!isInt32()) { throw DeserializationError("not an int32"); }
         return ref_.AsInt32();
     }
 
-    bool isInt32() const { 
-        return ref_.GetType() == flexbuffers::FBT_INT;
+    int64_t asInt64() const {
+        if (!isInt64()) { throw DeserializationError("not an int64"); }
+        return ref_.AsInt64();
     }
 
     double asDouble() const { 
         if (!isDouble()) { throw DeserializationError("not a float"); }
         return ref_.AsDouble();
-    }
-
-    bool isDouble() const { 
-        return ref_.GetType() == flexbuffers::FBT_FLOAT;
     }
 
     std::string_view asString() const {
@@ -76,8 +84,16 @@ public:
         return std::string_view(str.c_str(), str.size());
     }
 
-    bool isString() const { 
-        return ref_.GetType() == flexbuffers::FBT_STRING;
+    std::vector<std::string_view> mapKeys() const {
+        if (!isMap()) { throw DeserializationError("not a map"); }
+        std::vector<std::string_view> keys;
+        for (size_t i=0; i < ref_.AsMap().Keys().size(); i++) {
+            std::string_view key(
+                ref_.AsMap().Keys()[i].AsString().c_str(), 
+                ref_.AsMap().Keys()[i].AsString().size());
+            keys.push_back(key);
+        }
+        return keys;
     }
 
     FlexBuffer operator[] (const std::string& key) const {
@@ -85,17 +101,14 @@ public:
         return FlexBuffer(ref_.AsMap()[key]);
     }
 
-    bool isMap() const { 
-        return ref_.GetType() == flexbuffers::FBT_MAP;
+    size_t arraySize() const {
+        if (!isArray()) { throw DeserializationError("not an array"); }
+        return ref_.AsVector().size();
     }
 
     FlexBuffer operator[] (size_t index) const {
-        if (!isVector()) { throw DeserializationError("not a vector"); }
+        if (!isArray()) { throw DeserializationError("not an array"); }
         return FlexBuffer(ref_.AsVector()[index]);
-    }
-
-    bool isVector() const { 
-        return ref_.GetType() == flexbuffers::FBT_VECTOR;
     }
 };
 
