@@ -171,6 +171,10 @@ private:
         fbb.Int(val);
     }
 
+    void serializeValue(flexbuffers::Builder& fbb, long long val) {
+        fbb.UInt(val);
+    }
+
     void serializeValue(flexbuffers::Builder& fbb, float val) {
         fbb.Float(val);
     }

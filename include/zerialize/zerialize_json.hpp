@@ -160,6 +160,10 @@ private:
         j = val;
     }
 
+    void serializeValue(nlohmann::json& j, long long val) {
+        j = val;
+    }
+
     void serializeValue(nlohmann::json& j, float val) {
         j = val;
     }
