@@ -50,13 +50,31 @@ public:
         return buf_;
     }
 
+    bool isInt8() const { return json_.is_number_integer(); }
+    bool isInt16() const { return json_.is_number_integer(); }
     bool isInt32() const { return json_.is_number_integer(); }
     bool isInt64() const { return json_.is_number_integer(); }
+    bool isUInt8() const { return json_.is_number_integer(); }
+    bool isUInt16() const { return json_.is_number_integer(); }
+    bool isUInt32() const { return json_.is_number_integer(); }
+    bool isUInt64() const { return json_.is_number_integer(); }
+    bool isFloat() const { return json_.is_number_float(); }
     bool isDouble() const { return json_.is_number_float(); }
+    bool isBool() const { return json_.is_boolean(); }
     bool isString() const { return json_.is_string(); }
     bool isMap() const { return json_.is_object(); }
     bool isArray() const { return json_.is_array(); }
 
+    int8_t asInt8() const {
+        if (!isInt8()) { throw DeserializationError("not an int8"); }
+        return json_.get<int8_t>();
+    }
+
+    int16_t asInt16() const {
+        if (!isInt16()) { throw DeserializationError("not an int16"); }
+        return json_.get<int16_t>();
+    }
+    
     int32_t asInt32() const { 
         if (!isInt32()) { throw DeserializationError("not an int32"); }
         return json_.get<int32_t>(); 
@@ -67,9 +85,39 @@ public:
         return json_.get<int64_t>(); 
     }
 
+    uint8_t asUInt8() const {
+        if (!isUInt8()) { throw DeserializationError("not a uint8"); }
+        return json_.get<uint8_t>();
+    }
+
+    uint16_t asUInt16() const {
+        if (!isUInt16()) { throw DeserializationError("not a uint16"); }
+        return json_.get<uint16_t>();
+    }
+
+    uint32_t asUInt32() const {
+        if (!isUInt32()) { throw DeserializationError("not a uint32"); }
+        return json_.get<uint32_t>();
+    }
+
+    uint64_t asUInt64() const {
+        if (!isUInt64()) { throw DeserializationError("not a uint64"); }
+        return json_.get<uint64_t>();
+    }
+
+    float asFloat() const {
+        if (!isFloat()) { throw DeserializationError("not a float"); }
+        return json_.get<float>();
+    }
+
     double asDouble() const {
         if (!isDouble()) { throw DeserializationError("not a double"); }
         return json_.get<double>(); 
+    }
+
+    bool asBool() const {
+        if (!isBool()) { throw DeserializationError("not a bool"); }
+        return json_.get<bool>();
     }
     
     std::string_view asString() const { 
@@ -267,4 +315,3 @@ struct SerializerName<Json> {
 };
 
 } // namespace zerialize
-

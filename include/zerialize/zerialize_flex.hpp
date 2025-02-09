@@ -56,12 +56,30 @@ public:
 
     // Satisfy the Deserializer concept
 
+    bool isInt8() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isInt16() const { return ref_.GetType() == flexbuffers::FBT_INT; }
     bool isInt32() const { return ref_.GetType() == flexbuffers::FBT_INT; }
     bool isInt64() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isUInt8() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isUInt16() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isUInt32() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isUInt64() const { return ref_.GetType() == flexbuffers::FBT_INT; }
+    bool isFloat() const { return ref_.GetType() == flexbuffers::FBT_FLOAT; }
     bool isDouble() const { return ref_.GetType() == flexbuffers::FBT_FLOAT; }
+    bool isBool() const { return ref_.GetType() == flexbuffers::FBT_BOOL; }
     bool isString() const { return ref_.GetType() == flexbuffers::FBT_STRING; }
     bool isMap() const { return ref_.GetType() == flexbuffers::FBT_MAP; }
     bool isArray() const { return ref_.GetType() == flexbuffers::FBT_VECTOR; }
+
+    int8_t asInt8() const {
+        if (!isInt8()) { throw DeserializationError("not an int8"); }
+        return static_cast<int8_t>(ref_.AsInt8());
+    }
+
+    int16_t asInt16() const {
+        if (!isInt16()) { throw DeserializationError("not an int16"); }
+        return static_cast<int16_t>(ref_.AsInt16());
+    }
 
     int32_t asInt32() const {
         if (!isInt32()) { throw DeserializationError("not an int32"); }
@@ -73,9 +91,39 @@ public:
         return ref_.AsInt64();
     }
 
+    uint8_t asUInt8() const {
+        if (!isUInt8()) { throw DeserializationError("not a uint8"); }
+        return static_cast<uint8_t>(ref_.AsUInt8());
+    }
+
+    uint16_t asUInt16() const {
+        if (!isUInt16()) { throw DeserializationError("not a uint16"); }
+        return static_cast<uint16_t>(ref_.AsUInt16());
+    }
+
+    uint32_t asUInt32() const {
+        if (!isUInt32()) { throw DeserializationError("not a uint32"); }
+        return static_cast<uint32_t>(ref_.AsUInt32());
+    }
+
+    uint64_t asUInt64() const {
+        if (!isUInt64()) { throw DeserializationError("not a uint64"); }
+        return static_cast<uint64_t>(ref_.AsUInt64());
+    }
+
+    float asFloat() const {
+        if (!isFloat()) { throw DeserializationError("not a float"); }
+        return static_cast<float>(ref_.AsFloat());
+    }
+
     double asDouble() const { 
         if (!isDouble()) { throw DeserializationError("not a float"); }
         return ref_.AsDouble();
+    }
+
+    bool asBool() const {
+        if (!isBool()) { throw DeserializationError("not a bool"); }
+        return ref_.AsBool();
     }
 
     std::string_view asString() const {
