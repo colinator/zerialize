@@ -35,7 +35,7 @@ concept Deserializer = requires(const V& v, const std::string& key, size_t index
     { v.isBool() } -> std::convertible_to<bool>;
     { v.isMap() } -> std::convertible_to<bool>;
     { v.isArray() } -> std::convertible_to<bool>;
-    
+
     { v.asInt8() } -> std::convertible_to<int8_t>;
     { v.asInt16() } -> std::convertible_to<int16_t>;
     { v.asInt32() } -> std::convertible_to<int32_t>;
@@ -83,7 +83,6 @@ struct SerializerName;
 // Define various serializers: the 7 canonical forms.
 
 template <typename SerializerType>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize() {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize()" << std::endl;
@@ -93,7 +92,6 @@ typename SerializerType::BufferType serialize() {
 }
 
 template <typename SerializerType>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(const std::any& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(any: " << value.type().name() << ")" << std::endl;
@@ -103,7 +101,6 @@ typename SerializerType::BufferType serialize(const std::any& value) {
 }
 
 template <typename SerializerType>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(std::initializer_list<std::any> list) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(initializer list)" << std::endl;
@@ -113,7 +110,6 @@ typename SerializerType::BufferType serialize(std::initializer_list<std::any> li
 }
 
 template <typename SerializerType>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(initializer list/map)" << std::endl;
@@ -123,7 +119,6 @@ typename SerializerType::BufferType serialize(std::initializer_list<std::pair<st
 }
 
 template<typename SerializerType, typename ValueType>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(ValueType&& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(&&value)" << std::endl;
@@ -133,7 +128,6 @@ typename SerializerType::BufferType serialize(ValueType&& value) {
 }
 
 template<typename SerializerType, typename... ValueTypes>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(&&values" << std::endl;
@@ -143,7 +137,6 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
 }
 
 template<typename SerializerType, typename... ValueTypes>
-//requires DataValueType<typename SerializerType::BufferType>
 typename SerializerType::BufferType serialize(std::pair<const char*, ValueTypes>&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) {
         std::cout << "serialize(&& value pairs)" << std::endl;
