@@ -27,7 +27,7 @@ public:
 // tree of Deserializer must define these operations, and
 // are encouraged to do so in a zero-copy way, if possible.
 template<typename V>
-concept Deserializer = requires(const V& v, const string& key, size_t index) {
+concept Deserializable = requires(const V& v, const string& key, size_t index) {
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
@@ -80,7 +80,7 @@ template <typename Derived>
 class DataBuffer {
 public:
     DataBuffer() {
-        static_assert(Deserializer<Derived>, "Derived must satisfy Deserializer concept");
+        static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
     }
     virtual const vector<uint8_t>& buf() const = 0;
     size_t size() const { return buf().size(); }
