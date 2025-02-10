@@ -167,12 +167,40 @@ private:
         fbb.String(val);
     }
 
-    void serializeValue(flexbuffers::Builder& fbb, int val) {
+    void serializeValue(flexbuffers::Builder& fbb, int8_t val) {
         fbb.Int(val);
     }
 
-    void serializeValue(flexbuffers::Builder& fbb, long long val) {
+    void serializeValue(flexbuffers::Builder& fbb, int16_t val) {
+        fbb.Int(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, int32_t val) {
+        fbb.Int(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, int64_t val) {
+        fbb.Int(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, uint8_t val) {
         fbb.UInt(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, uint16_t val) {
+        fbb.UInt(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, uint32_t val) {
+        fbb.UInt(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, uint64_t val) {
+        fbb.UInt(val);
+    }
+
+    void serializeValue(flexbuffers::Builder& fbb, bool val) {
+        fbb.Bool(val);
     }
 
     void serializeValue(flexbuffers::Builder& fbb, float val) {
@@ -203,8 +231,24 @@ private:
     }
 
     void serializeValue(flexbuffers::Builder& fbb, const std::any& val) {
-        if (val.type() == typeid(int)) {
-            fbb.Int(std::any_cast<int>(val));
+        if (val.type() == typeid(int8_t)) {
+            fbb.Int(std::any_cast<int8_t>(val));
+        } else if (val.type() == typeid(int16_t)) {
+            fbb.Int(std::any_cast<int16_t>(val));
+        } else if (val.type() == typeid(int32_t)) {
+            fbb.Int(std::any_cast<int32_t>(val));
+        } else if (val.type() == typeid(int64_t)) {
+            fbb.Int(std::any_cast<int64_t>(val));
+        } else if (val.type() == typeid(uint8_t)) {
+            fbb.UInt(std::any_cast<uint8_t>(val));
+        } else if (val.type() == typeid(uint16_t)) {
+            fbb.UInt(std::any_cast<uint16_t>(val));
+        } else if (val.type() == typeid(uint32_t)) {
+            fbb.UInt(std::any_cast<uint32_t>(val));
+        } else if (val.type() == typeid(uint64_t)) {
+            fbb.UInt(std::any_cast<uint64_t>(val));
+        } else if (val.type() == typeid(bool)) {
+            fbb.Bool(std::any_cast<bool>(val));
         } else if (val.type() == typeid(double)) {
             fbb.Double(std::any_cast<double>(val));
         } else if (val.type() == typeid(float)) {

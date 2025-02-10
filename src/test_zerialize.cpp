@@ -216,18 +216,15 @@ void testem() {
 
 template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
-    // auto src = zerialize::serialize<SrcSerializerType, int, double, std::string, std::vector<std::any>>(
-    //     {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}}
-    // );
-    auto src = zerialize::serialize<SrcSerializerType, int>(37);
-    auto dst = zerialize::convert<DestSerializerType, SrcSerializerType>(src);
+    auto src = zerialize::serialize<SrcSerializerType>({ {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} });
+    auto dst = zerialize::convert<SrcSerializerType, DestSerializerType>(src);
     std::cout << "CONVERTED: " << src.to_string() << std::endl;
     std::cout << "       TO: " << dst.to_string() << std::endl;
 }
 
 int main() {
-    // testem<zerialize::Flex>();
-    // testem<zerialize::Json>();
+    testem<zerialize::Flex>();
+    testem<zerialize::Json>();
     test_conversion<zerialize::Flex, zerialize::Json>();
     return 0;
 }

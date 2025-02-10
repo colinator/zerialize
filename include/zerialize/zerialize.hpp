@@ -64,10 +64,12 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
     { v.asBool() } -> convertible_to<bool>;
 
     // Composite handling: everything that conforms to this concept needs
-    // to be able to index itself as a map or vector.
+    // to be able to index itself as a map...
     { v.mapKeys() } -> convertible_to<vector<string_view>>;
-    { v.arraySize() } -> convertible_to<int64_t>;
     { v[key] } -> same_as<V>;
+
+    // ... or as an array
+    { v.arraySize() } -> convertible_to<size_t>;
     { v[index] } -> same_as<V>;
 };
 
@@ -162,67 +164,17 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
 }
 
 
+// A special handle-it-all generic conversion function
 
-
-
-template<typename DestSerializerType, typename SrcSerializerType>
-typename DestSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& src) {
+template<typename SrcSerializerType, typename DstSerializerType>
+typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& src) {
     if constexpr (DEBUG_TRACE_CALLS) {
-        std::cout << "convert(" << SerializerName<SrcSerializerType>::value << ") to: " << SerializerName<DestSerializerType>::value << std::endl;
+        std::cout << "convert(" << SerializerName<SrcSerializerType>::value << ") to: " << SerializerName<DstSerializerType>::value << std::endl;
     }
 
-    // Create destination serializer
-    DestSerializerType destSerializer;
-
- 
-    
-    // Use the Deserializer concept to query the source type
-    if (src.isInt8()) {
-        return destSerializer.template serialize<int8_t>(src.asInt8());
-    } else if (src.isInt16()) {
-        return destSerializer.template serialize<int16_t>(src.asInt16());
-    } else if (src.isInt32()) {
-        return destSerializer.template serialize<int32_t>(src.asInt32());
-    } else if (src.isInt64()) {
-        return destSerializer.template serialize<int64_t>(src.asInt64());
-    } else if (src.isUInt8()) {
-        return destSerializer.template serialize<uint8_t>(src.asUInt8());
-    } else if (src.isUInt16()) {
-        return destSerializer.template serialize<uint16_t>(src.asUInt16());
-    //} else if (src.isUInt32()) {
-    //    return destSerializer.template serialize<uint32_t>(src.asUInt32());
-    //} else if (src.isUInt64()) {
-    //    return destSerializer.template serialize<uint64_t>(src.asUInt64());
-    } else if (src.isFloat()) {
-        return destSerializer.template serialize<float>(src.asFloat());
-    } else if (src.isDouble()) {
-        return destSerializer.template serialize<double>(src.asDouble());
-    } else if (src.isString()) {
-        return destSerializer.serialize(src.asString());
-    } else if (src.isBool()) {
-        return destSerializer.serialize(src.asBool());
-    } 
-    //else if (src.isArray()) {
-    //     std::vector<std::any> array;
-    //     const auto size = src.arraySize();
-    //     for (int64_t i = 0; i < size; i++) {
-    //         auto elem = convert<DestSerializerType>(src[i]);
-    //         array.push_back(elem);
-    //     }
-    //     return destSerializer.serialize(array);
-    // } else if (src.isMap()) {
-    //     std::vector<std::pair<std::string, std::any>> map;
-    //     const auto keys = src.mapKeys();
-    //     for (const auto& key : keys) {
-    //         auto value = convert<DestSerializerType>(src[std::string(key)]);
-    //         map.emplace_back(std::string(key), value);
-    //     }
-    //     return destSerializer.serialize(map);
-    // }
-    
-    // throw DeserializationError("Unknown source type in conversion");
-
-   return serialize<DestSerializerType>(3);
+    // Create destination serializer, use it to serialize the src
+    DstSerializerType dstSerializer;
+    return dstSerializer.serialize(src);
 }
 
 }

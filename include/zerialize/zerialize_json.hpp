@@ -156,11 +156,39 @@ private:
         j = val;
     }
 
-    void serializeValue(nlohmann::json& j, int val) {
+    void serializeValue(nlohmann::json& j, int8_t val) {
         j = val;
     }
 
-    void serializeValue(nlohmann::json& j, long long val) {
+    void serializeValue(nlohmann::json& j, int16_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, int32_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, int64_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, uint8_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, uint16_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, uint32_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, uint64_t val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, bool val) {
         j = val;
     }
 
@@ -192,8 +220,24 @@ private:
     }
 
     void serializeValue(nlohmann::json& j, const std::any& val) {
-        if (val.type() == typeid(int)) {
-            j = std::any_cast<int>(val);
+        if (val.type() == typeid(int8_t)) {
+            j = std::any_cast<int8_t>(val);
+        } else if (val.type() == typeid(int16_t)) {
+            j = std::any_cast<int16_t>(val);
+        } else if (val.type() == typeid(int32_t)) {
+            j = std::any_cast<int32_t>(val);
+        } else if (val.type() == typeid(int64_t)) {
+            j = std::any_cast<int64_t>(val);
+        } else if (val.type() == typeid(uint8_t)) {
+            j = std::any_cast<uint8_t>(val);
+        } else if (val.type() == typeid(uint16_t)) {
+            j = std::any_cast<uint16_t>(val);
+        } else if (val.type() == typeid(uint32_t)) {
+            j = std::any_cast<uint32_t>(val);
+        } else if (val.type() == typeid(uint64_t)) {
+            j = std::any_cast<uint64_t>(val);
+        } else if (val.type() == typeid(bool)) {
+            j = std::any_cast<bool>(val);
         } else if (val.type() == typeid(double)) {
             j = std::any_cast<double>(val);
         } else if (val.type() == typeid(float)) {
@@ -218,6 +262,51 @@ private:
             }
         } else {
             throw std::runtime_error("Unsupported type in std::any");
+        }
+    }
+
+
+    template<Deserializable SourceBufferType>
+    void serializeValue(nlohmann::json& j, const SourceBufferType& value) {
+        if (value.isArray()) {
+            j = nlohmann::json::array();
+            for (size_t i=0; i<value.arraySize(); i++) {
+                j.push_back(nullptr);
+                serializeValue(j.back(),  value[i]);
+            }
+        } else if (value.isMap()) {
+            j = nlohmann::json::object();
+            for (string_view key: value.mapKeys()) {
+                const std::string s(key);
+                j[s] = nullptr;
+                serializeValue(j[s], value[s]);
+            }
+        } else if (value.isInt8()) {
+            serializeValue(j, value.asInt8());
+        } else if (value.isInt16()) {
+            serializeValue(j, value.asInt16());
+        } else if (value.isInt32()) {
+            serializeValue(j, value.asInt32());
+        } else if (value.isInt64()) {
+            serializeValue(j, value.asInt64());
+        } else if (value.isUInt8()) {
+            serializeValue(j, value.asUInt8());
+        } else if (value.isUInt16()) {
+            serializeValue(j, value.asUInt16());
+        } else if (value.isUInt32()) {
+            serializeValue(j, value.asUInt32());
+        } else if (value.isUInt64()) {
+            serializeValue(j, value.asUInt64());
+        }  else if (value.isFloat()) {
+            serializeValue(j, value.asFloat());
+        } else if (value.isDouble()) {
+            serializeValue(j, value.asDouble());
+        } else if (value.isBool()) {
+            serializeValue(j, value.asBool());
+        } else if (value.isString()) {
+            serializeValue(j, value.asString());
+        } else {
+            throw std::runtime_error("Unsupported source buffer value type");
         }
     }
 
@@ -270,6 +359,17 @@ public:
             buffer.json()[key] = nullptr;
             serializeValue(buffer.json()[key], val);
         }
+        buffer.finish();
+        return buffer;
+    }
+
+    template<Deserializable SourceBufferType>
+    BufferType serialize(const SourceBufferType& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(Deserializable &&value)" << std::endl;
+        }   
+        JsonBuffer buffer;
+        serializeValue(buffer.json(), value);
         buffer.finish();
         return buffer;
     }
