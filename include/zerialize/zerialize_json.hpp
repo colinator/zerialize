@@ -43,7 +43,7 @@ public:
     }
 
     std::string to_string() const override {
-        return json_.dump();
+        return "JsonBuffer size: " + std::to_string(buf().size()) + " " + json_.dump();
     }
 
     const std::vector<uint8_t>& buf() const override {
@@ -265,7 +265,7 @@ private:
         }
     }
 
-
+    // Used for format conversion, from any other Deserializable.
     template<Deserializable SourceBufferType>
     void serializeValue(nlohmann::json& j, const SourceBufferType& value) {
         if (value.isArray()) {
@@ -277,6 +277,7 @@ private:
         } else if (value.isMap()) {
             j = nlohmann::json::object();
             for (string_view key: value.mapKeys()) {
+                // Copies the key. Lame if you ask me...
                 const std::string s(key);
                 j[s] = nullptr;
                 serializeValue(j[s], value[s]);
@@ -363,17 +364,6 @@ public:
         return buffer;
     }
 
-    template<Deserializable SourceBufferType>
-    BufferType serialize(const SourceBufferType& value) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(Deserializable &&value)" << std::endl;
-        }   
-        JsonBuffer buffer;
-        serializeValue(buffer.json(), value);
-        buffer.finish();
-        return buffer;
-    }
-
     template<typename ValueType>
     BufferType serialize(ValueType&& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
@@ -408,6 +398,19 @@ public:
             buffer.json()[pair.first] = nullptr;
             serializeValue(buffer.json()[pair.first], std::forward<decltype(pair.second)>(pair.second));
         }(std::forward<ValueTypes>(values)), ...);
+        buffer.finish();
+        return buffer;
+    }
+
+    // A special serialize method that takes another buffer type.
+    // Used for format conversion.
+    template<Deserializable SourceBufferType>
+    BufferType serialize(const SourceBufferType& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Json::serialize(Deserializable &&value)" << std::endl;
+        }   
+        JsonBuffer buffer;
+        serializeValue(buffer.json(), value);
         buffer.finish();
         return buffer;
     }

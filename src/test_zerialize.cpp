@@ -216,15 +216,25 @@ void testem() {
 
 template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
-    auto src = zerialize::serialize<SrcSerializerType>({ {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} });
-    auto dst = zerialize::convert<SrcSerializerType, DestSerializerType>(src);
-    std::cout << "CONVERTED: " << src.to_string() << std::endl;
-    std::cout << "       TO: " << dst.to_string() << std::endl;
+    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}}}}});
+    //auto v1 = zerialize::serialize<SrcSerializerType>({ {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} });
+    auto v2 = zerialize::convert<SrcSerializerType, DestSerializerType>(v1);
+    auto v3 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
+    auto v4 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
+    auto v5 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
+    auto v6 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
+    std::cout << "1: " << v1.to_string() << std::endl;
+    std::cout << "2: " << v2.to_string() << std::endl;
+    std::cout << "3: " << v3.to_string() << std::endl;
+    std::cout << "4: " << v4.to_string() << std::endl;
+    std::cout << "5: " << v5.to_string() << std::endl;
+    std::cout << "6: " << v6.to_string() << std::endl;
 }
 
 int main() {
     testem<zerialize::Flex>();
     testem<zerialize::Json>();
     test_conversion<zerialize::Flex, zerialize::Json>();
+    test_conversion<zerialize::Json, zerialize::Flex>();
     return 0;
 }

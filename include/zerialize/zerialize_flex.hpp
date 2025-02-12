@@ -211,9 +211,16 @@ private:
         fbb.Double(val);
     }
 
+    void serializeValue(flexbuffers::Builder& fbb, const std::string& val) {
+        fbb.String(val);
+    }
+
     template<typename T, typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
     void serializeValue(flexbuffers::Builder& fbb, T&& val) {
-        fbb.String(std::forward<T>(val));
+        // fbb.String(std::forward<T>(val));
+        // LAME
+        std::string a(std::forward<T>(val));
+        fbb.String(a);
     }
 
     template<typename T>
@@ -231,7 +238,22 @@ private:
     }
 
     void serializeValue(flexbuffers::Builder& fbb, const std::any& val) {
-        if (val.type() == typeid(int8_t)) {
+        if (val.type() == typeid(std::vector<std::any>)) {
+            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+            fbb.Vector([&]() {
+                for (const std::any& v: l) {
+                    serializeValue(fbb, v);
+                }
+            });
+        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
+            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
+            fbb.Map([&]() {
+                for (const auto& [key, value]: m) {
+                    fbb.Key(key);
+                    serializeValue(fbb, value);
+                }
+            });
+        } else if (val.type() == typeid(int8_t)) {
             fbb.Int(std::any_cast<int8_t>(val));
         } else if (val.type() == typeid(int16_t)) {
             fbb.Int(std::any_cast<int16_t>(val));
@@ -257,23 +279,56 @@ private:
             fbb.String(std::any_cast<const char*>(val));
         } else if (val.type() == typeid(std::string)) {
             fbb.String(std::any_cast<std::string>(val));
-        } else if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
-            fbb.Vector([&]() {
-                for (const std::any& v: l) {
-                    serializeValue(fbb, v);
-                }
-            });
-        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
-            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
-            fbb.Map([&]() {
-                for (const auto& [key, value]: m) {
-                    fbb.Key(key);
-                    serializeValue(fbb, value);
-                }
-            });
         } else {
             throw std::runtime_error("Unsupported type in std::any");
+        }
+    }
+
+
+    // Used for format conversion, from any other Deserializable.
+    template<Deserializable SourceBufferType>
+    void serializeValue(flexbuffers::Builder& fbb, const SourceBufferType& value) {
+        if (value.isArray()) {
+            fbb.Vector([&]() {
+                for (size_t i=0; i<value.arraySize(); i++) {
+                    serializeValue(fbb, value[i]);
+                }
+            });
+        } else if (value.isMap()) {
+            fbb.Map([&]() {
+                for (string_view key: value.mapKeys()) {
+                    // Copies the key. Lame if you ask me...
+                    const std::string s(key);
+                    fbb.Key(s);
+                    serializeValue(fbb, value[s]);
+                }
+            });
+        } else if (value.isInt8()) {
+            serializeValue(fbb, value.asInt8());
+        } else if (value.isInt16()) {
+            serializeValue(fbb, value.asInt16());
+        } else if (value.isInt32()) {
+            serializeValue(fbb, value.asInt32());
+        } else if (value.isInt64()) {
+            serializeValue(fbb, value.asInt64());
+        } else if (value.isUInt8()) {
+            serializeValue(fbb, value.asUInt8());
+        } else if (value.isUInt16()) {
+            serializeValue(fbb, value.asUInt16());
+        } else if (value.isUInt32()) {
+            serializeValue(fbb, value.asUInt32());
+        } else if (value.isUInt64()) {
+            serializeValue(fbb, value.asUInt64());
+        }  else if (value.isFloat()) {
+            serializeValue(fbb, value.asFloat());
+        } else if (value.isDouble()) {
+            serializeValue(fbb, value.asDouble());
+        } else if (value.isBool()) {
+            serializeValue(fbb, value.asBool());
+        } else if (value.isString()) {
+            serializeValue(fbb, value.asString());
+        } else {
+            throw std::runtime_error("Unsupported source buffer value type");
         }
     }
 
@@ -366,6 +421,19 @@ public:
                 serializeValue(buffer.fbb, std::forward<decltype(pair.second)>(pair.second));
             }(std::forward<ValueTypes>(values)), ...);
         });
+        buffer.finish();
+        return buffer;
+    }
+
+    // A special serialize method that takes another buffer type.
+    // Used for format conversion.
+    template<Deserializable SourceBufferType>
+    BufferType serialize(const SourceBufferType& value) {
+        if constexpr (DEBUG_TRACE_CALLS) {
+            std::cout << "Flex::serialize(Deserializable &&value)" << std::endl;
+        }   
+        FlexBuffer buffer;
+        serializeValue(buffer.fbb, value);
         buffer.finish();
         return buffer;
     }
