@@ -145,14 +145,14 @@ void debug_stream(std::stringstream & s, int tabLevel, const T& v) {
     //s << tabString;
 
     if (v.isArray()) {
-        s << "Array [" << std::endl;
+        s << "<Array> [" << std::endl;
         for (size_t i=0; i<v.arraySize(); i++) {
             s << tabString << tab;
             debug_stream(s, tabLevel+1, v[i]);
         }
         s << tabString << "]" << std::endl;
     } else if (v.isMap()) {
-        s << "Map {" << std::endl;
+        s << "<Map> {" << std::endl;
         for (string_view key: v.mapKeys()) {
             const std::string sk(key);
             s << tabString << tab << "\"" << key << "\": ";

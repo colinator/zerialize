@@ -56,20 +56,20 @@ public:
 
     // Satisfy the Deserializer concept
 
-    bool isInt8() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isInt16() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isInt32() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isInt64() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isUInt8() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isUInt16() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isUInt32() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isUInt64() const { return ref_.GetType() == flexbuffers::FBT_INT; }
-    bool isFloat() const { return ref_.GetType() == flexbuffers::FBT_FLOAT; }
-    bool isDouble() const { return ref_.GetType() == flexbuffers::FBT_FLOAT; }
-    bool isBool() const { return ref_.GetType() == flexbuffers::FBT_BOOL; }
-    bool isString() const { return ref_.GetType() == flexbuffers::FBT_STRING; }
-    bool isMap() const { return ref_.GetType() == flexbuffers::FBT_MAP; }
-    bool isArray() const { return ref_.GetType() == flexbuffers::FBT_VECTOR; }
+    bool isInt8() const { return ref_.IsInt(); }
+    bool isInt16() const { return ref_.IsInt(); }
+    bool isInt32() const { return ref_.IsInt(); }
+    bool isInt64() const { return ref_.IsInt(); }
+    bool isUInt8() const { return ref_.IsUInt(); }
+    bool isUInt16() const { return ref_.IsUInt(); }
+    bool isUInt32() const { return ref_.IsUInt(); }
+    bool isUInt64() const { return ref_.IsUInt(); }
+    bool isFloat() const { return ref_.IsFloat(); }
+    bool isDouble() const { return ref_.IsFloat(); }
+    bool isBool() const { return ref_.IsBool(); }
+    bool isString() const { return ref_.IsString() ; }
+    bool isMap() const { return ref_.IsMap(); }
+    bool isArray() const { return ref_.IsAnyVector(); }
 
     int8_t asInt8() const {
         if (!isInt8()) { throw DeserializationError("not an int8"); }
