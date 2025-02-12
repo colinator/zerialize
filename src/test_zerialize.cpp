@@ -216,8 +216,8 @@ void testem() {
 
 template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
-    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}}}}});
-    //auto v1 = zerialize::serialize<SrcSerializerType>({ {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} });
+    std::cout << "Testing conversion from " << zerialize::SerializerName<SrcSerializerType>::value << " to " << zerialize::SerializerName<DestSerializerType>::value << std::endl;
+    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}}}}});
     auto v2 = zerialize::convert<SrcSerializerType, DestSerializerType>(v1);
     auto v3 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
     auto v4 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
@@ -229,6 +229,7 @@ void test_conversion() {
     std::cout << "4: " << v4.to_string() << std::endl;
     std::cout << "5: " << v5.to_string() << std::endl;
     std::cout << "6: " << v6.to_string() << std::endl;
+    std::cout << std::endl;
 }
 
 int main() {
