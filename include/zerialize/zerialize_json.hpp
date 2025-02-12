@@ -220,7 +220,21 @@ private:
     }
 
     void serializeValue(nlohmann::json& j, const std::any& val) {
-        if (val.type() == typeid(int8_t)) {
+        if (val.type() == typeid(std::vector<std::any>)) {
+            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+            j = nlohmann::json::array();
+            for (const std::any& v: l) {
+                j.push_back(nullptr);
+                serializeValue(j.back(), v);
+            }
+        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
+            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
+            j = nlohmann::json::object();
+            for (const auto& [key, value]: m) {
+                j[key] = nullptr;
+                serializeValue(j[key], value);
+            }
+        } else if (val.type() == typeid(int8_t)) {
             j = std::any_cast<int8_t>(val);
         } else if (val.type() == typeid(int16_t)) {
             j = std::any_cast<int16_t>(val);
@@ -246,20 +260,6 @@ private:
             j = std::any_cast<const char*>(val);
         } else if (val.type() == typeid(std::string)) {
             j = std::any_cast<std::string>(val);
-        } else if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
-            j = nlohmann::json::array();
-            for (const std::any& v: l) {
-                j.push_back(nullptr);
-                serializeValue(j.back(), v);
-            }
-        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
-            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
-            j = nlohmann::json::object();
-            for (const auto& [key, value]: m) {
-                j[key] = nullptr;
-                serializeValue(j[key], value);
-            }
         } else {
             throw std::runtime_error("Unsupported type in std::any");
         }
