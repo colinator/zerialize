@@ -56,10 +56,10 @@ public:
     bool isInt16() const { return json_.is_number_integer(); }
     bool isInt32() const { return json_.is_number_integer(); }
     bool isInt64() const { return json_.is_number_integer(); }
-    bool isUInt8() const { return json_.is_number_integer(); }
-    bool isUInt16() const { return json_.is_number_integer(); }
-    bool isUInt32() const { return json_.is_number_integer(); }
-    bool isUInt64() const { return json_.is_number_integer(); }
+    bool isUInt8() const { return json_.is_number_unsigned(); }
+    bool isUInt16() const { return json_.is_number_unsigned(); }
+    bool isUInt32() const { return json_.is_number_unsigned(); }
+    bool isUInt64() const { return json_.is_number_unsigned(); }
     bool isFloat() const { return json_.is_number_float(); }
     bool isDouble() const { return json_.is_number_float(); }
     bool isBool() const { return json_.is_boolean(); }
