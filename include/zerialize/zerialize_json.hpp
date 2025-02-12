@@ -8,6 +8,7 @@
 #include <vector>
 #include <map>
 #include <span>
+#include <sstream>
 
 namespace zerialize {
 
@@ -15,6 +16,7 @@ class JsonBuffer : public DataBuffer<JsonBuffer> {
 private:
     std::vector<uint8_t> buf_;
     nlohmann::json json_;
+
 public:
     nlohmann::json& json() { return json_; }
 
@@ -42,12 +44,12 @@ public:
         buf_ = std::vector<uint8_t>(str.begin(), str.end());
     }
 
-    std::string to_string() const override {
-        return "JsonBuffer size: " + std::to_string(buf().size()) + " " + json_.dump();
-    }
-
     const std::vector<uint8_t>& buf() const override {
         return buf_;
+    }
+
+    std::string to_string() const override {
+        return "JsonBuffer size: " + std::to_string(buf().size()) + " " + json_.dump() + "\n" + debug_string(*this);
     }
 
     bool isInt8() const { return json_.is_number_integer(); }

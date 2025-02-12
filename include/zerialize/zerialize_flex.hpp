@@ -47,7 +47,7 @@ public:
     // Base DataBuffer class overrides
     
     std::string to_string() const override {
-        return "FlexBuffer size: " + std::to_string(buf().size());
+        return "FlexBuffer size: " + std::to_string(buf().size()) + "\n" + debug_string(*this);;
     }
 
     const std::vector<uint8_t>& buf() const override {
