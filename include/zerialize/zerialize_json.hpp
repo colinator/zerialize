@@ -49,7 +49,9 @@ public:
     }
 
     std::string to_string() const override {
-        return "JsonBuffer size: " + std::to_string(buf().size()) + " " + json_.dump() + "\n" + debug_string(*this);
+        return "JsonBuffer " + std::to_string(buf().size()) + 
+            " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
+            " : " + json_.dump() + "\n" + debug_string(*this);
     }
 
     bool isInt8() const { return json_.is_number_integer(); }
