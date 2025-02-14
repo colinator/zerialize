@@ -63,6 +63,7 @@ public:
     bool isFloat() const { return ref_.IsFloat(); }
     bool isBool() const { return ref_.IsBool(); }
     bool isString() const { return ref_.IsString() ; }
+    bool isBlob() const { return ref_.IsBlob() ; }
     bool isMap() const { return ref_.IsMap(); }
     bool isArray() const { return ref_.IsAnyVector(); }
 
@@ -125,6 +126,12 @@ public:
         if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
         return std::string_view(str.c_str(), str.size());
+    }
+
+    DataBlob asBlob() const {
+        if (!isBlob()) { throw DeserializationError("not a blob"); }
+        auto b = ref_.AsBlob();
+        return DataBlob{.data = b.data(), .size = b.size()};
     }
 
     std::vector<std::string_view> mapKeys() const {
@@ -310,6 +317,8 @@ private:
             serializeValue(fbb, value.asBool());
         } else if (value.isString()) {
             serializeValue(fbb, value.asString());
+        } else if (value.isBlob()) {
+            // implement me!
         } else {
             throw std::runtime_error("Unsupported source buffer value type");
         }

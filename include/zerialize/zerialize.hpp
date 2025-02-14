@@ -25,8 +25,13 @@ public:
 
 enum ValueType {
     Bool, Int, UInt, Float,
-    String, // Blob,
+    String, Blob,
     Map, Array
+};
+
+struct DataBlob {
+    const uint8_t* data;
+    size_t size;
 };
 
 // The Deserializer concept defines a compile-time interface
@@ -42,6 +47,7 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
     { v.isUInt() } -> convertible_to<bool>;
     { v.isFloat() } -> convertible_to<bool>;
     { v.isString() } -> convertible_to<bool>;
+    { v.isBlob() } -> convertible_to<bool>;
     { v.isBool() } -> convertible_to<bool>;
     { v.isMap() } -> convertible_to<bool>;
     { v.isArray() } -> convertible_to<bool>;
@@ -60,6 +66,7 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
     { v.asFloat() } -> convertible_to<float>;
     { v.asDouble() } -> convertible_to<double>;
     { v.asString() } -> convertible_to<string_view>;
+    { v.asBlob() } -> same_as<DataBlob>;
     { v.asBool() } -> convertible_to<bool>;
 
     // Composite handling: everything that conforms to this concept needs
@@ -79,6 +86,7 @@ ValueType to_value_type(const T& v) {
         v.isUInt() ? ValueType::UInt : 
         v.isFloat() ? ValueType::Float : 
         v.isString() ? ValueType::String : 
+        v.isBlob() ? ValueType::Blob : 
         v.isBool() ? ValueType::Bool : 
         v.isMap() ? ValueType::Map : 
         ValueType::Array;
@@ -90,6 +98,7 @@ inline std::string value_type_to_string(ValueType v) {
         case ValueType::UInt: return "UInt";
         case ValueType::Float: return "Float";
         case ValueType::String: return "String";
+        case ValueType::Blob: return "Blob";
         case ValueType::Bool: return "Bool";
         case ValueType::Map: return "Map";
         case ValueType::Array: return "Array";
@@ -144,6 +153,9 @@ void debug_stream(std::stringstream & s, int tabLevel, const T& v) {
             s << "\"" << v.asString() << "\"";
         } else if (v.isBool()) {
             s << v.asBool();
+        } else if (v.isBlob()) {
+            auto blob = v.asBlob();
+            s << "<" << blob.size << " bytes>";
         }
         s << " <" << value_type_to_string(valueType) << ">" << std::endl;
     }
@@ -163,8 +175,6 @@ std::string debug_string(const T& v) {
 //    derived types, but also manage the actual byte buffer).
 template <typename Derived>
 class DataBuffer {
-private:
-
 public:
     DataBuffer() {
         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
@@ -230,14 +240,6 @@ typename SerializerType::BufferType serialize(ValueType&& value) {
     return serializer.serialize(std::forward<ValueType>(value));
 }
 
-template<typename SerializerType, typename... ValueTypes>
-typename SerializerType::BufferType serialize(ValueTypes&&... values) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        std::cout << "serialize(&&values" << std::endl;
-    }
-    SerializerType serializer;
-    return serializer.serialize(std::forward<ValueTypes>(values)...);
-}
 
 template<typename SerializerType, typename... ValueTypes>
 typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&... values) {
@@ -246,6 +248,15 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
     }
     SerializerType serializer;
     return serializer.serializeMap(std::forward<pair<const char*, ValueTypes>>(values)...);
+}
+
+template<typename SerializerType, typename... ValueTypes>
+typename SerializerType::BufferType serialize(ValueTypes&&... values) {
+    if constexpr (DEBUG_TRACE_CALLS) {
+        std::cout << "serialize(&&values" << std::endl;
+    }
+    SerializerType serializer;
+    return serializer.serialize(std::forward<ValueTypes>(values)...);
 }
 
 

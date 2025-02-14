@@ -59,6 +59,7 @@ public:
     bool isFloat() const { return json_.is_number_float(); }
     bool isBool() const { return json_.is_boolean(); }
     bool isString() const { return json_.is_string(); }
+    bool isBlob() const { return false; } //json_.is_string(); }
     bool isMap() const { return json_.is_object(); }
     bool isArray() const { return json_.is_array(); }
 
@@ -120,6 +121,11 @@ public:
     std::string_view asString() const { 
         if (!isString()) { throw DeserializationError("not a string"); }
         return json_.get<std::string_view>(); 
+    }
+
+    DataBlob asBlob() const { 
+        if (!isBlob()) { throw DeserializationError("not a blob"); }
+        return DataBlob{ .data = nullptr, .size = 0 };
     }
 
     std::vector<std::string_view> mapKeys() const {
@@ -289,6 +295,8 @@ private:
             serializeValue(j, value.asBool());
         } else if (value.isString()) {
             serializeValue(j, value.asString());
+        } else if (value.isBlob()) {
+            //serializeValue(j, value.asBlob());
         } else {
             throw std::runtime_error("Unsupported source buffer value type");
         }
