@@ -232,31 +232,31 @@ private:
                 serializeValue(j.back(), v);
             }
         } else if (val.type() == typeid(int8_t)) {
-            j = std::any_cast<int8_t>(val);
+            serializeValue(j, std::any_cast<int8_t>(val));
         } else if (val.type() == typeid(int16_t)) {
-            j = std::any_cast<int16_t>(val);
+            serializeValue(j, std::any_cast<int16_t>(val));
         } else if (val.type() == typeid(int32_t)) {
-            j = std::any_cast<int32_t>(val);
+            serializeValue(j, std::any_cast<int32_t>(val));
         } else if (val.type() == typeid(int64_t)) {
-            j = std::any_cast<int64_t>(val);
+            serializeValue(j, std::any_cast<int64_t>(val));
         } else if (val.type() == typeid(uint8_t)) {
-            j = std::any_cast<uint8_t>(val);
+            serializeValue(j, std::any_cast<uint8_t>(val));
         } else if (val.type() == typeid(uint16_t)) {
-            j = std::any_cast<uint16_t>(val);
+            serializeValue(j, std::any_cast<uint16_t>(val));
         } else if (val.type() == typeid(uint32_t)) {
-            j = std::any_cast<uint32_t>(val);
+            serializeValue(j, std::any_cast<uint32_t>(val));
         } else if (val.type() == typeid(uint64_t)) {
-            j = std::any_cast<uint64_t>(val);
+            serializeValue(j, std::any_cast<uint64_t>(val));
         } else if (val.type() == typeid(bool)) {
-            j = std::any_cast<bool>(val);
+            serializeValue(j, std::any_cast<bool>(val));
         } else if (val.type() == typeid(double)) {
-            j = std::any_cast<double>(val);
+            serializeValue(j, std::any_cast<double>(val));
         } else if (val.type() == typeid(float)) {
-            j = std::any_cast<float>(val);
+            serializeValue(j, std::any_cast<float>(val));
         } else if (val.type() == typeid(const char*)) {
-            j = std::any_cast<const char*>(val);
+            serializeValue(j, std::any_cast<const char*>(val));
         } else if (val.type() == typeid(std::string)) {
-            j = std::any_cast<std::string>(val);
+            serializeValue(j, std::any_cast<std::string>(val));
         } else {
             throw std::runtime_error("Unsupported type in std::any");
         }

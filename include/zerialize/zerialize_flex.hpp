@@ -68,12 +68,12 @@ public:
 
     int8_t asInt8() const {
         if (!isInt()) { throw DeserializationError("not an int"); }
-        return static_cast<int8_t>(ref_.AsInt8());
+        return ref_.AsInt8();
     }
 
     int16_t asInt16() const {
         if (!isInt()) { throw DeserializationError("not an int"); }
-        return static_cast<int16_t>(ref_.AsInt16());
+        return ref_.AsInt16();
     }
 
     int32_t asInt32() const {
@@ -213,7 +213,7 @@ private:
     template<typename T, typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
     void serializeValue(flexbuffers::Builder& fbb, T&& val) {
         // fbb.String(std::forward<T>(val));
-        // LAME
+        // LAME. must provide l-value.
         std::string a(std::forward<T>(val));
         fbb.String(a);
     }
@@ -249,31 +249,31 @@ private:
                 }
             });
         } else if (val.type() == typeid(int8_t)) {
-            fbb.Int(std::any_cast<int8_t>(val));
+            serializeValue(fbb, std::any_cast<int8_t>(val));
         } else if (val.type() == typeid(int16_t)) {
-            fbb.Int(std::any_cast<int16_t>(val));
+            serializeValue(fbb, std::any_cast<int16_t>(val));
         } else if (val.type() == typeid(int32_t)) {
-            fbb.Int(std::any_cast<int32_t>(val));
+            serializeValue(fbb, std::any_cast<int32_t>(val));
         } else if (val.type() == typeid(int64_t)) {
-            fbb.Int(std::any_cast<int64_t>(val));
+            serializeValue(fbb, std::any_cast<int64_t>(val));
         } else if (val.type() == typeid(uint8_t)) {
-            fbb.UInt(std::any_cast<uint8_t>(val));
+            serializeValue(fbb, std::any_cast<uint8_t>(val));
         } else if (val.type() == typeid(uint16_t)) {
-            fbb.UInt(std::any_cast<uint16_t>(val));
+            serializeValue(fbb, std::any_cast<uint16_t>(val));
         } else if (val.type() == typeid(uint32_t)) {
-            fbb.UInt(std::any_cast<uint32_t>(val));
+            serializeValue(fbb, std::any_cast<uint32_t>(val));
         } else if (val.type() == typeid(uint64_t)) {
-            fbb.UInt(std::any_cast<uint64_t>(val));
+            serializeValue(fbb, std::any_cast<uint64_t>(val));
         } else if (val.type() == typeid(bool)) {
-            fbb.Bool(std::any_cast<bool>(val));
+            serializeValue(fbb, std::any_cast<bool>(val));
         } else if (val.type() == typeid(double)) {
-            fbb.Double(std::any_cast<double>(val));
+            serializeValue(fbb, std::any_cast<double>(val));
         } else if (val.type() == typeid(float)) {
-            fbb.Float(std::any_cast<float>(val));
+            serializeValue(fbb, std::any_cast<float>(val));
         } else if (val.type() == typeid(const char*)) {
-            fbb.String(std::any_cast<const char*>(val));
+            serializeValue(fbb, std::any_cast<const char*>(val));
         } else if (val.type() == typeid(std::string)) {
-            fbb.String(std::any_cast<std::string>(val));
+            serializeValue(fbb, std::any_cast<std::string>(val));
         } else {
             throw std::runtime_error("Unsupported type in std::any");
         }
