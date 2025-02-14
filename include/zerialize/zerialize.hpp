@@ -24,10 +24,7 @@ public:
 };
 
 enum ValueType {
-    Bool,
-    Int8, Int16, Int32, Int64,
-    UInt8, UInt16, UInt32, UInt64,
-    Float, Double, 
+    Bool, Int, UInt, Float,
     String, // Blob,
     Map, Array
 };
@@ -41,16 +38,9 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
-    { v.isInt8() } -> convertible_to<bool>;
-    { v.isInt16() } -> convertible_to<bool>;
-    { v.isInt32() } -> convertible_to<bool>;
-    { v.isInt64() } -> convertible_to<bool>;
-    { v.isUInt8() } -> convertible_to<bool>;
-    { v.isUInt16() } -> convertible_to<bool>;
-    { v.isUInt32() } -> convertible_to<bool>;
-    { v.isUInt64() } -> convertible_to<bool>;
+    { v.isInt() } -> convertible_to<bool>;
+    { v.isUInt() } -> convertible_to<bool>;
     { v.isFloat() } -> convertible_to<bool>;
-    { v.isDouble() } -> convertible_to<bool>;
     { v.isString() } -> convertible_to<bool>;
     { v.isBool() } -> convertible_to<bool>;
     { v.isMap() } -> convertible_to<bool>;
@@ -85,15 +75,8 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
 template <Deserializable T>
 ValueType to_value_type(const T& v) {
     return 
-        v.isInt64() ? ValueType::Int64 : 
-        v.isInt32() ? ValueType::Int32 : 
-        v.isInt16() ? ValueType::Int16 : 
-        v.isInt8() ? ValueType::Int8 : 
-        v.isUInt64() ? ValueType::UInt64 : 
-        v.isUInt32() ? ValueType::UInt32 : 
-        v.isUInt16() ? ValueType::UInt16 : 
-        v.isUInt8() ? ValueType::UInt8 : 
-        v.isDouble() ? ValueType::Double : 
+        v.isInt() ? ValueType::Int : 
+        v.isUInt() ? ValueType::UInt : 
         v.isFloat() ? ValueType::Float : 
         v.isString() ? ValueType::String : 
         v.isBool() ? ValueType::Bool : 
@@ -103,16 +86,9 @@ ValueType to_value_type(const T& v) {
 
 inline std::string value_type_to_string(ValueType v) {
     switch (v) {
-        case ValueType::Int8: return "Int8";
-        case ValueType::Int16: return "Int16";
-        case ValueType::Int32: return "Int32";
-        case ValueType::Int64: return "Int64";
-        case ValueType::UInt8: return "UInt8";
-        case ValueType::UInt16: return "UInt16";
-        case ValueType::UInt32: return "UInt32";
-        case ValueType::UInt64: return "UInt64";
+        case ValueType::Int: return "Int";
+        case ValueType::UInt: return "UInt";
         case ValueType::Float: return "Float";
-        case ValueType::Double: return "Double";
         case ValueType::String: return "String";
         case ValueType::Bool: return "Bool";
         case ValueType::Map: return "Map";
@@ -158,26 +134,12 @@ void debug_stream(std::stringstream & s, int tabLevel, const T& v) {
         }
         s << tabString << "]" << std::endl;
     } else if (is_primitive(valueType)) {
-        if (v.isInt64()) {
+        if (v.isInt()) {
             s << v.asInt64();
-        } else if (v.isInt32()) {
-            s << v.asInt32();
-        } else if (v.isInt16()) {
-            s << v.asInt16();
-        } else if (v.isInt8()) {
-            s << int(v.asInt8());
-        } else if (v.isUInt64()) {
+        } else if (v.isUInt()) {
             s << v.asUInt64();
-        } else if (v.isUInt32()) {
-            s << v.asUInt32();
-        } else if (v.isUInt16()) {
-            s << v.asUInt16();
-        } else if (v.isUInt8()) {
-            s << v.asUInt8();
-        } else if (v.isDouble()) {
-            s << v.asDouble();
         } else if (v.isFloat()) {
-                s << v.asFloat();
+            s << v.asDouble();
         } else if (v.isString()) {
             s << "\"" << v.asString() << "\"";
         } else if (v.isBool()) {

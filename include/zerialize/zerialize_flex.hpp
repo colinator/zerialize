@@ -58,58 +58,51 @@ public:
 
     // Satisfy the Deserializer concept
 
-    bool isInt8() const { return ref_.IsInt(); }
-    bool isInt16() const { return ref_.IsInt(); }
-    bool isInt32() const { return ref_.IsInt(); }
-    bool isInt64() const { return ref_.IsInt(); }
-    bool isUInt8() const { return ref_.IsUInt(); }
-    bool isUInt16() const { return ref_.IsUInt(); }
-    bool isUInt32() const { return ref_.IsUInt(); }
-    bool isUInt64() const { return ref_.IsUInt(); }
+    bool isInt() const { return ref_.IsInt(); }
+    bool isUInt() const { return ref_.IsUInt(); }
     bool isFloat() const { return ref_.IsFloat(); }
-    bool isDouble() const { return ref_.IsFloat(); }
     bool isBool() const { return ref_.IsBool(); }
     bool isString() const { return ref_.IsString() ; }
     bool isMap() const { return ref_.IsMap(); }
     bool isArray() const { return ref_.IsAnyVector(); }
 
     int8_t asInt8() const {
-        if (!isInt8()) { throw DeserializationError("not an int8"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return static_cast<int8_t>(ref_.AsInt8());
     }
 
     int16_t asInt16() const {
-        if (!isInt16()) { throw DeserializationError("not an int16"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return static_cast<int16_t>(ref_.AsInt16());
     }
 
     int32_t asInt32() const {
-        if (!isInt32()) { throw DeserializationError("not an int32"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt32();
     }
 
     int64_t asInt64() const {
-        if (!isInt64()) { throw DeserializationError("not an int64"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt64();
     }
 
     uint8_t asUInt8() const {
-        if (!isUInt8()) { throw DeserializationError("not a uint8"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint8_t>(ref_.AsUInt8());
     }
 
     uint16_t asUInt16() const {
-        if (!isUInt16()) { throw DeserializationError("not a uint16"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint16_t>(ref_.AsUInt16());
     }
 
     uint32_t asUInt32() const {
-        if (!isUInt32()) { throw DeserializationError("not a uint32"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint32_t>(ref_.AsUInt32());
     }
 
     uint64_t asUInt64() const {
-        if (!isUInt64()) { throw DeserializationError("not a uint64"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint64_t>(ref_.AsUInt64());
     }
 
@@ -119,7 +112,7 @@ public:
     }
 
     double asDouble() const { 
-        if (!isDouble()) { throw DeserializationError("not a float"); }
+        if (!isFloat()) { throw DeserializationError("not a float"); }
         return ref_.AsDouble();
     }
 
@@ -307,26 +300,12 @@ private:
                     serializeValue(fbb, value[i]);
                 }
             });
-        } else if (value.isInt64()) {
+        } else if (value.isInt()) {
             serializeValue(fbb, value.asInt64());
-        } else if (value.isInt32()) {
-            serializeValue(fbb, value.asInt32());
-        } else if (value.isInt16()) {
-            serializeValue(fbb, value.asInt16());
-        } else if (value.isInt8()) {
-            serializeValue(fbb, value.asInt8());
-        } else if (value.isUInt64()) {
+        } else if (value.isUInt()) {
             serializeValue(fbb, value.asUInt64());
-        } else if (value.isUInt32()) {
-            serializeValue(fbb, value.asUInt32());
-        } else if (value.isUInt16()) {
-            serializeValue(fbb, value.asUInt16());
-        } else if (value.isUInt8()) {
-            serializeValue(fbb, value.asUInt8());
-        } else if (value.isDouble()) {
-            serializeValue(fbb, value.asDouble());
         } else if (value.isFloat()) {
-            serializeValue(fbb, value.asFloat());
+            serializeValue(fbb, value.asDouble());
         } else if (value.isBool()) {
             serializeValue(fbb, value.asBool());
         } else if (value.isString()) {

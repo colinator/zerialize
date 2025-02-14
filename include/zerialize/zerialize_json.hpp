@@ -54,58 +54,51 @@ public:
             " : " + json_.dump() + "\n" + debug_string(*this);
     }
 
-    bool isInt8() const { return json_.is_number_integer(); }
-    bool isInt16() const { return json_.is_number_integer(); }
-    bool isInt32() const { return json_.is_number_integer(); }
-    bool isInt64() const { return json_.is_number_integer(); }
-    bool isUInt8() const { return json_.is_number_unsigned(); }
-    bool isUInt16() const { return json_.is_number_unsigned(); }
-    bool isUInt32() const { return json_.is_number_unsigned(); }
-    bool isUInt64() const { return json_.is_number_unsigned(); }
+    bool isInt() const { return json_.is_number_integer(); }
+    bool isUInt() const { return json_.is_number_unsigned(); }
     bool isFloat() const { return json_.is_number_float(); }
-    bool isDouble() const { return json_.is_number_float(); }
     bool isBool() const { return json_.is_boolean(); }
     bool isString() const { return json_.is_string(); }
     bool isMap() const { return json_.is_object(); }
     bool isArray() const { return json_.is_array(); }
 
     int8_t asInt8() const {
-        if (!isInt8()) { throw DeserializationError("not an int8"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return json_.get<int8_t>();
     }
 
     int16_t asInt16() const {
-        if (!isInt16()) { throw DeserializationError("not an int16"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return json_.get<int16_t>();
     }
     
     int32_t asInt32() const { 
-        if (!isInt32()) { throw DeserializationError("not an int32"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return json_.get<int32_t>(); 
     }
 
     int64_t asInt64() const { 
-        if (!isInt64()) { throw DeserializationError("not an int64"); }
+        if (!isInt()) { throw DeserializationError("not an int"); }
         return json_.get<int64_t>(); 
     }
 
     uint8_t asUInt8() const {
-        if (!isUInt8()) { throw DeserializationError("not a uint8"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return json_.get<uint8_t>();
     }
 
     uint16_t asUInt16() const {
-        if (!isUInt16()) { throw DeserializationError("not a uint16"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return json_.get<uint16_t>();
     }
 
     uint32_t asUInt32() const {
-        if (!isUInt32()) { throw DeserializationError("not a uint32"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return json_.get<uint32_t>();
     }
 
     uint64_t asUInt64() const {
-        if (!isUInt64()) { throw DeserializationError("not a uint64"); }
+        if (!isUInt()) { throw DeserializationError("not a uint"); }
         return json_.get<uint64_t>();
     }
 
@@ -115,7 +108,7 @@ public:
     }
 
     double asDouble() const {
-        if (!isDouble()) { throw DeserializationError("not a double"); }
+        if (!isFloat()) { throw DeserializationError("not a float"); }
         return json_.get<double>(); 
     }
 
@@ -286,26 +279,12 @@ private:
                 j.push_back(nullptr);
                 serializeValue(j.back(),  value[i]);
             }
-        } else if (value.isInt64()) {
+        } else if (value.isInt()) {
             serializeValue(j, value.asInt64());
-        } else if (value.isInt32()) {
-            serializeValue(j, value.asInt32());
-        } else if (value.isInt16()) {
-            serializeValue(j, value.asInt16());
-        } else if (value.isInt8()) {
-            serializeValue(j, value.asInt8());
-        } else if (value.isUInt64()) {
+        } else if (value.isUInt()) {
             serializeValue(j, value.asUInt64());
-        } else if (value.isUInt32()) {
-            serializeValue(j, value.asUInt32());
-        } else if (value.isUInt16()) {
-            serializeValue(j, value.asUInt16());
-        } else if (value.isUInt8()) {
-            serializeValue(j, value.asUInt8());
-        } else if (value.isDouble()) {
-            serializeValue(j, value.asDouble());
         }  else if (value.isFloat()) {
-            serializeValue(j, value.asFloat());
+            serializeValue(j, value.asDouble());
         } else if (value.isBool()) {
             serializeValue(j, value.asBool());
         } else if (value.isString()) {
@@ -426,3 +405,9 @@ struct SerializerName<Json> {
 };
 
 } // namespace zerialize
+
+
+
+// Verified:
+// {"a":3,"b":5.2,"c":"asdf","d":[7,8.2,{"e":2.613,"pi":3.14159}],"k":1028}
+// JsonBuffer 72 bytes at: 0x13ae070a0
