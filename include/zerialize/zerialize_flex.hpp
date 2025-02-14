@@ -240,19 +240,19 @@ private:
     }
 
     void serializeValue(flexbuffers::Builder& fbb, const std::any& val) {
-        if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
-            fbb.Vector([&]() {
-                for (const std::any& v: l) {
-                    serializeValue(fbb, v);
-                }
-            });
-        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
+        if (val.type() == typeid(std::map<std::string, std::any>)) {
             std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
             fbb.Map([&]() {
                 for (const auto& [key, value]: m) {
                     fbb.Key(key);
                     serializeValue(fbb, value);
+                }
+            });
+        } else if (val.type() == typeid(std::vector<std::any>)) {
+            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+            fbb.Vector([&]() {
+                for (const std::any& v: l) {
+                    serializeValue(fbb, v);
                 }
             });
         } else if (val.type() == typeid(int8_t)) {
@@ -290,13 +290,8 @@ private:
     // Used for format conversion, from any other Deserializable.
     template<Deserializable SourceBufferType>
     void serializeValue(flexbuffers::Builder& fbb, const SourceBufferType& value) {
-        if (value.isArray()) {
-            fbb.Vector([&]() {
-                for (size_t i=0; i<value.arraySize(); i++) {
-                    serializeValue(fbb, value[i]);
-                }
-            });
-        } else if (value.isMap()) {
+        if (value.isMap()) {
+            std::cout << "SERIALIZING MAP" << std::endl;
             fbb.Map([&]() {
                 for (string_view key: value.mapKeys()) {
                     // Copies the key. Lame if you ask me...
@@ -305,26 +300,33 @@ private:
                     serializeValue(fbb, value[s]);
                 }
             });
-        } else if (value.isInt8()) {
-            serializeValue(fbb, value.asInt8());
-        } else if (value.isInt16()) {
-            serializeValue(fbb, value.asInt16());
-        } else if (value.isInt32()) {
-            serializeValue(fbb, value.asInt32());
+        } else if (value.isArray()) {
+            std::cout << "SERIALIZING VECTOR" << std::endl;
+            fbb.Vector([&]() {
+                for (size_t i=0; i<value.arraySize(); i++) {
+                    serializeValue(fbb, value[i]);
+                }
+            });
         } else if (value.isInt64()) {
             serializeValue(fbb, value.asInt64());
-        } else if (value.isUInt8()) {
-            serializeValue(fbb, value.asUInt8());
-        } else if (value.isUInt16()) {
-            serializeValue(fbb, value.asUInt16());
-        } else if (value.isUInt32()) {
-            serializeValue(fbb, value.asUInt32());
+        } else if (value.isInt32()) {
+            serializeValue(fbb, value.asInt32());
+        } else if (value.isInt16()) {
+            serializeValue(fbb, value.asInt16());
+        } else if (value.isInt8()) {
+            serializeValue(fbb, value.asInt8());
         } else if (value.isUInt64()) {
             serializeValue(fbb, value.asUInt64());
-        }  else if (value.isFloat()) {
-            serializeValue(fbb, value.asFloat());
+        } else if (value.isUInt32()) {
+            serializeValue(fbb, value.asUInt32());
+        } else if (value.isUInt16()) {
+            serializeValue(fbb, value.asUInt16());
+        } else if (value.isUInt8()) {
+            serializeValue(fbb, value.asUInt8());
         } else if (value.isDouble()) {
             serializeValue(fbb, value.asDouble());
+        } else if (value.isFloat()) {
+            serializeValue(fbb, value.asFloat());
         } else if (value.isBool()) {
             serializeValue(fbb, value.asBool());
         } else if (value.isString()) {

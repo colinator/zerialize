@@ -24,7 +24,7 @@ public:
 };
 
 enum ValueType {
-    Bool,
+    Bool, Int, UInt,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float, Double, 
@@ -85,16 +85,16 @@ concept Deserializable = requires(const V& v, const string& key, size_t index) {
 template <Deserializable T>
 ValueType to_value_type(const T& v) {
     return 
-        v.isInt8() ? ValueType::Int8 : 
-        v.isInt16() ? ValueType::Int16 : 
-        v.isInt32() ? ValueType::Int32 : 
         v.isInt64() ? ValueType::Int64 : 
-        v.isUInt8() ? ValueType::UInt8 : 
-        v.isUInt16() ? ValueType::UInt16 : 
-        v.isUInt32() ? ValueType::UInt32 : 
+        v.isInt32() ? ValueType::Int32 : 
+        v.isInt16() ? ValueType::Int16 : 
+        v.isInt8() ? ValueType::Int8 : 
         v.isUInt64() ? ValueType::UInt64 : 
-        v.isFloat() ? ValueType::Float : 
+        v.isUInt32() ? ValueType::UInt32 : 
+        v.isUInt16() ? ValueType::UInt16 : 
+        v.isUInt8() ? ValueType::UInt8 : 
         v.isDouble() ? ValueType::Double : 
+        v.isFloat() ? ValueType::Float : 
         v.isString() ? ValueType::String : 
         v.isBool() ? ValueType::Bool : 
         v.isMap() ? ValueType::Map : 
@@ -128,8 +128,7 @@ inline bool is_primitive(ValueType v) {
     return !is_composite(v);
 }
 
-inline std::string repeated_string(int num, const std::string& input)
-{
+inline std::string repeated_string(int num, const std::string& input) {
     std::string ret;
     ret.reserve(input.size() * num);
     while (num--)
@@ -142,16 +141,8 @@ void debug_stream(std::stringstream & s, int tabLevel, const T& v) {
     auto valueType = to_value_type(v);
     auto tab = "  ";
     auto tabString = repeated_string(tabLevel, tab);
-    //s << tabString;
 
-    if (v.isArray()) {
-        s << "<Array> [" << std::endl;
-        for (size_t i=0; i<v.arraySize(); i++) {
-            s << tabString << tab;
-            debug_stream(s, tabLevel+1, v[i]);
-        }
-        s << tabString << "]" << std::endl;
-    } else if (v.isMap()) {
+    if (v.isMap()) {
         s << "<Map> {" << std::endl;
         for (string_view key: v.mapKeys()) {
             const std::string sk(key);
@@ -159,27 +150,34 @@ void debug_stream(std::stringstream & s, int tabLevel, const T& v) {
             debug_stream(s, tabLevel+1, v[sk]);
         }
         s << tabString << "}" << std::endl;
+    } else if (v.isArray()) {
+        s << "<Array> [" << std::endl;
+        for (size_t i=0; i<v.arraySize(); i++) {
+            s << tabString << tab;
+            debug_stream(s, tabLevel+1, v[i]);
+        }
+        s << tabString << "]" << std::endl;
     } else if (is_primitive(valueType)) {
-        if (v.isInt8()) {
-            s << int(v.asInt8());
-        } else if (v.isInt16()) {
-            s << v.asInt16();
+        if (v.isInt64()) {
+            s << v.asInt64();
         } else if (v.isInt32()) {
             s << v.asInt32();
-        } else if (v.isInt64()) {
-            s << v.asInt64();
-        } else if (v.isUInt8()) {
-            s << v.asUInt8();
-        } else if (v.isUInt16()) {
-            s << v.asUInt16();
-        } else if (v.isUInt32()) {
-            s << v.asUInt32();
+        } else if (v.isInt16()) {
+            s << v.asInt16();
+        } else if (v.isInt8()) {
+            s << int(v.asInt8());
         } else if (v.isUInt64()) {
             s << v.asUInt64();
-        } else if (v.isFloat()) {
-            s << v.asFloat();
+        } else if (v.isUInt32()) {
+            s << v.asUInt32();
+        } else if (v.isUInt16()) {
+            s << v.asUInt16();
+        } else if (v.isUInt8()) {
+            s << v.asUInt8();
         } else if (v.isDouble()) {
             s << v.asDouble();
+        } else if (v.isFloat()) {
+                s << v.asFloat();
         } else if (v.isString()) {
             s << "\"" << v.asString() << "\"";
         } else if (v.isBool()) {

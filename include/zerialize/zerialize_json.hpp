@@ -224,19 +224,19 @@ private:
     }
 
     void serializeValue(nlohmann::json& j, const std::any& val) {
-        if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
-            j = nlohmann::json::array();
-            for (const std::any& v: l) {
-                j.push_back(nullptr);
-                serializeValue(j.back(), v);
-            }
-        } else if (val.type() == typeid(std::map<std::string, std::any>)) {
+        if (val.type() == typeid(std::map<std::string, std::any>)) {
             std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
             j = nlohmann::json::object();
             for (const auto& [key, value]: m) {
                 j[key] = nullptr;
                 serializeValue(j[key], value);
+            }
+        } else if (val.type() == typeid(std::vector<std::any>)) {
+            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+            j = nlohmann::json::array();
+            for (const std::any& v: l) {
+                j.push_back(nullptr);
+                serializeValue(j.back(), v);
             }
         } else if (val.type() == typeid(int8_t)) {
             j = std::any_cast<int8_t>(val);
@@ -272,13 +272,7 @@ private:
     // Used for format conversion, from any other Deserializable.
     template<Deserializable SourceBufferType>
     void serializeValue(nlohmann::json& j, const SourceBufferType& value) {
-        if (value.isArray()) {
-            j = nlohmann::json::array();
-            for (size_t i=0; i<value.arraySize(); i++) {
-                j.push_back(nullptr);
-                serializeValue(j.back(),  value[i]);
-            }
-        } else if (value.isMap()) {
+        if (value.isMap()) {
             j = nlohmann::json::object();
             for (string_view key: value.mapKeys()) {
                 // Copies the key. Lame if you ask me...
@@ -286,26 +280,32 @@ private:
                 j[s] = nullptr;
                 serializeValue(j[s], value[s]);
             }
-        } else if (value.isInt8()) {
-            serializeValue(j, value.asInt8());
-        } else if (value.isInt16()) {
-            serializeValue(j, value.asInt16());
-        } else if (value.isInt32()) {
-            serializeValue(j, value.asInt32());
+        } else if (value.isArray()) {
+            j = nlohmann::json::array();
+            for (size_t i=0; i<value.arraySize(); i++) {
+                j.push_back(nullptr);
+                serializeValue(j.back(),  value[i]);
+            }
         } else if (value.isInt64()) {
             serializeValue(j, value.asInt64());
-        } else if (value.isUInt8()) {
-            serializeValue(j, value.asUInt8());
-        } else if (value.isUInt16()) {
-            serializeValue(j, value.asUInt16());
-        } else if (value.isUInt32()) {
-            serializeValue(j, value.asUInt32());
+        } else if (value.isInt32()) {
+            serializeValue(j, value.asInt32());
+        } else if (value.isInt16()) {
+            serializeValue(j, value.asInt16());
+        } else if (value.isInt8()) {
+            serializeValue(j, value.asInt8());
         } else if (value.isUInt64()) {
             serializeValue(j, value.asUInt64());
-        }  else if (value.isFloat()) {
-            serializeValue(j, value.asFloat());
+        } else if (value.isUInt32()) {
+            serializeValue(j, value.asUInt32());
+        } else if (value.isUInt16()) {
+            serializeValue(j, value.asUInt16());
+        } else if (value.isUInt8()) {
+            serializeValue(j, value.asUInt8());
         } else if (value.isDouble()) {
             serializeValue(j, value.asDouble());
+        }  else if (value.isFloat()) {
+            serializeValue(j, value.asFloat());
         } else if (value.isBool()) {
             serializeValue(j, value.asBool());
         } else if (value.isString()) {
