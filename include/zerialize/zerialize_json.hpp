@@ -84,13 +84,10 @@ inline vector<uint8_t> base64Decode(string_view encoded) {
     return decoded;
 }
 
-vector<uint8_t> decoded_blob_;
-
 class JsonBuffer : public DataBuffer<JsonBuffer> {
 private:
     vector<uint8_t> buf_;
     nlohmann::json json_;
-    //mutable vector<uint8_t> decoded_blob_;
 
 public:
     nlohmann::json& json() { return json_; }

@@ -9,7 +9,6 @@
 #include <concepts>
 #include <sstream>
 
-
 constexpr bool DEBUG_TRACE_CALLS = true;
 
 namespace zerialize {
