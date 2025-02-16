@@ -165,6 +165,22 @@ void testem() {
                 v["d"][1].asDouble() == 8.2;
         });
 
+    // Using an initializer list for a map with a nested blob:
+    //     {"a": Blob{1,2,3,4}, "b": 457835 }
+    auto k = std::array<uint8_t, 4>({'a','b','c','z'});
+    testit<SerializerType>("Initializer list: {\"a\": std::span<const uint8_t>({'a','b','c','z'}), \"b\": 457835 }",
+        [k](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"a", std::span<const uint8_t>(k)}, { "b", 457835 } }
+            ); 
+        },
+        [k](const auto& v) {
+            auto a = v["a"].asBlob();
+           return 
+                std::equal(a.begin(), a.end(), k.begin()) &&
+                v["b"].asInt32() == 457835;
+        });
+
 
     //return;
 

@@ -9,13 +9,11 @@
 #include <zerialize/zerialize.hpp>
 #include "flatbuffers/flexbuffers.h"
 
-
 namespace zerialize {
-
 
 class FlexBuffer : public DataBuffer<FlexBuffer> {
 private:
-    std::vector<uint8_t> buf_;
+    vector<uint8_t> buf_;
     flexbuffers::Reference ref_;
 public:
     flexbuffers::Builder fbb;
@@ -25,16 +23,16 @@ public:
     FlexBuffer(flexbuffers::Reference ref): ref_(ref) {}
 
     // Zero-copy view of existing data
-    FlexBuffer(std::span<const uint8_t> data)
+    FlexBuffer(span<const uint8_t> data)
         : ref_(flexbuffers::GetRoot(data.data(), data.size())) { }
 
     // Zero-copy move of vector ownership
-    FlexBuffer(std::vector<uint8_t>&& buf)
+    FlexBuffer(vector<uint8_t>&& buf)
         : buf_(std::move(buf))
         , ref_(flexbuffers::GetRoot(buf_)) { }
 
     // Must copy for const reference
-    FlexBuffer(const std::vector<uint8_t>& buf)
+    FlexBuffer(const vector<uint8_t>& buf)
         : buf_(buf)
         , ref_(flexbuffers::GetRoot(buf_)) { }
 
@@ -46,13 +44,13 @@ public:
 
     // Base DataBuffer class overrides
     
-    std::string to_string() const override {
+    string to_string() const override {
         return "FlexBuffer " + std::to_string(buf().size()) +
             " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
             "\n" + debug_string(*this);;
     }
 
-    const std::vector<uint8_t>& buf() const override {
+    const vector<uint8_t>& buf() const override {
         return buf_;
     }
 
@@ -122,23 +120,23 @@ public:
         return ref_.AsBool();
     }
 
-    std::string_view asString() const {
+    string_view asString() const {
         if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
-        return std::string_view(str.c_str(), str.size());
+        return string_view(str.c_str(), str.size());
     }
 
-    DataBlob asBlob() const {
+    span<const uint8_t> asBlob() const {
         if (!isBlob()) { throw DeserializationError("not a blob"); }
         auto b = ref_.AsBlob();
-        return DataBlob{.data = b.data(), .size = b.size()};
+        return span<const uint8_t>(b.data(), b.size());
     }
 
-    std::vector<std::string_view> mapKeys() const {
+    vector<string_view> mapKeys() const {
         if (!isMap()) { throw DeserializationError("not a map"); }
-        std::vector<std::string_view> keys;
+        vector<string_view> keys;
         for (size_t i=0; i < ref_.AsMap().Keys().size(); i++) {
-            std::string_view key(
+            string_view key(
                 ref_.AsMap().Keys()[i].AsString().c_str(), 
                 ref_.AsMap().Keys()[i].AsString().size());
             keys.push_back(key);
@@ -146,7 +144,7 @@ public:
         return keys;
     }
 
-    FlexBuffer operator[] (const std::string& key) const {
+    FlexBuffer operator[] (const string& key) const {
         if (!isMap()) { throw DeserializationError("not a map"); }
         return FlexBuffer(ref_.AsMap()[key]);
     }
@@ -213,76 +211,82 @@ private:
         fbb.Double(val);
     }
 
-    void serializeValue(flexbuffers::Builder& fbb, const std::string& val) {
+    void serializeValue(flexbuffers::Builder& fbb, const string& val) {
         fbb.String(val);
     }
 
-    template<typename T, typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
+    void serializeValue(flexbuffers::Builder& fbb, const span<const uint8_t>& val) {
+        fbb.Blob(val.data(), val.size());
+    }
+
+    template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
     void serializeValue(flexbuffers::Builder& fbb, T&& val) {
         // fbb.String(std::forward<T>(val));
         // LAME. must provide l-value.
-        std::string a(std::forward<T>(val));
+        string a(std::forward<T>(val));
         fbb.String(a);
     }
 
     template<typename T>
-    void serializeValue(flexbuffers::Builder& fbb, std::pair<const char*, T>&& keyVal) {
+    void serializeValue(flexbuffers::Builder& fbb, pair<const char*, T>&& keyVal) {
         fbb.Key(keyVal.first);
         serializeValue(fbb, std::forward<T>(keyVal.second));
     }
 
-    void serializeValue(flexbuffers::Builder& fbb, std::vector<std::any>&& val) {
+    void serializeValue(flexbuffers::Builder& fbb, vector<any>&& val) {
         fbb.Vector([&]() {
-            for (const std::any& v: val) {
+            for (const any& v: val) {
                 serializeValue(fbb, v);
             }
         });
     }
 
-    void serializeValue(flexbuffers::Builder& fbb, const std::any& val) {
-        if (val.type() == typeid(std::map<std::string, std::any>)) {
-            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
+    void serializeValue(flexbuffers::Builder& fbb, const any& val) {
+        if (val.type() == typeid(map<string, any>)) {
+            map<string, any> m = any_cast<map<string, any>>(val);
             fbb.Map([&]() {
                 for (const auto& [key, value]: m) {
                     fbb.Key(key);
                     serializeValue(fbb, value);
                 }
             });
-        } else if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+        } else if (val.type() == typeid(vector<any>)) {
+            vector<any> l = any_cast<vector<any>>(val);
             fbb.Vector([&]() {
-                for (const std::any& v: l) {
+                for (const any& v: l) {
                     serializeValue(fbb, v);
                 }
             });
         } else if (val.type() == typeid(int8_t)) {
-            serializeValue(fbb, std::any_cast<int8_t>(val));
+            serializeValue(fbb, any_cast<int8_t>(val));
         } else if (val.type() == typeid(int16_t)) {
-            serializeValue(fbb, std::any_cast<int16_t>(val));
+            serializeValue(fbb, any_cast<int16_t>(val));
         } else if (val.type() == typeid(int32_t)) {
-            serializeValue(fbb, std::any_cast<int32_t>(val));
+            serializeValue(fbb, any_cast<int32_t>(val));
         } else if (val.type() == typeid(int64_t)) {
-            serializeValue(fbb, std::any_cast<int64_t>(val));
+            serializeValue(fbb, any_cast<int64_t>(val));
         } else if (val.type() == typeid(uint8_t)) {
-            serializeValue(fbb, std::any_cast<uint8_t>(val));
+            serializeValue(fbb, any_cast<uint8_t>(val));
         } else if (val.type() == typeid(uint16_t)) {
-            serializeValue(fbb, std::any_cast<uint16_t>(val));
+            serializeValue(fbb, any_cast<uint16_t>(val));
         } else if (val.type() == typeid(uint32_t)) {
-            serializeValue(fbb, std::any_cast<uint32_t>(val));
+            serializeValue(fbb, any_cast<uint32_t>(val));
         } else if (val.type() == typeid(uint64_t)) {
-            serializeValue(fbb, std::any_cast<uint64_t>(val));
+            serializeValue(fbb, any_cast<uint64_t>(val));
         } else if (val.type() == typeid(bool)) {
-            serializeValue(fbb, std::any_cast<bool>(val));
+            serializeValue(fbb, any_cast<bool>(val));
         } else if (val.type() == typeid(double)) {
-            serializeValue(fbb, std::any_cast<double>(val));
+            serializeValue(fbb, any_cast<double>(val));
         } else if (val.type() == typeid(float)) {
-            serializeValue(fbb, std::any_cast<float>(val));
+            serializeValue(fbb, any_cast<float>(val));
+        } else if (val.type() == typeid(span<const uint8_t>)) {
+            serializeValue(fbb, any_cast<span<const uint8_t>>(val));
         } else if (val.type() == typeid(const char*)) {
-            serializeValue(fbb, std::any_cast<const char*>(val));
-        } else if (val.type() == typeid(std::string)) {
-            serializeValue(fbb, std::any_cast<std::string>(val));
+            serializeValue(fbb, any_cast<const char*>(val));
+        } else if (val.type() == typeid(string)) {
+            serializeValue(fbb, any_cast<string>(val));
         } else {
-            throw std::runtime_error("Unsupported type in std::any");
+            throw SerializationError("Unsupported type in any");
         }
     }
 
@@ -291,17 +295,15 @@ private:
     template<Deserializable SourceBufferType>
     void serializeValue(flexbuffers::Builder& fbb, const SourceBufferType& value) {
         if (value.isMap()) {
-            std::cout << "SERIALIZING MAP" << std::endl;
             fbb.Map([&]() {
                 for (string_view key: value.mapKeys()) {
                     // Copies the key. Lame if you ask me...
-                    const std::string s(key);
+                    const string s(key);
                     fbb.Key(s);
                     serializeValue(fbb, value[s]);
                 }
             });
         } else if (value.isArray()) {
-            std::cout << "SERIALIZING VECTOR" << std::endl;
             fbb.Vector([&]() {
                 for (size_t i=0; i<value.arraySize(); i++) {
                     serializeValue(fbb, value[i]);
@@ -318,9 +320,10 @@ private:
         } else if (value.isString()) {
             serializeValue(fbb, value.asString());
         } else if (value.isBlob()) {
-            // implement me!
+            span<const uint8_t> s = value.asBlob();
+            serializeValue(fbb, s);
         } else {
-            throw std::runtime_error("Unsupported source buffer value type");
+            throw SerializationError("Unsupported source buffer value type");
         }
     }
 
@@ -332,15 +335,15 @@ public:
 
     BufferType serialize() {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize nothing" << std::endl;
+            cout << "FlexBuffer::serialize nothing" << endl;
         }
         FlexBuffer buffer;
         return buffer;
     }
 
-    BufferType serialize(const std::any& value) {
+    BufferType serialize(const any& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize any: " << value.type().name() << std::endl;
+            cout << "FlexBuffer::serialize any: " << value.type().name() << endl;
         }
         FlexBuffer buffer;
         serializeValue(buffer.fbb, value);
@@ -348,13 +351,13 @@ public:
         return buffer;
     }
 
-    BufferType serialize(std::initializer_list<std::any> list) {
+    BufferType serialize(initializer_list<any> list) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize initializer list" << std::endl;
+            cout << "FlexBuffer::serialize initializer list" << endl;
         }
         FlexBuffer buffer;
         buffer.fbb.Vector([&]() {
-            for (const std::any& val : list) {
+            for (const any& val : list) {
                 serializeValue(buffer.fbb, val);
             }
         });
@@ -362,9 +365,9 @@ public:
         return buffer;
     }
 
-    BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
+    BufferType serialize(initializer_list<pair<string, any>> list) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize initializer list(map)" << std::endl;
+            cout << "FlexBuffer::serialize initializer list(map)" << endl;
         }
         FlexBuffer buffer;
         buffer.fbb.Map([&]() {
@@ -380,7 +383,7 @@ public:
     template<typename ValueType>
     BufferType serialize(ValueType&& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize value&&" << std::endl;
+            cout << "FlexBuffer::serialize value&&" << endl;
         }
         FlexBuffer buffer;
         serializeValue(buffer.fbb, std::forward<ValueType>(value));
@@ -391,7 +394,7 @@ public:
     template<typename... ValueTypes>
     BufferType serialize(ValueTypes&&... values) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize values &&" << std::endl;
+            cout << "FlexBuffer::serialize values &&" << endl;
         }
         FlexBuffer buffer;
         buffer.fbb.Vector([&]() {
@@ -404,7 +407,7 @@ public:
     template<typename... ValueTypes>
     BufferType serializeMap(ValueTypes&&... values) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "FlexBuffer::serialize ValueTypes" << std::endl;
+            cout << "FlexBuffer::serialize ValueTypes" << endl;
         }
         FlexBuffer buffer;
         buffer.fbb.Map([&]() {
@@ -422,7 +425,7 @@ public:
     template<Deserializable SourceBufferType>
     BufferType serialize(const SourceBufferType& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Flex::serialize(Deserializable &&value)" << std::endl;
+            cout << "Flex::serialize(Deserializable &&value)" << endl;
         }   
         FlexBuffer buffer;
         serializeValue(buffer.fbb, value);

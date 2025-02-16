@@ -12,10 +12,91 @@
 
 namespace zerialize {
 
+string base64Encode(span<const uint8_t> data) {
+    static constexpr char base64_chars[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"
+        "0123456789+/";
+
+    string encoded;
+    size_t i = 0;
+    uint32_t value = 0;
+
+    for (uint8_t byte : data) {
+        value = (value << 8) + byte;
+        i += 8;
+        while (i >= 6) {
+            encoded += base64_chars[(value >> (i - 6)) & 0x3F];
+            i -= 6;
+        }
+    }
+
+    if (i > 0) {
+        encoded += base64_chars[(value << (6 - i)) & 0x3F];
+    }
+
+    while (encoded.size() % 4 != 0) {
+        encoded += '=';
+    }
+
+    return encoded;
+}
+
+// #include <string>
+// #include <vector>
+// #include <span>
+// #include <stdexcept>
+// #include <cstdint>
+
+vector<uint8_t> base64Decode(string_view encoded) {
+    static constexpr uint8_t lookup[256] = {
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
+        52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64,
+        64, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 64, 64, 64, 64, 64,
+        64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+        41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+        64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
+    };
+
+    vector<uint8_t> decoded;
+    uint32_t buffer = 0;
+    int bits_collected = 0;
+
+    for (char c : encoded) {
+        if (c == '=') break; // Ignore padding
+
+        uint8_t value = lookup[static_cast<uint8_t>(c)];
+        if (value == 64) throw DeserializationError("Invalid Base64 character");
+
+        buffer = (buffer << 6) | value;
+        bits_collected += 6;
+
+        if (bits_collected >= 8) {
+            bits_collected -= 8;
+            decoded.push_back(static_cast<uint8_t>((buffer >> bits_collected) & 0xFF));
+        }
+    }
+
+    return decoded;
+}
+
+vector<uint8_t> decoded_blob_;
+
 class JsonBuffer : public DataBuffer<JsonBuffer> {
 private:
-    std::vector<uint8_t> buf_;
+    vector<uint8_t> buf_;
     nlohmann::json json_;
+    //mutable vector<uint8_t> decoded_blob_;
 
 public:
     nlohmann::json& json() { return json_; }
@@ -25,30 +106,30 @@ public:
     JsonBuffer(const nlohmann::json& j): json_(j) {}
 
     // Zero-copy view of existing data
-    JsonBuffer(std::span<const uint8_t> data)
+    JsonBuffer(span<const uint8_t> data)
         : buf_(data.begin(), data.end()),
           json_(nlohmann::json::parse(data.begin(), data.end())) { }
 
     // Zero-copy move of vector ownership
-    JsonBuffer(std::vector<uint8_t>&& buf)
+    JsonBuffer(vector<uint8_t>&& buf)
         : buf_(std::move(buf)),
           json_(nlohmann::json::parse(buf_)) { }
 
     // Must copy for const reference
-    JsonBuffer(const std::vector<uint8_t>& buf)
+    JsonBuffer(const vector<uint8_t>& buf)
         : buf_(buf),
           json_(nlohmann::json::parse(buf_)) { }
 
     void finish() {
-        std::string str = json_.dump();
-        buf_ = std::vector<uint8_t>(str.begin(), str.end());
+        string str = json_.dump();
+        buf_ = vector<uint8_t>(str.begin(), str.end());
     }
 
-    const std::vector<uint8_t>& buf() const override {
+    const vector<uint8_t>& buf() const override {
         return buf_;
     }
 
-    std::string to_string() const override {
+    string to_string() const override {
         return "JsonBuffer " + std::to_string(buf().size()) + 
             " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
             " : " + json_.dump() + "\n" + debug_string(*this);
@@ -59,7 +140,7 @@ public:
     bool isFloat() const { return json_.is_number_float(); }
     bool isBool() const { return json_.is_boolean(); }
     bool isString() const { return json_.is_string(); }
-    bool isBlob() const { return false; } //json_.is_string(); }
+    bool isBlob() const { return json_.is_string(); }
     bool isMap() const { return json_.is_object(); }
     bool isArray() const { return json_.is_array(); }
 
@@ -118,26 +199,26 @@ public:
         return json_.get<bool>();
     }
     
-    std::string_view asString() const { 
+    string_view asString() const { 
         if (!isString()) { throw DeserializationError("not a string"); }
-        return json_.get<std::string_view>(); 
+        return json_.get<string_view>(); 
     }
 
-    DataBlob asBlob() const { 
+    vector<uint8_t> asBlob() const {
         if (!isBlob()) { throw DeserializationError("not a blob"); }
-        return DataBlob{ .data = nullptr, .size = 0 };
+        return base64Decode(json_.get<string_view>());
     }
 
-    std::vector<std::string_view> mapKeys() const {
+    vector<string_view> mapKeys() const {
         if (!isMap()) { throw DeserializationError("not a map"); }
-        std::vector<std::string_view> keys;
+        vector<string_view> keys;
         for (const auto& it : json_.items()) {
             keys.push_back(it.key());
         }
         return keys;
     }
 
-    JsonBuffer operator[] (const std::string& key) const { 
+    JsonBuffer operator[] (const string& key) const { 
         if (!isMap()) { throw DeserializationError("not a map"); }
         return JsonBuffer(json_[key]); 
     }
@@ -203,68 +284,79 @@ private:
         j = val;
     }
 
-    template<typename T, typename = std::enable_if_t<std::is_convertible_v<T, std::string_view>>>
+    void serializeValue(nlohmann::json& j, const string& val) {
+        j = val;
+    }
+
+    void serializeValue(nlohmann::json& j, const span<const uint8_t>& val) {
+        std::string s = base64Encode(val);
+        j = s;
+    }
+
+    template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
     void serializeValue(nlohmann::json& j, T&& val) {
-        j = std::string(val);
+        j = string(val);
     }
 
     template<typename T>
-    void serializeValue(nlohmann::json& j, std::pair<const char*, T>&& keyVal) {
+    void serializeValue(nlohmann::json& j, pair<const char*, T>&& keyVal) {
         j[keyVal.first] = nullptr;
         serializeValue(j[keyVal.first], std::forward<T>(keyVal.second));
     }
 
-    void serializeValue(nlohmann::json& j, std::vector<std::any>&& val) {
+    void serializeValue(nlohmann::json& j, vector<any>&& val) {
         j = nlohmann::json::array();
-        for (const std::any& v: val) {
+        for (const any& v: val) {
             j.push_back(nullptr);
             serializeValue(j.back(), v);
         }
     }
 
-    void serializeValue(nlohmann::json& j, const std::any& val) {
-        if (val.type() == typeid(std::map<std::string, std::any>)) {
-            std::map<std::string, std::any> m = std::any_cast<std::map<std::string, std::any>>(val);
+    void serializeValue(nlohmann::json& j, const any& val) {
+        if (val.type() == typeid(map<string, any>)) {
+            map<string, any> m = any_cast<map<string, any>>(val);
             j = nlohmann::json::object();
             for (const auto& [key, value]: m) {
                 j[key] = nullptr;
                 serializeValue(j[key], value);
             }
-        } else if (val.type() == typeid(std::vector<std::any>)) {
-            std::vector<std::any> l = std::any_cast<std::vector<std::any>>(val);
+        } else if (val.type() == typeid(vector<any>)) {
+            vector<any> l = any_cast<vector<any>>(val);
             j = nlohmann::json::array();
-            for (const std::any& v: l) {
+            for (const any& v: l) {
                 j.push_back(nullptr);
                 serializeValue(j.back(), v);
             }
         } else if (val.type() == typeid(int8_t)) {
-            serializeValue(j, std::any_cast<int8_t>(val));
+            serializeValue(j, any_cast<int8_t>(val));
         } else if (val.type() == typeid(int16_t)) {
-            serializeValue(j, std::any_cast<int16_t>(val));
+            serializeValue(j, any_cast<int16_t>(val));
         } else if (val.type() == typeid(int32_t)) {
-            serializeValue(j, std::any_cast<int32_t>(val));
+            serializeValue(j, any_cast<int32_t>(val));
         } else if (val.type() == typeid(int64_t)) {
-            serializeValue(j, std::any_cast<int64_t>(val));
+            serializeValue(j, any_cast<int64_t>(val));
         } else if (val.type() == typeid(uint8_t)) {
-            serializeValue(j, std::any_cast<uint8_t>(val));
+            serializeValue(j, any_cast<uint8_t>(val));
         } else if (val.type() == typeid(uint16_t)) {
-            serializeValue(j, std::any_cast<uint16_t>(val));
+            serializeValue(j, any_cast<uint16_t>(val));
         } else if (val.type() == typeid(uint32_t)) {
-            serializeValue(j, std::any_cast<uint32_t>(val));
+            serializeValue(j, any_cast<uint32_t>(val));
         } else if (val.type() == typeid(uint64_t)) {
-            serializeValue(j, std::any_cast<uint64_t>(val));
+            serializeValue(j, any_cast<uint64_t>(val));
         } else if (val.type() == typeid(bool)) {
-            serializeValue(j, std::any_cast<bool>(val));
+            serializeValue(j, any_cast<bool>(val));
         } else if (val.type() == typeid(double)) {
-            serializeValue(j, std::any_cast<double>(val));
+            serializeValue(j, any_cast<double>(val));
         } else if (val.type() == typeid(float)) {
-            serializeValue(j, std::any_cast<float>(val));
+            serializeValue(j, any_cast<float>(val));
+        } else if (val.type() == typeid(span<const uint8_t>)) {
+            serializeValue(j, any_cast<span<const uint8_t>>(val));
         } else if (val.type() == typeid(const char*)) {
-            serializeValue(j, std::any_cast<const char*>(val));
-        } else if (val.type() == typeid(std::string)) {
-            serializeValue(j, std::any_cast<std::string>(val));
+            serializeValue(j, any_cast<const char*>(val));
+        } else if (val.type() == typeid(string)) {
+            serializeValue(j, any_cast<string>(val));
         } else {
-            throw std::runtime_error("Unsupported type in std::any");
+            throw SerializationError("Unsupported type in any");
         }
     }
 
@@ -275,7 +367,7 @@ private:
             j = nlohmann::json::object();
             for (string_view key: value.mapKeys()) {
                 // Copies the key. Lame if you ask me...
-                const std::string s(key);
+                const string s(key);
                 j[s] = nullptr;
                 serializeValue(j[s], value[s]);
             }
@@ -296,9 +388,9 @@ private:
         } else if (value.isString()) {
             serializeValue(j, value.asString());
         } else if (value.isBlob()) {
-            //serializeValue(j, value.asBlob());
+            serializeValue(j, value.asBlob()); // ERROR HERE!!!! Howdoweknow?
         } else {
-            throw std::runtime_error("Unsupported source buffer value type");
+            throw SerializationError("Unsupported source buffer value type");
         }
     }
 
@@ -309,7 +401,7 @@ public:
 
     BufferType serialize() {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize()" << std::endl;
+            cout << "Json::serialize()" << endl;
         }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
@@ -317,9 +409,9 @@ public:
         return buffer;
     }
 
-    BufferType serialize(const std::any& value) {
+    BufferType serialize(const any& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(value)" << std::endl;
+            cout << "Json::serialize(value)" << endl;
         }
         JsonBuffer buffer;
         serializeValue(buffer.json(), value);
@@ -327,13 +419,13 @@ public:
         return buffer;
     }
 
-    BufferType serialize(std::initializer_list<std::any> list) {
+    BufferType serialize(initializer_list<any> list) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(initializer_list)" << std::endl;
+            cout << "Json::serialize(initializer_list)" << endl;
         }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
-        for (const std::any& val : list) {
+        for (const any& val : list) {
             buffer.json().push_back(nullptr);
             serializeValue(buffer.json().back(), val);
         }
@@ -341,9 +433,9 @@ public:
         return buffer;
     }
 
-    BufferType serialize(std::initializer_list<std::pair<std::string, std::any>> list) {
+    BufferType serialize(initializer_list<pair<string, any>> list) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(initializer list/map)" << std::endl;
+            cout << "Json::serialize(initializer list/map)" << endl;
         }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::object();
@@ -358,7 +450,7 @@ public:
     template<typename ValueType>
     BufferType serialize(ValueType&& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(&&value)" << std::endl;
+            cout << "Json::serialize(&&value)" << endl;
         }   
         JsonBuffer buffer;
         serializeValue(buffer.json(), std::forward<ValueType>(value));
@@ -369,7 +461,7 @@ public:
     template<typename... ValueTypes>
     BufferType serialize(ValueTypes&&... values) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(&&values)" << std::endl;
+            cout << "Json::serialize(&&values)" << endl;
         }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::array();
@@ -381,7 +473,7 @@ public:
     template<typename... ValueTypes>
     BufferType serializeMap(ValueTypes&&... values) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serializeMap(&&values)" << std::endl;
+            cout << "Json::serializeMap(&&values)" << endl;
         }
         JsonBuffer buffer;
         buffer.json() = nlohmann::json::object();
@@ -398,7 +490,7 @@ public:
     template<Deserializable SourceBufferType>
     BufferType serialize(const SourceBufferType& value) {
         if constexpr (DEBUG_TRACE_CALLS) {
-            std::cout << "Json::serialize(Deserializable &&value)" << std::endl;
+            cout << "Json::serialize(Deserializable &&value)" << endl;
         }   
         JsonBuffer buffer;
         serializeValue(buffer.json(), value);
@@ -416,6 +508,6 @@ struct SerializerName<Json> {
 
 
 
-// Verified:
+// Verified size is correct:
 // {"a":3,"b":5.2,"c":"asdf","d":[7,8.2,{"e":2.613,"pi":3.14159}],"k":1028}
 // JsonBuffer 72 bytes at: 0x13ae070a0
