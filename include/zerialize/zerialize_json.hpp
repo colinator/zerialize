@@ -12,7 +12,7 @@
 
 namespace zerialize {
 
-string base64Encode(span<const uint8_t> data) {
+inline string base64Encode(span<const uint8_t> data) {
     static constexpr char base64_chars[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
@@ -42,13 +42,7 @@ string base64Encode(span<const uint8_t> data) {
     return encoded;
 }
 
-// #include <string>
-// #include <vector>
-// #include <span>
-// #include <stdexcept>
-// #include <cstdint>
-
-vector<uint8_t> base64Decode(string_view encoded) {
+inline vector<uint8_t> base64Decode(string_view encoded) {
     static constexpr uint8_t lookup[256] = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
