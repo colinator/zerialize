@@ -35,11 +35,6 @@ enum ValueType {
     Map, Array
 };
 
-#include <concepts>
-#include <vector>
-#include <span>
-#include <cstdint>
-
 // Requires classes to implement deserialization into primitive
 // types, maps, and vectors. Blob constraints defined below.
 template<typename V>
@@ -94,9 +89,11 @@ concept BlobDeserialiable = requires(T t) {
 // that compliant classes must satisfy. Each 'node' in a dynamic
 // tree of Deserializer must define these operations, and
 // are encouraged to do so in a zero-copy way, if possible.
+// It's just the union of BlobDeserialiable and NonBlobDeserialiable.
+// We just use the union because of c++20 constraints - we cannot
+// define the asBlob as returning either span or vector otherwise.
 template <typename T>
 concept Deserializable = BlobDeserialiable<T> && NonBlobDeserialiable<T>;
-
 
 template <Deserializable T>
 ValueType to_value_type(const T& v) {
@@ -203,6 +200,31 @@ public:
     virtual string to_string() const = 0;
 };
 
+// class BullshitClass {
+
+// };
+
+
+// template <typename T>
+// class ZComposite {
+// private:
+//     const T& t;
+// public:
+//     ZComposite(const T& t): t(t) {}
+
+//     template <typename SerializerType>
+//     void serializeValue(SerializerType& st) {
+//         t.serialize_write(st);
+//     }
+//     bool isInt() const { return false; }
+//     // bool isUInt() const { return ref_.IsUInt(); }
+//     // bool isFloat() const { return ref_.IsFloat(); }
+//     // bool isBool() const { return ref_.IsBool(); }
+//     // bool isString() const { return ref_.IsString() ; }
+//     // bool isBlob() const { return ref_.IsBlob() ; }
+//     // bool isMap() const { return ref_.IsMap(); }
+//     // bool isArray() const { return ref_.IsAnyVector(); }
+// };
 
 
 // Trait to get serializer name at compile-time:

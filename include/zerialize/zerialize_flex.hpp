@@ -161,6 +161,10 @@ public:
 };
 
 class Flex {
+public:
+
+    using BufferType = FlexBuffer;
+
 private:
 
     void serializeValue(flexbuffers::Builder& fbb, const char* val) {
@@ -285,6 +289,8 @@ private:
             serializeValue(fbb, any_cast<const char*>(val));
         } else if (val.type() == typeid(string)) {
             serializeValue(fbb, any_cast<string>(val));
+        // } else if (val.type() == typeid(Composite)) {
+        //     throw SerializationError("Composite type in any");
         } else {
             throw SerializationError("Unsupported type in any");
         }
@@ -292,6 +298,7 @@ private:
 
 
     // Used for format conversion, from any other Deserializable.
+    //void serializeValue(flexbuffers::Builder& fbb, const Deserializable auto& value) {
     template<Deserializable SourceBufferType>
     void serializeValue(flexbuffers::Builder& fbb, const SourceBufferType& value) {
         if (value.isMap()) {
@@ -323,13 +330,12 @@ private:
             span<const uint8_t> s = value.asBlob();
             serializeValue(fbb, s);
         } else {
+            //serializeValue(fbb, value.template serialize<Flex>(*this));
             throw SerializationError("Unsupported source buffer value type");
         }
     }
 
 public:
-
-    using BufferType = FlexBuffer;
 
     Flex() {}
 
@@ -364,6 +370,21 @@ public:
         buffer.finish();
         return buffer;
     }
+
+    // BufferType serialize(const map<string, any>& map) {
+    //     if constexpr (DEBUG_TRACE_CALLS) {
+    //         cout << "FlexBuffer::serialize (const map<string, any>&) " << endl;
+    //     }
+    //     FlexBuffer buffer;
+    //     buffer.fbb.Map([&]() {
+    //         for (const auto& [key, val] : map) {
+    //             buffer.fbb.Key(key);
+    //             serializeValue(buffer.fbb, val);
+    //         }
+    //     });
+    //     buffer.finish();
+    //     return buffer;
+    // }
 
     BufferType serialize(initializer_list<pair<string, any>> list) {
         if constexpr (DEBUG_TRACE_CALLS) {
