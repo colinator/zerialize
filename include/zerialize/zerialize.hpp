@@ -200,32 +200,6 @@ public:
     virtual string to_string() const = 0;
 };
 
-// class BullshitClass {
-
-// };
-
-
-// template <typename T>
-// class ZComposite {
-// private:
-//     const T& t;
-// public:
-//     ZComposite(const T& t): t(t) {}
-
-//     template <typename SerializerType>
-//     void serializeValue(SerializerType& st) {
-//         t.serialize_write(st);
-//     }
-//     bool isInt() const { return false; }
-//     // bool isUInt() const { return ref_.IsUInt(); }
-//     // bool isFloat() const { return ref_.IsFloat(); }
-//     // bool isBool() const { return ref_.IsBool(); }
-//     // bool isString() const { return ref_.IsString() ; }
-//     // bool isBlob() const { return ref_.IsBlob() ; }
-//     // bool isMap() const { return ref_.IsMap(); }
-//     // bool isArray() const { return ref_.IsAnyVector(); }
-// };
-
 
 // Trait to get serializer name at compile-time:
 // each serializer must have unique name, defined

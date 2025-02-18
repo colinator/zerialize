@@ -34,7 +34,7 @@ public:
     // Must copy for const reference
     FlexBuffer(const vector<uint8_t>& buf)
         : buf_(buf)
-        , ref_(flexbuffers::GetRoot(buf_)) { }
+        , ref_(buf.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) { }
 
     void finish() {
         fbb.Finish(); 
