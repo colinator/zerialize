@@ -13,7 +13,8 @@ void test_composite() {
     MyComposite<double, 3> c(3.14159, "yodude");
 
     testit<SerializerType>("Initializer list: MyComposite<float, 3>{3.14159,\"yodude\"}",
-        [c](){ return zerialize::composite::serialize<SerializerType>(c); },
+        //[c](){ return zerialize::composite::serialize<SerializerType>(c); },
+        [c](){ return zerialize::serialize<SerializerType>(serialize(c)); },
         [c](const auto& v) {
             auto l = asMyComposite<double, 3>(v);
             std::cout << "Deserialized MyComposite: " << l.to_string() << std::endl;
