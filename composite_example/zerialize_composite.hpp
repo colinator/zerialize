@@ -55,8 +55,8 @@ public:
 };
 
 template <typename TensorPrimitiveType, size_t NDimensions>
-std::map<std::string, std::any> serialize(const MyComposite<TensorPrimitiveType, NDimensions>& c) {
-    return std::map<std::string, std::any> {
+map<string, any> serialize(const MyComposite<TensorPrimitiveType, NDimensions>& c) {
+    return map<string, any> {
         {"s", (uint64_t)NDimensions}, 
         {"a", c.a}, 
         {"b", c.b}
@@ -68,11 +68,7 @@ typename SerializerType::BufferType serialize(SerializerType& serializer, const 
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(Composite&) up" << endl;
     }
-    return serializer.serialize({
-        {"s", (uint64_t)NDimensions}, 
-        {"a", c.a}, 
-        {"b", c.b}}
-    );
+    return serializer.serialize(serialize(c));
 }
 
 template<typename SerializerType, typename TensorPrimitiveType, size_t NDimensions>
@@ -84,16 +80,16 @@ typename SerializerType::BufferType serialize(const MyComposite<TensorPrimitiveT
     return serialize(serializer, c);
 }
 
-inline bool vectorContains(const std::vector<std::string_view>& v, const std::string_view& c) {
+inline bool _vectorContains(const std::vector<std::string_view>& v, const std::string_view& c) {
     return std::ranges::find(v, c) != v.end();
 }
 
 inline bool isMyComposite(const zerialize::Deserializable auto& buf) {
     if (buf.isMap()) {
         auto keys = buf.mapKeys();
-        return vectorContains(keys, "a") && buf["a"].isFloat() && 
-               vectorContains(keys, "b") && buf["b"].isString() && 
-               vectorContains(keys, "s") && buf["s"].isUInt();
+        return _vectorContains(keys, "a") && buf["a"].isFloat() && 
+               _vectorContains(keys, "b") && buf["b"].isString() && 
+               _vectorContains(keys, "s") && buf["s"].isUInt();
     }
     return false;
 }
@@ -101,9 +97,10 @@ inline bool isMyComposite(const zerialize::Deserializable auto& buf) {
 template <typename T, size_t D>
 MyComposite<T, D> asMyComposite(const zerialize::Deserializable auto& buf) {
     if (!isMyComposite(buf)) { throw zerialize::DeserializationError("not a MyComposite"); }
-    auto sv = buf["b"].asString();
-    std::string s(sv.begin(), sv.end());
-    return MyComposite<T, D>(buf["a"].asDouble(), s);
+    return MyComposite<T, D>(
+        buf["a"].asDouble(), 
+        buf["b"].asString()
+    );
 }
 
 } // namespace composite

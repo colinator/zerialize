@@ -190,7 +190,12 @@ public:
         return json_.get<bool>();
     }
     
-    string_view asString() const { 
+    string asString() const { 
+        if (!isString()) { throw DeserializationError("not a string"); }
+        return json_.get<string>(); 
+    }
+
+    string_view asStringView() const { 
         if (!isString()) { throw DeserializationError("not a string"); }
         return json_.get<string_view>(); 
     }

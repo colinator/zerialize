@@ -120,7 +120,13 @@ public:
         return ref_.AsBool();
     }
 
-    string_view asString() const {
+    string asString() const {
+        if (!isString()) { throw DeserializationError("not a string"); }
+        auto str = ref_.AsString();
+        return str.str();
+    }
+
+    string_view asStringView() const {
         if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
         return string_view(str.c_str(), str.size());

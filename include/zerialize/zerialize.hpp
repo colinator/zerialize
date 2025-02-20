@@ -64,7 +64,8 @@ concept NonBlobDeserialiable = requires(const V& v, const string& key, size_t in
     { v.asUInt64() } -> convertible_to<uint64_t>;
     { v.asFloat() } -> convertible_to<float>;
     { v.asDouble() } -> convertible_to<double>;
-    { v.asString() } -> convertible_to<string_view>;
+    { v.asString() } -> convertible_to<string>;
+    { v.asStringView() } -> convertible_to<string_view>;
     { v.asBool() } -> convertible_to<bool>;
 
     // Composite handling: everything that conforms to this concept needs
