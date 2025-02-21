@@ -256,5 +256,6 @@ int main() {
     testem<zerialize::Json>();
     test_conversion<zerialize::Flex, zerialize::Json>();
     test_conversion<zerialize::Json, zerialize::Flex>();
+    std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }

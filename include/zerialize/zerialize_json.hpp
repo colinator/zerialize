@@ -2,13 +2,6 @@
 
 #include <zerialize/zerialize.hpp>
 #include <nlohmann/json.hpp>
-#include <any>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <span>
-#include <sstream>
 
 namespace zerialize {
 
@@ -205,13 +198,10 @@ public:
         return base64Decode(json_.get<string_view>());
     }
 
-    vector<string_view> mapKeys() const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
-        vector<string_view> keys;
+    void copyMapKeys() const {
         for (const auto& it : json_.items()) {
-            keys.push_back(it.key());
+            cachedMapKeys.insert(it.key());
         }
-        return keys;
     }
 
     JsonBuffer operator[] (const string& key) const { 

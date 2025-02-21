@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
 #include <span>
 #include <concepts>
 #include <sstream>
@@ -13,7 +14,7 @@ constexpr bool DEBUG_TRACE_CALLS = true;
 
 namespace zerialize {
 
-using std::string, std::string_view, std::vector, std::map, std::pair, std::span;
+using std::string, std::string_view, std::vector, std::map, std::set, std::pair, std::span;
 using std::any, std::any_cast, std::initializer_list;
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t, std::declval;
 using std::runtime_error;
@@ -70,7 +71,7 @@ concept NonBlobDeserialiable = requires(const V& v, const string& key, size_t in
 
     // Composite handling: everything that conforms to this concept needs
     // to be able to index itself as a map...
-    { v.mapKeys() } -> convertible_to<vector<string_view>>;
+    { v.mapKeys() } -> convertible_to<set<string_view>>;
     { v[key] } -> same_as<V>;
 
     // ... or as an array
@@ -192,13 +193,32 @@ string debug_string(const T& v) {
 //    derived types, but also manage the actual byte buffer).
 template <typename Derived>
 class DataBuffer {
+protected:
+    mutable set<string_view> cachedMapKeys;
+    mutable bool mapKeysCached;
 public:
-    DataBuffer() {
+    DataBuffer(): mapKeysCached(false) {
         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
     }
+    
     virtual const vector<uint8_t>& buf() const = 0;
-    size_t size() const { return buf().size(); }
-    virtual string to_string() const = 0;
+    
+    size_t size() const { 
+        return buf().size(); 
+    }
+    
+    virtual string to_string() const { 
+        return "<DataBuffer size: " + std::to_string(size()) + ">"; 
+    }
+    
+    set<string_view> mapKeys() const {
+        if (!mapKeysCached) {
+            if (!static_cast<const Derived*>(this)->isMap()) { throw DeserializationError("not a map"); }
+            static_cast<const Derived*>(this)->copyMapKeys();
+            mapKeysCached = true;
+        }
+        return cachedMapKeys;
+    }
 };
 
 

@@ -30,6 +30,30 @@ map<string, any> serialize(const MyComposite<T, D>& c) {
     };
 }
 
+template <size_t D>
+bool isMyComposite(const Deserializable auto& buf) {
+    if (!buf.isMap()) return false;
+    set<string_view> keys = buf.mapKeys();
+    return keys.contains("a") && buf["a"].isFloat() && 
+           keys.contains("b") && buf["b"].isString() && 
+           keys.contains("s") && buf["s"].isUInt() && buf["s"].asUInt64() == D;
+}
+
+template <typename T, size_t D>
+MyComposite<T, D> asMyComposite(const Deserializable auto& buf) {
+    if (!isMyComposite<D>(buf)) { throw DeserializationError("not a MyComposite"); }
+    return MyComposite<T, D>(
+        buf["a"].asDouble(), 
+        buf["b"].asString()
+    );
+}
+
+} // namespace composite
+} // namespace zerialize
+
+
+
+
 // template<typename SerializerType, typename T, size_t D>
 // typename SerializerType::BufferType serialize(SerializerType& serializer, const MyComposite<T, D>& c) {
 //     if constexpr (DEBUG_TRACE_CALLS) {
@@ -46,29 +70,3 @@ map<string, any> serialize(const MyComposite<T, D>& c) {
 //     SerializerType serializer;
 //     return serialize(serializer, c);
 // }
-
-inline bool _vectorContains(const vector<string_view>& v, const string_view& c) {
-    return std::ranges::find(v, c) != v.end();
-}
-
-inline bool isMyComposite(const Deserializable auto& buf) {
-    if (buf.isMap()) {
-        auto keys = buf.mapKeys();
-        return _vectorContains(keys, "a") && buf["a"].isFloat() && 
-               _vectorContains(keys, "b") && buf["b"].isString() && 
-               _vectorContains(keys, "s") && buf["s"].isUInt();
-    }
-    return false;
-}
-
-template <typename T, size_t D>
-MyComposite<T, D> asMyComposite(const Deserializable auto& buf) {
-    if (!isMyComposite(buf)) { throw DeserializationError("not a MyComposite"); }
-    return MyComposite<T, D>(
-        buf["a"].asDouble(), 
-        buf["b"].asString()
-    );
-}
-
-} // namespace composite
-} // namespace zerialize

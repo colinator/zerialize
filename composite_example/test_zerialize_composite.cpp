@@ -38,6 +38,6 @@ void test_composite() {
 
 int main() {
     test_composite<zerialize::Flex>();
-    std::cout << "test zerialize composite done" << std::endl;
+    std::cout << "test zerialize composite done, ALL SUCCEEDED" << std::endl;
     return 0;
 }

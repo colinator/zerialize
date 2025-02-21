@@ -1,11 +1,5 @@
 #pragma once
 
-#include <any>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <span>
 #include <zerialize/zerialize.hpp>
 #include "flatbuffers/flexbuffers.h"
 
@@ -138,16 +132,13 @@ public:
         return span<const uint8_t>(b.data(), b.size());
     }
 
-    vector<string_view> mapKeys() const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
-        vector<string_view> keys;
+    void copyMapKeys() const {
         for (size_t i=0; i < ref_.AsMap().Keys().size(); i++) {
             string_view key(
                 ref_.AsMap().Keys()[i].AsString().c_str(), 
                 ref_.AsMap().Keys()[i].AsString().size());
-            keys.push_back(key);
+            cachedMapKeys.insert(key);
         }
-        return keys;
     }
 
     FlexBuffer operator[] (const string& key) const {
