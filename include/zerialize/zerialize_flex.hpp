@@ -132,13 +132,16 @@ public:
         return span<const uint8_t>(b.data(), b.size());
     }
 
-    void copyMapKeys() const {
+    set<string_view> mapKeys() const {
+        if (!isMap()) { throw DeserializationError("not a map"); }
+        set<string_view> keys;
         for (size_t i=0; i < ref_.AsMap().Keys().size(); i++) {
             string_view key(
                 ref_.AsMap().Keys()[i].AsString().c_str(), 
                 ref_.AsMap().Keys()[i].AsString().size());
-            cachedMapKeys.insert(key);
+            keys.insert(key);
         }
+        return keys;
     }
 
     FlexBuffer operator[] (const string& key) const {

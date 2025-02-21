@@ -198,10 +198,13 @@ public:
         return base64Decode(json_.get<string_view>());
     }
 
-    void copyMapKeys() const {
+    set<string_view> mapKeys() const {
+        if (!isMap()) { throw DeserializationError("not a map"); }
+        set<string_view> keys;
         for (const auto& it : json_.items()) {
-            cachedMapKeys.insert(it.key());
+            keys.insert(it.key());
         }
+        return keys;
     }
 
     JsonBuffer operator[] (const string& key) const { 

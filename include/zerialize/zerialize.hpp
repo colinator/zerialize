@@ -9,6 +9,7 @@
 #include <span>
 #include <concepts>
 #include <sstream>
+#include <mutex>
 
 constexpr bool DEBUG_TRACE_CALLS = true;
 
@@ -193,32 +194,14 @@ string debug_string(const T& v) {
 //    derived types, but also manage the actual byte buffer).
 template <typename Derived>
 class DataBuffer {
-protected:
-    mutable set<string_view> cachedMapKeys;
-    mutable bool mapKeysCached;
 public:
-    DataBuffer(): mapKeysCached(false) {
+    DataBuffer() {
         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
     }
     
     virtual const vector<uint8_t>& buf() const = 0;
-    
-    size_t size() const { 
-        return buf().size(); 
-    }
-    
-    virtual string to_string() const { 
-        return "<DataBuffer size: " + std::to_string(size()) + ">"; 
-    }
-    
-    set<string_view> mapKeys() const {
-        if (!mapKeysCached) {
-            if (!static_cast<const Derived*>(this)->isMap()) { throw DeserializationError("not a map"); }
-            static_cast<const Derived*>(this)->copyMapKeys();
-            mapKeysCached = true;
-        }
-        return cachedMapKeys;
-    }
+    size_t size() const { return buf().size(); }
+    virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
 };
 
 
