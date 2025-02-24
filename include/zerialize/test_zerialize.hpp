@@ -15,7 +15,7 @@ bool testit(const string& name,
     const function<typename SerializerType::BufferType()>& serializer,
     const function<bool(const typename SerializerType::BufferType&)>& test)
 {
-    string str = string("TEST <") + SerializerName<SerializerType>::value + "> --- " + name + " ---";
+    string str = string("TEST <") + SerializerType::Name + "> --- " + name + " ---";
     cout << "START " << str << std::endl;
     auto buffer = serializer();
     cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;

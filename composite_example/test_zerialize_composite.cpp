@@ -24,10 +24,21 @@ void test_composite() {
                 v["b"].asString() == "yodude";
         });
 
-    testit<SerializerType>("Initializer whatever",
+    testit<SerializerType>("Initializer with serialized composite",
         [c](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", serialize(c)}, { "b", 457835 } }
+            ); 
+        },
+        [c](const auto& v) {
+            auto l = asMyComposite<double, 3>(v["a"]);
+            return l == c && v["b"].asInt32() == 457835;
+        });
+
+    testit<SerializerType>("Initializer with serializer function",
+        [c](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"a", serializer<SerializerType>(c)}, { "b", 457835 } }
             ); 
         },
         [c](const auto& v) {

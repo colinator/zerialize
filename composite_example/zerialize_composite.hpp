@@ -21,6 +21,35 @@ public:
     }
 };
 
+// template <typename Serializer, typename T, size_t D>
+// struct MyCompositeSerializer {
+// private:
+//     const MyComposite<T, D>& c;
+// public:
+//     MyCompositeSerializer(const MyComposite& c): c(c) {}
+//     void serialize(Serializer s) {
+//         s.serializeMap([&c]() {
+//             s.serializeKeyAnd("a", c.a);
+//             s.serializeKeyAnd("b", c.b);
+//             s.serializeKeyAnd("s", (uint64_t)D);
+//         });
+//     }
+// };
+
+
+//std::function<void(Serializer&)> serializer(const MyComposite<T, D>& c) {
+
+template <typename S, typename T, size_t D>
+S::SerializingFunction serializer(const MyComposite<T, D>& c) {
+    return [&c](S::Serializer& s) {
+        s.serializeMap([&c](S::Serializer& ser) {
+            ser.serialize("a", c.a);
+            ser.serialize("b", c.b);
+            ser.serialize("s", static_cast<uint64_t>(D));
+        });
+    };
+}
+
 template <typename T, size_t D>
 map<string, any> serialize(const MyComposite<T, D>& c) {
     return map<string, any> {

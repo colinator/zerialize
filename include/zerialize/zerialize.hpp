@@ -9,17 +9,21 @@
 #include <span>
 #include <concepts>
 #include <sstream>
-#include <mutex>
+#include <functional>
 
 constexpr bool DEBUG_TRACE_CALLS = true;
 
 namespace zerialize {
 
 using std::string, std::string_view, std::vector, std::map, std::set, std::pair, std::span;
-using std::any, std::any_cast, std::initializer_list;
+using std::any, std::any_cast, std::initializer_list, std::function;
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t, std::declval;
 using std::runtime_error;
 using std::cout, std::endl, std::stringstream;
+
+
+// --------------
+// Error types thrown by various functions.
 
 class SerializationError : public runtime_error {
 public:
@@ -31,16 +35,20 @@ public:
     DeserializationError(const string& msg) : runtime_error(msg) { }
 };
 
-enum ValueType {
-    Bool, Int, UInt, Float,
-    String, Blob,
-    Map, Array
-};
+
+// --------------
+// Deserializable Concept
+//
+// The Deserializer concept defines a compile-time interface
+// that compliant classes must satisfy. Each 'node' in a dynamic
+// tree of Deserializer must define these operations, and
+// are encouraged to do so in a zero-copy way, if possible.
+// It's just the union of BlobDeserialiable and NonBlobDeserialiable.
 
 // Requires classes to implement deserialization into primitive
 // types, maps, and vectors. Blob constraints defined below.
 template<typename V>
-concept NonBlobDeserialiable = requires(const V& v, const string& key, size_t index) {
+concept NonBlobDeserializable = requires(const V& v, const string& key, size_t index) {
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
@@ -83,20 +91,205 @@ concept NonBlobDeserialiable = requires(const V& v, const string& key, size_t in
 // Requires classes to implement a valid asBlob method
 // that can return owning or non-owning array types.
 template <typename T>
-concept BlobDeserialiable = requires(T t) {
+concept BloDeserializable = requires(T t) {
     { t.asBlob() };
 } && (convertible_to<decltype(declval<T>().asBlob()), vector<uint8_t>> ||
       same_as<decltype(declval<T>().asBlob()), span<const uint8_t>>);
 
-// The Deserializer concept defines a compile-time interface
-// that compliant classes must satisfy. Each 'node' in a dynamic
-// tree of Deserializer must define these operations, and
-// are encouraged to do so in a zero-copy way, if possible.
-// It's just the union of BlobDeserialiable and NonBlobDeserialiable.
 // We just use the union because of c++20 constraints - we cannot
 // define the asBlob as returning either span or vector otherwise.
 template <typename T>
-concept Deserializable = BlobDeserialiable<T> && NonBlobDeserialiable<T>;
+concept Deserializable = BloDeserializable<T> && NonBlobDeserializable<T>;
+
+
+// --------------
+// The DataBuffer class exists to:
+// 1. enforce a common compile-time concept interface for derived types: they
+//    must conform to Deserializable.
+// 2. enforce a common interface for root-node buffers (that are themselves
+//    derived types, but also manage the actual byte buffer).
+
+template <typename Derived>
+class DataBuffer {
+public:
+    DataBuffer() {
+        static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
+    }
+    
+    virtual const vector<uint8_t>& buf() const = 0;
+    size_t size() const { return buf().size(); }
+    virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
+};
+
+
+// --------------
+// The Serializing concept defines a compile-time interface
+// that compliant classes must satisfy, to be considered
+// a 'Serializer'.
+
+template<typename V>
+concept Serializing = requires(V& v, 
+    const any& a, 
+    int64_t b, uint64_t c, 
+    bool d, double e, const string& f, 
+    const span<const uint8_t>& g, const string_view& h, const char* k,
+    const string& key
+) {
+
+    // Must support v.serialize(any)
+    //{ v.serialize(a) } -> std::same_as<void>;
+    { v.serialize(b) } -> std::same_as<void>;
+    { v.serialize(c) } -> std::same_as<void>;
+    { v.serialize(c) } -> std::same_as<void>;
+    { v.serialize(d) } -> std::same_as<void>;
+    { v.serialize(e) } -> std::same_as<void>;
+    { v.serialize(f) } -> std::same_as<void>;
+    { v.serialize(g) } -> std::same_as<void>;
+    { v.serialize(h) } -> std::same_as<void>;
+    { v.serialize(k) } -> std::same_as<void>;
+
+    // Must support v.serialize(key, any)
+    { v.serialize(key, a) } -> std::same_as<void>;
+};
+
+
+struct SerializingCallable {
+    template <typename T>
+    requires Serializing<std::remove_cvref_t<T>>
+    void operator()(T&&) { }
+};
+
+// Lame: _another_ concept to define serializeMap and Vector. These methods
+// take as arguments SerializingCallable objects: 'sub-serializers' that
+// are responsible for serializing key/value pairs or vector elements.
+template <typename V>
+concept SerializingComposite = requires(V& v, const std::string& key) {
+    typename V::Serializer;
+    { v.serializeMap(SerializingCallable{}) } -> std::same_as<void>;
+    { v.serializeVector(SerializingCallable{}) } -> std::same_as<void>;
+};
+
+// Finally, the concept we really want: just the union of the above.
+template <typename T>
+concept SerializingConcept = Serializing<T> && SerializingComposite<T>;
+
+
+// --------------
+// A CRTP-base class for serializers. Requires child classes to 
+// implement the SerializingConcept. Provides several convenience
+// methods.
+
+template <typename Derived>
+class Serializer {
+public:
+
+    using SerializingFunction = function<void(Derived& s)>;
+
+    Serializer() {
+        static_assert(SerializingConcept<Derived>, "Derived must satisfy Serializing concept");
+    }
+
+    void serializeFunction(function<void(Derived& s)> f) {
+        f(*static_cast<Derived*>(this));
+    }
+
+    void serializeAny(const any& val) {
+        Derived* d = static_cast<Derived*>(this);
+        if (val.type() == typeid(function<void(Derived& s)>)) {
+            serializeFunction(any_cast<function<void(Derived& s)>>(val));
+        } else if (val.type() == typeid(map<string, any>)) {
+            map<string, any> m = any_cast<map<string, any>>(val);
+            d->serializeMap([&](Derived& s){
+                for (const auto& [key, value]: m) {
+                    s.serialize(key, value);
+                }
+            });
+        } else if (val.type() == typeid(vector<any>)) {
+            vector<any> v = any_cast<vector<any>>(val);
+            d->serializeVector([&](Derived& s){
+                for (const any& value: v) {
+                    static_cast<Serializer*>(&s)->serializeAny(value);
+                }
+            });
+        } else if (val.type() == typeid(int8_t)) {
+            d->serialize(static_cast<int64_t>(any_cast<int8_t>(val)));
+        } else if (val.type() == typeid(int16_t)) {
+            d->serialize(static_cast<int64_t>(any_cast<int16_t>(val)));
+        } else if (val.type() == typeid(int32_t)) {
+            d->serialize(static_cast<int64_t>(any_cast<int32_t>(val)));
+        } else if (val.type() == typeid(int64_t)) {
+            d->serialize(static_cast<int64_t>(any_cast<int64_t>(val)));
+        } else if (val.type() == typeid(uint8_t)) {
+            d->serialize(static_cast<uint64_t>(any_cast<uint8_t>(val)));
+        } else if (val.type() == typeid(uint16_t)) {
+            d->serialize(static_cast<uint64_t>(any_cast<uint16_t>(val)));
+        } else if (val.type() == typeid(uint32_t)) {
+            d->serialize(static_cast<uint64_t>(any_cast<uint32_t>(val)));
+        } else if (val.type() == typeid(uint64_t)) {
+            d->serialize(static_cast<uint64_t>(any_cast<uint64_t>(val)));
+        } else if (val.type() == typeid(bool)) {
+            d->serialize(any_cast<bool>(val));
+        } else if (val.type() == typeid(double)) {
+            d->serialize(any_cast<double>(val));
+        } else if (val.type() == typeid(float)) {
+            d->serialize(static_cast<double>(any_cast<float>(val)));
+        } else if (val.type() == typeid(span<const uint8_t>)) {
+            d->serialize(any_cast<span<const uint8_t>>(val));
+        } else if (val.type() == typeid(const char*)) {
+            d->serialize(any_cast<const char*>(val));
+        } else if (val.type() == typeid(string)) {
+            d->serialize(any_cast<string>(val));
+        } else {
+            throw SerializationError("-- Unsupported type in any");
+        }
+    }
+
+    // Used for format conversion, from any other Deserializable.
+    template<Deserializable SourceBufferType>
+    void serialize(const SourceBufferType& value) {
+        Derived* d = static_cast<Derived*>(this);
+        if (value.isMap()) {
+            d->serializeMap([&](Derived& s){
+                for (string_view key: value.mapKeys()) {
+                    const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
+                    Derived keySerializer = s.serializerForKey(k);
+                    keySerializer.Serializer::serialize(value[k]);
+                }
+            });
+        } else if (value.isArray()) {
+            d->serializeVector([&](Derived& s){
+                for (size_t i=0; i<value.arraySize(); i++) {
+                    s.Serializer::serialize(value[i]);
+                }
+            });
+        } else if (value.isInt()) {
+            d->serialize(value.asInt64());
+        } else if (value.isUInt()) {
+            d->serialize(value.asUInt64());
+        }  else if (value.isFloat()) {
+            d->serialize(value.asDouble());
+        } else if (value.isBool()) {
+            d->serialize(value.asBool());
+        } else if (value.isString()) {
+            d->serialize(value.asString());
+        } else if (value.isBlob()) {
+            d->serialize(value.asBlob()); // ERROR HERE!!!! Howdoweknow?
+        } else {
+            throw SerializationError("Unsupported source buffer value type");
+        }
+    }
+};
+
+
+// --------------
+// Value Type: exists to provide support for introspection
+// on Deserializable.
+
+enum ValueType {
+    Bool, Int, UInt, Float,
+    String, Blob,
+    Map, Array
+};
 
 template <Deserializable T>
 ValueType to_value_type(const T& v) {
@@ -132,6 +325,10 @@ inline bool is_primitive(ValueType v) {
     return !is_composite(v);
 }
 
+
+// --------------
+// debug streaming
+
 inline string repeated_string(int num, const string& input) {
     string ret;
     ret.reserve(input.size() * num);
@@ -140,8 +337,7 @@ inline string repeated_string(int num, const string& input) {
     return ret;
 }
 
-template <Deserializable T>
-void debug_stream(stringstream & s, int tabLevel, const T& v) {
+void debug_stream(stringstream & s, int tabLevel, const Deserializable auto& v) {
     auto valueType = to_value_type(v);
     auto tab = "  ";
     auto tabString = repeated_string(tabLevel, tab);
@@ -180,116 +376,139 @@ void debug_stream(stringstream & s, int tabLevel, const T& v) {
     }
 }
 
-template <Deserializable T>
-string debug_string(const T& v) {
+string debug_string(const Deserializable auto& v) {
     stringstream s;
     debug_stream(s, 0, v);
     return s.str();
 }
 
 
-// The DataBuffer class exists to:
-// 1. enforce a common compile-time concept interface for derived types
-// 2. enforce a common interface for root-node buffers (that are themselves
-//    derived types, but also manage the actual byte buffer).
-template <typename Derived>
-class DataBuffer {
-public:
-    DataBuffer() {
-        static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
-    }
-    
-    virtual const vector<uint8_t>& buf() const = 0;
-    size_t size() const { return buf().size(); }
-    virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
-};
+// --------------
+// Define various serializer functions: the 7 canonical forms, so
+// we can pass nothing, an any, initializer lists for
+// vectors and maps, a perfect-forwarded value, and 
+// perfect-forwarded lists and maps.
 
-
-// Trait to get serializer name at compile-time:
-// each serializer must have unique name, defined
-// in it's .hpp file
-template<typename T>
-struct SerializerName;
-
-
-// Define various serializers: the 7 canonical forms.
-
+// Serialize nothing.
 template <typename SerializerType>
 typename SerializerType::BufferType serialize() {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize()" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize();
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    buffer.finish();
+    return buffer;
 }
 
+// Serialize anything, as an 'any' value.
 template <typename SerializerType>
 typename SerializerType::BufferType serialize(const any& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(any: " << value.type().name() << ")" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize(value);
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serializeAny(value);
+    buffer.finish();
+    return buffer;
 }
 
+// Serialize a vector from an initializer list of any.
 template <typename SerializerType>
 typename SerializerType::BufferType serialize(initializer_list<any> list) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(initializer list)" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize(list);
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serializeVector([&list](SerializerType::Serializer& s){
+        for (const any& val : list) {
+            s.serializeAny(val);
+        }           
+    });
+    buffer.finish();
+    return buffer;
 }
 
+// Serialize a map from an initializer list of pair<string, any>.
 template <typename SerializerType>
 typename SerializerType::BufferType serialize(initializer_list<pair<string, any>> list) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(initializer list/map)" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize(list);
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serializeMap([&list](SerializerType::Serializer& s){
+        for (const auto& [key, val] : list) {
+            s.serialize(key, val);
+        }           
+    });
+    buffer.finish();
+    return buffer;
 }
 
+// Serialize a perfect-forwarded value.
 template<typename SerializerType, typename ValueType>
 typename SerializerType::BufferType serialize(ValueType&& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(&&value)" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize(std::forward<ValueType>(value));
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serialize(std::forward<ValueType>(value));
+    buffer.finish();
+    return buffer;
 }
 
-
+// Serialize a map from pairs of string keys and  perfectly-forwarded values.
 template<typename SerializerType, typename... ValueTypes>
 typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(&& value pairs)" << endl;
     }
-    SerializerType serializer;
-    return serializer.serializeMap(std::forward<pair<const char*, ValueTypes>>(values)...);
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serializeMap([&](typename SerializerType::Serializer& s){
+        ([&](auto&& pair) {
+            string key(pair.first);
+            typename SerializerType::Serializer ks = s.serializerForKey(key);
+            ks.serialize(std::forward<decltype(pair.second)>(pair.second));
+        } (std::forward<decltype(values)>(values)), ...);
+    });
+    buffer.finish();
+    return buffer;
 }
 
+// Serialize a vector from a perfectly-forwarded parameter pack.
 template<typename SerializerType, typename... ValueTypes>
 typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(&&values" << endl;
+        cout << "serialize(&&values)" << endl;
     }
-    SerializerType serializer;
-    return serializer.serialize(std::forward<ValueTypes>(values)...);
+    typename SerializerType::BufferType buffer;
+    typename SerializerType::Serializer serializer(buffer);
+    serializer.serializeVector([&](typename SerializerType::Serializer& s){
+        (s.serialize(std::forward<ValueTypes>(values)), ...);      
+    });
+    buffer.finish();
+    return buffer;
 }
 
-
-// A special handle-it-all generic conversion function
+// --------------
+// ...and a special handle-it-all generic conversion function,
+// to convert from serialization format to another.
 
 template<typename SrcSerializerType, typename DstSerializerType>
 typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& src) {
     if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "convert(" << SerializerName<SrcSerializerType>::value << ") to: " << SerializerName<DstSerializerType>::value << endl;
+        cout << "convert(" << SrcSerializerType::Name << ") to: " << DstSerializerType::Name << endl;
     }
-
-    // Create destination serializer, use it to serialize the src
-    DstSerializerType dstSerializer;
-    return dstSerializer.serialize(src);
+    typename DstSerializerType::BufferType buffer;
+    typename DstSerializerType::Serializer serializer(buffer);
+    serializer.Serializer::serialize(src);
+    buffer.finish();
+    return buffer;
 }
 
 }

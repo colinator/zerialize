@@ -33,7 +33,7 @@ void testem() {
 
     using ST = SerializerType;
 
-    std::cout << "START testing zerialize: <" << SerializerName<ST>::value << ">" << endl << endl;
+    std::cout << "START testing zerialize: <" << SerializerType::Name << ">" << endl << endl;
 
     // Passing nothing: {}   
     testit<ST>("nothing",
@@ -77,8 +77,8 @@ void testem() {
             return v.asString() == "asdf";
         });
 
-    // Passing multiple rvalues: { 3, 5.2, "asdf" }
-    testit<SerializerType>("{ 3, 5.2, \"asdf\" } (via rvalues)",
+    // Passing multiple rvalues via parameter pack: { 3, 5.2, "asdf" }
+    testit<SerializerType>("{ 3, 5.2, \"asdf\" } (via parameter pack rvalues)",
         [](){ return zerialize::serialize<SerializerType>(3, 5.2, "asdf"); },
         [](const auto& v) {
             return v[0].asInt32() == 3 &&
@@ -168,6 +168,23 @@ void testem() {
                 v["d"][1].asDouble() == 8.2;
         });
 
+    // Using an initializer list for a map with a nested vector:
+    //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
+    testit<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, std::map<std::string, std::any>{ {"w", 3.2}, {"y", "yomamma"} }}} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 3 &&
+                v["b"].asDouble() == 5.2 &&
+                v["c"].asString() == "asdf" &&
+                v["d"][0].asInt32() == 7 &&
+                v["d"][1]["w"].asDouble() == 3.2 &&
+                v["d"][1]["y"].asString() == "yomamma";
+        });
+
     // Using an initializer list for a map with a nested blob:
     //     {"a": Blob{1,2,3,4}, "b": 457835 }
     auto k = std::array<uint8_t, 4>({'a','b','c','z'});
@@ -203,7 +220,7 @@ void testem() {
         
         // 1. Using span (zero-copy view)
         std::cout << "1. Construct from span (zero-copy view):" << std::endl;
-        auto span_view = flatbuffers::span<const uint8_t>(v.buf().data(), v.buf().size());
+        auto span_view = std::span<const uint8_t>(v.buf().data(), v.buf().size());
         auto v_span = typename SerializerType::BufferType(span_view);
         std::cout << v_span["a"].asInt32() << " " << v_span["b"].asDouble() << " " << v_span["c"].asString() << " " << v_span["d"][0].asInt32() << " " << v_span["d"][1].asDouble() << std::endl;
         std::cout << std::endl;
@@ -229,13 +246,13 @@ void testem() {
         std::cout << std::endl;
     }
 
-     std::cout << "..END testing zerialize: <" << zerialize::SerializerName<SerializerType>::value << ">" << endl << endl;
+     std::cout << "..END testing zerialize: <" << SerializerType::Name << ">" << endl << endl;
 }
 
 
 template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
-    std::cout << "Testing conversion from " << zerialize::SerializerName<SrcSerializerType>::value << " to " << zerialize::SerializerName<DestSerializerType>::value << std::endl;
+    std::cout << "Testing conversion from " << SrcSerializerType::Name << " to " << DestSerializerType::Name << std::endl;
     auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}}}}});
     auto v2 = zerialize::convert<SrcSerializerType, DestSerializerType>(v1);
     auto v3 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);

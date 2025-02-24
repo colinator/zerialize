@@ -223,278 +223,119 @@ public:
     }
 };
 
-class Json {
+class JsonSerializer: public Serializer<JsonSerializer> {
 private:
-    void serializeValue(nlohmann::json& j, const char* val) {
-        j = val;
+    nlohmann::json& j;
+    bool serializingVector;
+
+public:
+    JsonSerializer(nlohmann::json& j, bool serializingVector = false)
+        : j(j)
+        , serializingVector(serializingVector) {}
+
+    JsonSerializer(JsonBuffer& jb, bool serializingVector = false)
+        : j(jb.json())
+        , serializingVector(serializingVector) {}
+
+    nlohmann::json& elem() {
+        if (serializingVector) {
+            j.push_back(nullptr);
+            return j.back();
+        }
+        return j;
     }
 
-    void serializeValue(nlohmann::json& j, int8_t val) {
-        j = val;
+    template <typename T>
+    void writeT(T val) {
+        elem() = val;
     }
 
-    void serializeValue(nlohmann::json& j, int16_t val) {
-        j = val;
-    }
+    void serialize(int8_t val) { writeT(val); }
+    void serialize(int16_t val) { writeT(val); }
+    void serialize(int32_t val) { writeT(val); }
+    void serialize(int64_t val) { writeT(val); }
 
-    void serializeValue(nlohmann::json& j, int32_t val) {
-        j = val;
-    }
+    void serialize(uint8_t val) { writeT(val); }
+    void serialize(uint16_t val) { writeT(val); }
+    void serialize(uint32_t val) { writeT(val); }
+    void serialize(uint64_t val) { writeT(val); }
 
-    void serializeValue(nlohmann::json& j, int64_t val) {
-        j = val;
-    }
+    void serialize(bool val) {writeT(val); }
+    void serialize(double val) { writeT(val); }
+    void serialize(const char* val) { writeT(val); }
+    void serialize(const string& val) { writeT(val); }
 
-    void serializeValue(nlohmann::json& j, uint8_t val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, uint16_t val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, uint32_t val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, uint64_t val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, bool val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, float val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, double val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, const string& val) {
-        j = val;
-    }
-
-    void serializeValue(nlohmann::json& j, const span<const uint8_t>& val) {
+    void serialize(const span<const uint8_t>& val) { 
         std::string s = base64Encode(val);
-        j = s;
+        writeT(s);
     }
 
     template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
-    void serializeValue(nlohmann::json& j, T&& val) {
-        j = string(val);
+    void serialize(T&& val) {
+        writeT(string(val));
     }
 
-    template<typename T>
-    void serializeValue(nlohmann::json& j, pair<const char*, T>&& keyVal) {
-        j[keyVal.first] = nullptr;
-        serializeValue(j[keyVal.first], std::forward<T>(keyVal.second));
+    void serialize(const string& key, const any& value) {
+        if (serializingVector) { throw SerializationError("Cannot serialize key/value to vector"); }
+        j[key] = nullptr;
+        JsonSerializer s(j[key]);
+        s.serializeAny(value);
     }
 
-    void serializeValue(nlohmann::json& j, vector<any>&& val) {
-        j = nlohmann::json::array();
-        for (const any& v: val) {
-            j.push_back(nullptr);
-            serializeValue(j.back(), v);
+    JsonSerializer serializerForKey(const string& key) {
+        if (serializingVector) { throw SerializationError("Cannot serialize key/value to vector"); }
+        j[key] = nullptr;
+        return JsonSerializer(j[key]);
+    }
+
+    void serialize(const map<string, any>& m) {
+        writeT(nlohmann::json::object());
+        for (const auto& [key, value]: m) {
+            j[key] = nullptr;
+            JsonSerializer s(j[key]);
+            s.serialize(key, value);
         }
     }
 
-    void serializeValue(nlohmann::json& j, const any& val) {
-        if (val.type() == typeid(map<string, any>)) {
-            map<string, any> m = any_cast<map<string, any>>(val);
-            j = nlohmann::json::object();
-            for (const auto& [key, value]: m) {
-                j[key] = nullptr;
-                serializeValue(j[key], value);
-            }
-        } else if (val.type() == typeid(vector<any>)) {
-            vector<any> l = any_cast<vector<any>>(val);
-            j = nlohmann::json::array();
-            for (const any& v: l) {
-                j.push_back(nullptr);
-                serializeValue(j.back(), v);
-            }
-        } else if (val.type() == typeid(int8_t)) {
-            serializeValue(j, any_cast<int8_t>(val));
-        } else if (val.type() == typeid(int16_t)) {
-            serializeValue(j, any_cast<int16_t>(val));
-        } else if (val.type() == typeid(int32_t)) {
-            serializeValue(j, any_cast<int32_t>(val));
-        } else if (val.type() == typeid(int64_t)) {
-            serializeValue(j, any_cast<int64_t>(val));
-        } else if (val.type() == typeid(uint8_t)) {
-            serializeValue(j, any_cast<uint8_t>(val));
-        } else if (val.type() == typeid(uint16_t)) {
-            serializeValue(j, any_cast<uint16_t>(val));
-        } else if (val.type() == typeid(uint32_t)) {
-            serializeValue(j, any_cast<uint32_t>(val));
-        } else if (val.type() == typeid(uint64_t)) {
-            serializeValue(j, any_cast<uint64_t>(val));
-        } else if (val.type() == typeid(bool)) {
-            serializeValue(j, any_cast<bool>(val));
-        } else if (val.type() == typeid(double)) {
-            serializeValue(j, any_cast<double>(val));
-        } else if (val.type() == typeid(float)) {
-            serializeValue(j, any_cast<float>(val));
-        } else if (val.type() == typeid(span<const uint8_t>)) {
-            serializeValue(j, any_cast<span<const uint8_t>>(val));
-        } else if (val.type() == typeid(const char*)) {
-            serializeValue(j, any_cast<const char*>(val));
-        } else if (val.type() == typeid(string)) {
-            serializeValue(j, any_cast<string>(val));
-        } else {
-            throw SerializationError("Unsupported type in any");
+    void serialize(const vector<any>& l) {
+        nlohmann::json& ja = elem();
+        ja = nlohmann::json::array();
+        for (auto v: l) {
+            JsonSerializer s(ja, true);
+            s.serializeAny(v);
         }
     }
 
-    // Used for format conversion, from any other Deserializable.
-    template<Deserializable SourceBufferType>
-    void serializeValue(nlohmann::json& j, const SourceBufferType& value) {
-        if (value.isMap()) {
-            j = nlohmann::json::object();
-            for (string_view key: value.mapKeys()) {
-                // Copies the key. Lame if you ask me...
-                const string s(key);
-                j[s] = nullptr;
-                serializeValue(j[s], value[s]);
-            }
-        } else if (value.isArray()) {
-            j = nlohmann::json::array();
-            for (size_t i=0; i<value.arraySize(); i++) {
-                j.push_back(nullptr);
-                serializeValue(j.back(),  value[i]);
-            }
-        } else if (value.isInt()) {
-            serializeValue(j, value.asInt64());
-        } else if (value.isUInt()) {
-            serializeValue(j, value.asUInt64());
-        }  else if (value.isFloat()) {
-            serializeValue(j, value.asDouble());
-        } else if (value.isBool()) {
-            serializeValue(j, value.asBool());
-        } else if (value.isString()) {
-            serializeValue(j, value.asString());
-        } else if (value.isBlob()) {
-            serializeValue(j, value.asBlob()); // ERROR HERE!!!! Howdoweknow?
-        } else {
-            throw SerializationError("Unsupported source buffer value type");
-        }
+    void serialize(function<void(JsonSerializer& s)> f) {
+        f(*this);
     }
 
-public:
-    using BufferType = JsonBuffer;
-
-    Json() {}
-
-    BufferType serialize() {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize()" << endl;
-        }
-        JsonBuffer buffer;
-        buffer.json() = nlohmann::json::array();
-        buffer.finish();
-        return buffer;
+    void serializeMap(function<void(JsonSerializer& s)> f) {
+        nlohmann::json& ja = elem();
+        ja = nlohmann::json::object();
+        JsonSerializer s(ja);
+        f(s);
     }
 
-    BufferType serialize(const any& value) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(value)" << endl;
-        }
-        JsonBuffer buffer;
-        serializeValue(buffer.json(), value);
-        buffer.finish();
-        return buffer;
-    }
-
-    BufferType serialize(initializer_list<any> list) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(initializer_list)" << endl;
-        }
-        JsonBuffer buffer;
-        buffer.json() = nlohmann::json::array();
-        for (const any& val : list) {
-            buffer.json().push_back(nullptr);
-            serializeValue(buffer.json().back(), val);
-        }
-        buffer.finish();
-        return buffer;
-    }
-
-    BufferType serialize(initializer_list<pair<string, any>> list) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(initializer list/map)" << endl;
-        }
-        JsonBuffer buffer;
-        buffer.json() = nlohmann::json::object();
-        for (const auto& [key, val] : list) {
-            buffer.json()[key] = nullptr;
-            serializeValue(buffer.json()[key], val);
-        }
-        buffer.finish();
-        return buffer;
-    }
-
-    template<typename ValueType>
-    BufferType serialize(ValueType&& value) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(&&value)" << endl;
-        }   
-        JsonBuffer buffer;
-        serializeValue(buffer.json(), std::forward<ValueType>(value));
-        buffer.finish();
-        return buffer;
-    }
-
-    template<typename... ValueTypes>
-    BufferType serialize(ValueTypes&&... values) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(&&values)" << endl;
-        }
-        JsonBuffer buffer;
-        buffer.json() = nlohmann::json::array();
-        (serializeValue(buffer.json().emplace_back(), std::forward<ValueTypes>(values)), ...);
-        buffer.finish();
-        return buffer;
-    }
-
-    template<typename... ValueTypes>
-    BufferType serializeMap(ValueTypes&&... values) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serializeMap(&&values)" << endl;
-        }
-        JsonBuffer buffer;
-        buffer.json() = nlohmann::json::object();
-        ([&](auto&& pair) {
-            buffer.json()[pair.first] = nullptr;
-            serializeValue(buffer.json()[pair.first], std::forward<decltype(pair.second)>(pair.second));
-        }(std::forward<ValueTypes>(values)), ...);
-        buffer.finish();
-        return buffer;
-    }
-
-    // A special serialize method that takes another buffer type.
-    // Used for format conversion.
-    template<Deserializable SourceBufferType>
-    BufferType serialize(const SourceBufferType& value) {
-        if constexpr (DEBUG_TRACE_CALLS) {
-            cout << "Json::serialize(Deserializable &&value)" << endl;
-        }   
-        JsonBuffer buffer;
-        serializeValue(buffer.json(), value);
-        buffer.finish();
-        return buffer;
+    void serializeVector(function<void(JsonSerializer& s)> f) {
+        nlohmann::json& ja = elem();
+        ja = nlohmann::json::array();
+        JsonSerializer s(ja, true);
+        f(s);
     }
 };
 
-template<>
-struct SerializerName<Json> {
-    static constexpr const char* value = "JSON";
+
+class Json {
+public:
+    using BufferType = JsonBuffer;
+    using Serializer = JsonSerializer;
+    using SerializingFunction = JsonSerializer::SerializingFunction;
+
+    static inline constexpr const char* Name = "JSON";
 };
 
 } // namespace zerialize
-
 
 
 // Verified size is correct:
