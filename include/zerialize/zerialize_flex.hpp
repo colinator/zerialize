@@ -168,7 +168,6 @@ private:
     flexbuffers::Builder& fbb;
 
 public:
-    FlexSerializer(flexbuffers::Builder& fbb): fbb(fbb) {}
     FlexSerializer(FlexBuffer& fb): fbb(fb.fbb) {}
 
     void serialize(int8_t val) { fbb.Int(val); }

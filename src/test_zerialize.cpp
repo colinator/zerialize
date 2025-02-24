@@ -10,24 +10,6 @@ using std::cout, std::endl;
 using namespace zerialize;
 
 
-
-// template <typename SerializerType>
-// bool testit(const string& name,
-//     const function<typename SerializerType::BufferType()>& serializer,
-//     const function<bool(const typename SerializerType::BufferType&)>& test)
-// {
-//     string str = string("TEST <") + SerializerName<SerializerType>::value + "> --- " + name + " ---";
-//     cout << "START " << str << std::endl;
-//     auto buffer = serializer();
-//     cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
-//     bool res = test(buffer);
-//     cout << (res ? "   OK " : " FAIL ") << str << endl << endl;
-//     if (!res) {
-//         throw std::runtime_error(string("test failed!!!") + str);
-//     }
-//     return res;
-// }
-
 template <typename SerializerType>
 void testem() {
 
@@ -200,9 +182,6 @@ void testem() {
                 std::equal(a.begin(), a.end(), k.begin()) &&
                 v["b"].asInt32() == 457835;
         });
-
-
-    //return;
 
 
     {
