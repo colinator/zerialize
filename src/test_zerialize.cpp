@@ -185,10 +185,10 @@ void testem() {
         });
 
 
-    // Using an initializer list for a map with a nested blob:
-    //     {"a": Blob{1,2,3,4}, "b": 457835 }
+    // Using an initializer list for a map with a nested xtensor:
+    //     {"a": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
     auto t = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
-    testit<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}}, \"b\": 457835 }",
+    testit<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
         [&t](){ 
             return zerialize::serialize<SerializerType>(
                 { 
@@ -198,11 +198,32 @@ void testem() {
             ); 
         },
         [&t](const auto& v) {
-            auto a = zerialize::xtensor::asXTensor<double>(v["a"]);
-            std::cout << " ---- a " << std::endl << a << std::endl;
-            std::cout << " ---- t " << std::endl << t << std::endl;
+            auto a = zerialize::xtensor::asXTensor<double, 2>(v["a"]);
+            //std::cout << " ---- a " << std::endl << a << std::endl;
+            //std::cout << " ---- t " << std::endl << t << std::endl;
             return
                 a == t &&
+                v["b"].asInt32() == 457835;
+        });
+
+    // Using an initializer list for a map with a nested xarray:
+    //     {"a": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
+    auto t2 = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    testit<SerializerType>("Initializer list: {\"a\": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
+        [&t2](){
+            return zerialize::serialize<SerializerType>(
+                { 
+                  { "a", zerialize::xtensor::serializer<SerializerType>(t2) }, 
+                  { "b", 457835 } 
+                }
+            );
+        },
+        [&t2](const auto& v) {
+            auto a = zerialize::xtensor::asXTensor<double>(v["a"]);
+            //std::cout << " ---- a " << std::endl << a << std::endl;
+            //std::cout << " ---- t2 " << std::endl << t2 << std::endl;
+            return
+                a == t2 &&
                 v["b"].asInt32() == 457835;
         });
 
