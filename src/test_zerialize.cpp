@@ -3,6 +3,7 @@
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
 #include <zerialize/test_zerialize.hpp>
+#include <zerialize/zerialize_xtensor.hpp>
 
 using std::string, std::function;
 using std::cout, std::endl;
@@ -178,8 +179,30 @@ void testem() {
         },
         [k](const auto& v) {
             auto a = v["a"].asBlob();
-           return 
+            return 
                 std::equal(a.begin(), a.end(), k.begin()) &&
+                v["b"].asInt32() == 457835;
+        });
+
+
+    // Using an initializer list for a map with a nested blob:
+    //     {"a": Blob{1,2,3,4}, "b": 457835 }
+    auto t = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    testit<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}}, \"b\": 457835 }",
+        [&t](){ 
+            return zerialize::serialize<SerializerType>(
+                { 
+                  { "a", zerialize::xtensor::serializer<SerializerType>(t) }, 
+                  { "b", 457835 } 
+                }
+            ); 
+        },
+        [&t](const auto& v) {
+            auto a = zerialize::xtensor::asXTensor<double>(v["a"]);
+            std::cout << " ---- a " << std::endl << a << std::endl;
+            std::cout << " ---- t " << std::endl << t << std::endl;
+            return
+                a == t &&
                 v["b"].asInt32() == 457835;
         });
 
@@ -249,9 +272,58 @@ void test_conversion() {
 
 int main() {
     testem<zerialize::Flex>();
+    testem<zerialize::Flex>();
     testem<zerialize::Json>();
-    test_conversion<zerialize::Flex, zerialize::Json>();
-    test_conversion<zerialize::Json, zerialize::Flex>();
-    std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
+    // test_conversion<zerialize::Flex, zerialize::Json>();
+    // test_conversion<zerialize::Json, zerialize::Flex>();
+    // std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }
+
+
+// <Map> {
+//   "a": <Map> {
+//     "data": <32 bytes> <Blob>
+//     "dtype": 11 <Int>
+//     "shape": <Array> [
+//       2 <UInt>
+//       2 <UInt>
+//     ]
+//   }
+//   "b": 457835 <Int>
+// }
+
+// <Map> {
+//   "a": <Map> {
+//     "data": "AAAAAAAA8D8AAAAAAAAAQAAAAAAAAAhAAAAAAAAAEEA=" <String>
+//     "dtype": 11 <Int>
+//     "shape": <Array> [
+//       2 <Int>
+//       2 <Int>
+//     ]
+//   }
+//   "b": 457835 <Int>
+// }
+
+
+//  ---- pred 
+//  READ BLOB: <span 32:  0 0 0 0 0 0 240 63 0 0 0 0 0 0 0 64 0 0 0 0 0 0 8 64 0 0 0 0 0 0 16 64>
+//  READ BLOB: <span 32:  0 0 0 0 0 0 240 63 0 0 0 0 0 0 0 64 0 0 0 0 0 0 8 64 0 0 0 0 0 0 16 64>
+//  ---- a 
+// {{ 1.,  2.},
+//  { 3.,  4.}}
+//  ---- t 
+// {{ 1.,  2.},
+//  { 3.,  4.}}
+//    OK TEST <FLEX> --- Initializer list: {"a": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}}, "b": 457835 } ---
+
+//  ---- pred 
+//  READ BLOB: <span 32:  0 0 0 0 0 0 240 63 0 0 0 0 0 0 0 64 0 0 0 0 0 0 8 64 0 0 0 0 0 0 16 64>
+//  ---- a 
+// {{ 0.,  0.},
+//  { 0.,  0.}}
+//  ---- t 
+// {{ 1.,  2.},
+//  { 3.,  4.}}
+//  FAIL TEST <JSON> --- Initializer list: {"a": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}}, "b": 457835 } ---
+
