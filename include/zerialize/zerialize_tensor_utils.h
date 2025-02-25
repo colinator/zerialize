@@ -1,11 +1,14 @@
 #pragma once
 
 #include "zerialize.hpp"
+#include <complex>
 
 // boooo... xtensor dependency...
 #include <xtl/xhalf_float.hpp>
 
 namespace zerialize {
+
+using std::complex;
 
 template<typename T>
 inline constexpr int tensor_dtype_index = -1;
@@ -19,6 +22,8 @@ template<> inline constexpr int tensor_dtype_index<uint32_t> = 6;
 template<> inline constexpr int tensor_dtype_index<uint64_t> = 7;
 template<> inline constexpr int tensor_dtype_index<float> = 10;
 template<> inline constexpr int tensor_dtype_index<double> = 11;
+template<> inline constexpr int tensor_dtype_index<complex<float>> = 12;
+template<> inline constexpr int tensor_dtype_index<complex<double>> = 13;
 template<> inline constexpr int tensor_dtype_index<xtl::half_float> = 14;
 
 template<typename T>
@@ -33,13 +38,14 @@ template<> inline constexpr string_view tensor_dtype_name<uint32_t> = "uint32";
 template<> inline constexpr string_view tensor_dtype_name<uint64_t> = "uint64";
 template<> inline constexpr string_view tensor_dtype_name<float> = "float";
 template<> inline constexpr string_view tensor_dtype_name<double> = "double";
+template<> inline constexpr string_view tensor_dtype_name<complex<float>> = "complex<float>";
+template<> inline constexpr string_view tensor_dtype_name<complex<double>> = "complex<double>";
 template<> inline constexpr string_view tensor_dtype_name<xtl::half_float> = "xtl::half_float";
 
 // Unsupported...
 //template<> inline constexpr int tensor_dtype_index<intptr_t> = 8;
 //template<> inline constexpr int tensor_dtype_index<uintptr_t> = 9;
-//template<> inline constexpr int tensor_dtype_index<complex64> = 12;
-//template<> inline constexpr int tensor_dtype_index<complex128> = 13;
+
 
 inline string_view type_name_from_code(int type_code) {
     switch (type_code) {
@@ -53,6 +59,8 @@ inline string_view type_name_from_code(int type_code) {
         case tensor_dtype_index<uint64_t>: return tensor_dtype_name<uint64_t>;
         case tensor_dtype_index<float>: return tensor_dtype_name<float>;
         case tensor_dtype_index<double>: return tensor_dtype_name<double>;
+        case tensor_dtype_index<complex<float>>: return tensor_dtype_name<complex<float>>;
+        case tensor_dtype_index<complex<double>>: return tensor_dtype_name<complex<double>>;
         case tensor_dtype_index<xtl::half_float>: return tensor_dtype_name<xtl::half_float>;
     }
     return "unknown";
