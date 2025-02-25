@@ -260,7 +260,7 @@ public:
     void serialize(uint32_t val) { writeT(val); }
     void serialize(uint64_t val) { writeT(val); }
 
-    void serialize(bool val) {writeT(val); }
+    void serialize(bool val) { writeT(val); }
     void serialize(double val) { writeT(val); }
     void serialize(const char* val) { writeT(val); }
     void serialize(const string& val) { writeT(val); }
