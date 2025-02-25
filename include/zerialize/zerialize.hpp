@@ -91,7 +91,7 @@ concept NonBlobDeserializable = requires(const V& v, const string& key, size_t i
 // Requires classes to implement a valid asBlob method
 // that can return owning or non-owning array types.
 template <typename T>
-concept BloDeserializable = requires(T t) {
+concept BlobDeserializable = requires(T t) {
     { t.asBlob() };
 } && (convertible_to<decltype(declval<T>().asBlob()), vector<uint8_t>> ||
       same_as<decltype(declval<T>().asBlob()), span<const uint8_t>>);
@@ -99,7 +99,7 @@ concept BloDeserializable = requires(T t) {
 // We just use the union because of c++20 constraints - we cannot
 // define the asBlob as returning either span or vector otherwise.
 template <typename T>
-concept Deserializable = BloDeserializable<T> && NonBlobDeserializable<T>;
+concept Deserializable = BlobDeserializable<T> && NonBlobDeserializable<T>;
 
 
 // --------------
@@ -195,8 +195,8 @@ public:
 
     void serializeAny(const any& val) {
         Derived* d = static_cast<Derived*>(this);
-        if (val.type() == typeid(function<void(Derived& s)>)) {
-            serializeFunction(any_cast<function<void(Derived& s)>>(val));
+        if (val.type() == typeid(function<void(Derived&)>)) {
+            serializeFunction(any_cast<function<void(Derived&)>>(val));
         } else if (val.type() == typeid(map<string, any>)) {
             map<string, any> m = any_cast<map<string, any>>(val);
             d->serializeMap([&](Derived& s){
@@ -380,6 +380,24 @@ string debug_string(const Deserializable auto& v) {
     stringstream s;
     debug_stream(s, 0, v);
     return s.str();
+}
+
+inline std::string blob_to_string(vector<uint8_t>& s) {
+    std::string result = "<vec " + std::to_string(s.size()) + ": ";
+    for (uint8_t v : s) {
+        result += " " + std::to_string(v);
+    }
+    result += ">";
+    return result;
+}
+
+inline std::string blob_to_string(std::span<const uint8_t> s) {
+    std::string result = "<span " + std::to_string(s.size()) + ": ";
+    for (uint8_t v : s) {
+        result += " " + std::to_string(v);
+    }
+    result += ">";
+    return result;
 }
 
 
