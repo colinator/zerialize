@@ -2,7 +2,7 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
-#include <zerialize/test_zerialize.hpp>
+#include <zerialize/zerialize_testing_utils.hpp>
 #include <zerialize/zerialize_xtensor.hpp>
 #include <zerialize/zerialize_eigen.hpp>
 
@@ -20,49 +20,49 @@ void testem() {
     std::cout << "START testing zerialize: <" << SerializerType::Name << ">" << endl << endl;
 
     // Passing nothing: {}   
-    testit<ST>("nothing",
+    test_serialization<ST>("nothing",
         [](){ return serialize<ST>(); },
         [](const auto&) {
             return true;
         });
 
     // Passing a single value: 3
-    testit<ST>("3",
+    test_serialization<ST>("3",
         [](){ return serialize<ST>(3); },
         [](const auto& v) {
             return v.asInt32() == 3;
         });
 
     // Passing a string: "asdf" via char*
-    testit<ST>("\"asdf\" (via rvalue char*)",
+    test_serialization<ST>("\"asdf\" (via rvalue char*)",
         [](){ return serialize<ST>("asdf"); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
     // Passing a string: "asdf" via temp string
-    testit<ST>("\"asdf\" (via rvalue temp string)",
+    test_serialization<ST>("\"asdf\" (via rvalue temp string)",
         [](){ return serialize<ST>(std::string{"asdf"}); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
     // Passing a string: "asdf" via lvalue string
-    testit<ST>("\"asdf\" (via lvalue string)",
+    test_serialization<ST>("\"asdf\" (via lvalue string)",
         [](){ std::string s = "asdf"; return serialize<ST>(s); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
     
     // Passing a string: "asdf" via const lvalue string
-    testit<ST>("\"asdf\" (via const lvalue string)",
+    test_serialization<ST>("\"asdf\" (via const lvalue string)",
         [](){ const std::string s = "asdf"; return serialize<ST>(s); },
         [](const auto& v) {
             return v.asString() == "asdf";
         });
 
     // Passing multiple rvalues via parameter pack: { 3, 5.2, "asdf" }
-    testit<SerializerType>("{ 3, 5.2, \"asdf\" } (via parameter pack rvalues)",
+    test_serialization<SerializerType>("{ 3, 5.2, \"asdf\" } (via parameter pack rvalues)",
         [](){ return zerialize::serialize<SerializerType>(3, 5.2, "asdf"); },
         [](const auto& v) {
             return v[0].asInt32() == 3 &&
@@ -71,7 +71,7 @@ void testem() {
         });
 
     // Passing an initializer list: { 3, 5.2, "asdf" }
-    testit<SerializerType>("3, 5.2, \"asdf\" (via initializer list)",
+    test_serialization<SerializerType>("3, 5.2, \"asdf\" (via initializer list)",
         [](){ return zerialize::serialize<SerializerType>({ 3, 5.2, "asdf" }); },
         [](const auto& v) {
             return v[0].asInt32() == 3 &&
@@ -80,7 +80,7 @@ void testem() {
         });
 
     // Passing multiple values including a vector: 3, 5.2, "asdf", [7, 8.2]
-    testit<SerializerType>("3, 5.2, \"asdf\", [7, 8.2]",
+    test_serialization<SerializerType>("3, 5.2, \"asdf\", [7, 8.2]",
         [](){ 
             return zerialize::serialize<SerializerType>(
                 3, 5.2, "asdf", std::vector<std::any>{7, 8.2}
@@ -95,7 +95,7 @@ void testem() {
         });
 
     // Using an initializer list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
-    testit<SerializerType>("{\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} (via initializer list)",
+    test_serialization<SerializerType>("{\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} (via initializer list)",
         [](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"} }
@@ -108,7 +108,7 @@ void testem() {
         });
 
     // Using a generic rvalue list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
-    testit<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"}",
+    test_serialization<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"}",
         [](){ 
             return zerialize::serialize<SerializerType, int, double, std::string>(
                 {"a", 3}, {"b", 5.2}, {"c", "asdf"}
@@ -122,7 +122,7 @@ void testem() {
 
     // Using a generic rvalue list for a map with a nested vector:
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
-    testit<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+    test_serialization<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
             return zerialize::serialize<SerializerType, int, double, std::string, std::vector<std::any>>(
                 {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}}
@@ -138,7 +138,7 @@ void testem() {
 
     // Using an initializer list for a map with a nested vector:
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
-    testit<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+    test_serialization<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} }
@@ -154,7 +154,7 @@ void testem() {
 
     // Using an initializer list for a map with a nested vector:
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
-    testit<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
+    test_serialization<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, std::map<std::string, std::any>{ {"w", 3.2}, {"y", "yomamma"} }}} }
@@ -172,7 +172,7 @@ void testem() {
     // Using an initializer list for a map with a nested blob:
     //     {"a": Blob{1,2,3,4}, "b": 457835 }
     auto k = std::array<uint8_t, 4>({'a','b','c','z'});
-    testit<SerializerType>("Initializer list: {\"a\": std::span<const uint8_t>({'a','b','c','z'}), \"b\": 457835 }",
+    test_serialization<SerializerType>("Initializer list: {\"a\": std::span<const uint8_t>({'a','b','c','z'}), \"b\": 457835 }",
         [k](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", std::span<const uint8_t>(k)}, { "b", 457835 } }
@@ -188,7 +188,7 @@ void testem() {
     // Using an initializer list for a map with a nested xtensor:
     //     {"a": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
     auto t = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
-    testit<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
+    test_serialization<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
         [&t](){ 
             return zerialize::serialize<SerializerType>(
                 { 
@@ -209,7 +209,7 @@ void testem() {
     // Using an initializer list for a map with a nested xarray:
     //     {"a": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
     auto t2 = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
-    testit<SerializerType>("Initializer list: {\"a\": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
+    test_serialization<SerializerType>("Initializer list: {\"a\": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
         [&t2](){
             return zerialize::serialize<SerializerType>(
                 { 
@@ -233,7 +233,7 @@ void testem() {
     m << 1, 2, 3,
          4, 5, 6,
          7, 8, 9;
-    testit<SerializerType>("Initializer list: {\"a\": Eigen::Matrix3f, \"b\": 457835 }",
+    test_serialization<SerializerType>("Initializer list: {\"a\": Eigen::Matrix3f, \"b\": 457835 }",
         [&m](){
             return zerialize::serialize<SerializerType>(
                 { 
