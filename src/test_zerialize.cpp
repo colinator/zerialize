@@ -300,7 +300,8 @@ void testem() {
 template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
     std::cout << "Testing conversion from " << SrcSerializerType::Name << " to " << DestSerializerType::Name << std::endl;
-    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}}}}});
+    auto m = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}, {"m", zerialize::xtensor::serializer<SrcSerializerType>(m)}}}}});
     auto v2 = zerialize::convert<SrcSerializerType, DestSerializerType>(v1);
     auto v3 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
     auto v4 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
