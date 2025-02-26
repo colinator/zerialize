@@ -4,6 +4,7 @@
 #include <zerialize/zerialize_json.hpp>
 #include <zerialize/test_zerialize.hpp>
 #include <zerialize/zerialize_xtensor.hpp>
+#include <zerialize/zerialize_eigen.hpp>
 
 using std::string, std::function;
 using std::cout, std::endl;
@@ -184,7 +185,6 @@ void testem() {
                 v["b"].asInt32() == 457835;
         });
 
-
     // Using an initializer list for a map with a nested xtensor:
     //     {"a": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
     auto t = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
@@ -224,6 +224,30 @@ void testem() {
             //std::cout << " ---- t2 " << std::endl << t2 << std::endl;
             return
                 a == t2 &&
+                v["b"].asInt32() == 457835;
+        });
+
+    // Using an initializer list for a map with a nested eigen matrix:
+    //     {"a": Eigen::Matrix3f, "b": 457835 }
+    Eigen::Matrix3f m;
+    m << 1, 2, 3,
+         4, 5, 6,
+         7, 8, 9;
+    testit<SerializerType>("Initializer list: {\"a\": Eigen::Matrix3f, \"b\": 457835 }",
+        [&m](){
+            return zerialize::serialize<SerializerType>(
+                { 
+                  { "a", zerialize::eigen::serializer<SerializerType>(m) }, 
+                  { "b", 457835 } 
+                }
+            );
+        },
+        [&m](const auto& v) {
+            auto a = zerialize::eigen::asEigenMatrix<float, 3, 3>(v["a"]);
+            // std::cout << " ---- a " << std::endl << a << std::endl;
+            // std::cout << " ---- m " << std::endl << m << std::endl;
+            return
+                a == m &&
                 v["b"].asInt32() == 457835;
         });
 

@@ -15,8 +15,7 @@ span<const uint8_t> _blob_from_xtensor(const auto& t) {
     const T* actual_data = t.data();
     const uint8_t* byte_data = (const uint8_t*)actual_data;
     size_t num_bytes = t.size() * sizeof(T);
-    auto blob = span<const uint8_t>(byte_data, num_bytes);
-    return blob;
+    return span<const uint8_t>(byte_data, num_bytes);
 }
 
 // Serialize an xtensor
@@ -66,7 +65,7 @@ auto asXTensor(const Deserializable auto& buf) {
 
     // Check that the serialized dtype matches T
     auto dtype = buf[DTypeKey].asInt32();
-    if (dtype != tensor_dtype_index<T>) throw SerializationError(string("asXTensor asked to deserialize a tensor of type ") + string(tensor_dtype_name<T>) + " but found a tensor of type " + string(type_name_from_code(dtype)));
+    if (dtype != tensor_dtype_index<T>) throw DeserializationError(string("asXTensor asked to deserialize a tensor of type ") + string(tensor_dtype_name<T>) + " but found a tensor of type " + string(type_name_from_code(dtype)));
 
     // get the shape
     TensorShape vshape = tensor_shape(buf[ShapeKey]);
@@ -74,7 +73,7 @@ auto asXTensor(const Deserializable auto& buf) {
     // perform dimension check
     if constexpr(D >= 0) {
         if (vshape.size() != D) {
-            throw SerializationError("asXTensor asked to deserialize a tensor of rank " + std::to_string(D) + " but found a tensor of rank " +  std::to_string(vshape.size()));
+            throw DeserializationError("asXTensor asked to deserialize a tensor of rank " + std::to_string(D) + " but found a tensor of rank " +  std::to_string(vshape.size()));
         }
     }
 
@@ -96,10 +95,10 @@ auto asXTensor(const Deserializable auto& buf) {
     // Depending on the blob type (is it owned or not), we might
     // have to instantiate (copy) the tensor. This will happen for 
     // serializable types that do not support 0-copy blobs (such as Json).
-    if constexpr (std::is_same_v<decltype(blob), std::vector<uint8_t>>) {
+    if constexpr (std::is_same_v<decltype(blob), vector<uint8_t>>) {
         // We've gotta copy it...
         return xt::xarray<T>(in_place_xtensor);
-    } else if constexpr (std::is_same_v<decltype(blob), std::span<const uint8_t>>) {
+    } else { //if constexpr (std::is_same_v<decltype(blob), span<const uint8_t>>) {
         return in_place_xtensor;
     }
 }
