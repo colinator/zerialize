@@ -20,7 +20,7 @@ template <typename S, typename T, int NRows, int NCols, int Options=Eigen::ColMa
 S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
     return [&m](S::Serializer& s) {
         s.serializeMap([&m](S::Serializer& ser) {
-            std::vector<any> shape = { any((uint64_t)m.rows()), any((uint64_t)m.cols()) };
+            std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
             ser.serialize(ShapeKey, shape);
             ser.serialize(DTypeKey, tensor_dtype_index<T>);
             ser.serialize(DataKey, _blob_from_eigen_matrix(m));

@@ -54,7 +54,7 @@ using flextensor_adaptor = const xt::xarray_adaptor<
         std::allocator<T>
     >,
     xt::layout_type::row_major,
-    std::vector<uint32_t, std::allocator<uint32_t>>,
+    std::vector<TensorShapeElement, std::allocator<TensorShapeElement>>,
     xt::xtensor_expression_tag
 >;
 

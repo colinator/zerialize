@@ -70,7 +70,8 @@ constexpr char ShapeKey[] = "shape";
 constexpr char DTypeKey[] = "dtype";
 constexpr char DataKey[] = "data";
 
-using TensorShape = vector<uint32_t>;
+using TensorShapeElement = uint32_t;
+using TensorShape = vector<TensorShapeElement>;
 
 inline vector<any> shape_of_any(const auto& tshape) {
     // get a vector of the shape as a vector of any.
@@ -79,7 +80,7 @@ inline vector<any> shape_of_any(const auto& tshape) {
     vector<any> shape;
     shape.reserve(tshape.size());
     std::transform(tshape.begin(), tshape.end(), std::back_inserter(shape),
-        [](uint32_t x) { return any(x); });
+        [](TensorShapeElement x) { return any(x); });
     return shape;
 }
 
