@@ -515,7 +515,7 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
 
 // --------------
 // ...and a special handle-it-all generic conversion function,
-// to convert from serialization format to another.
+// to convert from one serialization format to another.
 
 template<typename SrcSerializerType, typename DstSerializerType>
 typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& src) {
