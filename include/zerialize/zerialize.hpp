@@ -130,13 +130,17 @@ public:
 template<typename V>
 concept Serializing = requires(V& v, 
     const any& a, 
-    int64_t b, uint64_t c, 
-    bool d, double e, const string& f, 
-    const span<const uint8_t>& g, const string_view& h, const char* k,
+    int64_t b, 
+    uint64_t c, 
+    bool d, 
+    double e, 
+    const string& f, 
+    const span<const uint8_t>& g, 
+    const string_view& h, 
+    const char* i,
     const string& key
 ) {
 
-    // Must support v.serialize(any)
     //{ v.serialize(a) } -> std::same_as<void>;
     { v.serialize(b) } -> std::same_as<void>;
     { v.serialize(c) } -> std::same_as<void>;
@@ -146,7 +150,7 @@ concept Serializing = requires(V& v,
     { v.serialize(f) } -> std::same_as<void>;
     { v.serialize(g) } -> std::same_as<void>;
     { v.serialize(h) } -> std::same_as<void>;
-    { v.serialize(k) } -> std::same_as<void>;
+    { v.serialize(i) } -> std::same_as<void>;
 
     // Must support v.serialize(key, any)
     { v.serialize(key, a) } -> std::same_as<void>;
@@ -277,6 +281,47 @@ public:
         } else {
             throw SerializationError("Unsupported source buffer value type");
         }
+    }
+
+    // template <typename T>
+    // void serialize(const vector<T>& v) {
+    //     Derived* d = static_cast<Derived*>(this);
+    //     d->serializeVector([&v](Derived& s){
+    //         for (const T& val: v) {
+    //             s.serialize(val);
+    //         }
+    //     });
+    // }
+
+    // Serialize any vector-like container that we can iterate over.
+    // Tested with array and vector
+    template <typename Container>
+    requires std::ranges::range<Container>
+    void serialize(const Container& v) {
+        Derived* d = static_cast<Derived*>(this);
+        d->serializeVector([&](Derived& s) {
+            for (auto&& val : v)
+                s.serialize(val);
+        });
+    }
+
+    // Serialize any map-like container that we can iterate over,
+    // and whose key is convertible to string_view.
+    template <typename Map>
+    requires std::ranges::range<Map> &&
+    requires(const typename Map::value_type kv) {
+        { kv.first } -> std::convertible_to<std::string_view>;
+        { kv.second };
+    }
+    void serialize(const Map& m) {
+        Derived* d = static_cast<Derived*>(this);
+        d->serializeMap([&m](Derived& s){
+            for (const auto& [key, value] : m) {
+                const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
+                Derived keySerializer = s.serializerForKey(k);
+                keySerializer.serialize(value);
+            }
+        });
     }
 };
 

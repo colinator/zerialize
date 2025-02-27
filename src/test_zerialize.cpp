@@ -252,6 +252,237 @@ void testem() {
         });
 
 
+    // Vector of int
+    test_serialization<SerializerType>("initializer list of int: {1, 2, 3, 4, 5}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                {1, 2, 3, 4, 5}
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+    // Vector of any
+    auto va = std::vector<any>{1, 2, 3, 4, 5};
+    test_serialization<SerializerType>("Vector of any: [1, 2, 3, 4, 5]",
+        [&va](){ 
+            return zerialize::serialize<SerializerType>(va); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+    // Vector of int
+    auto vi = std::vector<int>{1, 2, 3, 4, 5};
+    test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
+        [&vi](){ 
+            return zerialize::serialize<SerializerType>(vi); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+    // array of int
+    auto ai = std::array<int, 5>{1, 2, 3, 4, 5};
+    test_serialization<SerializerType>("array of int: [1, 2, 3, 4, 5]",
+        [&ai](){ 
+            return zerialize::serialize<SerializerType>(ai); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+    // Vector of int
+    auto iv = std::vector<int>{1, 2, 3, 4, 5};
+    test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
+        [&iv](){ 
+            //return zerialize::serialize<SerializerType>(iv); 
+            return zerialize::serialize<SerializerType>([&iv](SerializerType::Serializer& s){
+                s.serializeVector([&iv](SerializerType::Serializer& ser) {
+                    for (auto z: iv) {
+                        ser.serialize(z);
+                    }
+                });
+            });
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+
+    // Vector of int
+    test_serialization<SerializerType>("Temporary vector of int: [1, 2, 3, 4, 5]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::vector<int>{1, 2, 3, 4, 5}
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asInt32() == 1 &&
+                v[1].asInt32() == 2 &&
+                v[2].asInt32() == 3 &&
+                v[3].asInt32() == 4 &&
+                v[4].asInt32() == 5;
+        });
+
+
+    // Vector of double
+    test_serialization<SerializerType>("Vector of double: [1.1, 2.2, 3.3, 4.4, 5.5]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::vector<double>{1.1, 2.2, 3.3, 4.4, 5.5}
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 5 &&
+                v[0].asDouble() == 1.1 &&
+                v[1].asDouble() == 2.2 &&
+                v[2].asDouble() == 3.3 &&
+                v[3].asDouble() == 4.4 &&
+                v[4].asDouble() == 5.5;
+        });
+
+    // Vector of string
+    test_serialization<SerializerType>("Vector of string: [\"one\", \"two\", \"three\"]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::vector<std::string>{"one", "two", "three"}
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 3 &&
+                v[0].asString() == "one" &&
+                v[1].asString() == "two" &&
+                v[2].asString() == "three";
+        });
+
+    // Map with string keys and int values
+    test_serialization<SerializerType>("Map with string keys and int values: {\"a\": 1, \"b\": 2, \"c\": 3}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::map<std::string, int>{{"a", 1}, {"b", 2}, {"c", 3}}
+            ); 
+        },
+        [](const auto& v) {
+            return v["a"].asInt32() == 1 &&
+                v["b"].asInt32() == 2 &&
+                v["c"].asInt32() == 3;
+        });
+
+
+    // Map with string keys and double values
+    test_serialization<SerializerType>("Map with string keys and double values: {\"x\": 1.1, \"y\": 2.2, \"z\": 3.3}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::map<std::string, double>{{"x", 1.1}, {"y", 2.2}, {"z", 3.3}}
+            ); 
+        },
+        [](const auto& v) {
+            return v["x"].asDouble() == 1.1 &&
+                v["y"].asDouble() == 2.2 &&
+                v["z"].asDouble() == 3.3;
+        });
+
+    // Map with string keys and string values
+    test_serialization<SerializerType>("Map with string keys and string values: {\"first\": \"one\", \"second\": \"two\", \"third\": \"three\"}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::map<std::string, std::string>{{"first", "one"}, {"second", "two"}, {"third", "three"}}
+            ); 
+        },
+        [](const auto& v) {
+            return v["first"].asString() == "one" &&
+                v["second"].asString() == "two" &&
+                v["third"].asString() == "three";
+        });
+
+    // Vector of vectors (nested vectors of int)
+    test_serialization<SerializerType>("Vector of vectors: [[1, 2], [3, 4], [5, 6]]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::vector<std::vector<int>>{{1, 2}, {3, 4}, {5, 6}}
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 3 &&
+                v[0].arraySize() == 2 &&
+                v[0][0].asInt32() == 1 &&
+                v[0][1].asInt32() == 2 &&
+                v[1].arraySize() == 2 &&
+                v[1][0].asInt32() == 3 &&
+                v[1][1].asInt32() == 4 &&
+                v[2].arraySize() == 2 &&
+                v[2][0].asInt32() == 5 &&
+                v[2][1].asInt32() == 6;
+        });
+
+    // Map with string keys and vector values
+    test_serialization<SerializerType>("Map with string keys and vector values: {\"nums\": [1, 2, 3], \"decimals\": [4.4, 5.5, 6.6]}",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::map<std::string, std::vector<double>>{
+                    {"nums", {1.0, 2.0, 3.0}}, 
+                    {"decimals", {4.4, 5.5, 6.6}}
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return v["nums"].arraySize() == 3 &&
+                v["nums"][0].asDouble() == 1.0 &&
+                v["nums"][1].asDouble() == 2.0 &&
+                v["nums"][2].asDouble() == 3.0 &&
+                v["decimals"].arraySize() == 3 &&
+                v["decimals"][0].asDouble() == 4.4 &&
+                v["decimals"][1].asDouble() == 5.5 &&
+                v["decimals"][2].asDouble() == 6.6;
+        });
+
+
+    // Vector of maps
+    test_serialization<SerializerType>("Vector of maps: [{\"a\": 1, \"b\": 2}, {\"c\": 3, \"d\": 4}]",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                std::vector<std::map<std::string, int>>{
+                    {{"a", 1}, {"b", 2}},
+                    {{"c", 3}, {"d", 4}}
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return v.arraySize() == 2 &&
+                v[0]["a"].asInt32() == 1 &&
+                v[0]["b"].asInt32() == 2 &&
+                v[1]["c"].asInt32() == 3 &&
+                v[1]["d"].asInt32() == 4;
+        });
+
     {
         std::cout << std::endl;
 

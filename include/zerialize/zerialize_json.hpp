@@ -83,6 +83,7 @@ private:
     nlohmann::json json_;
 
 public:
+
     nlohmann::json& json() { return json_; }
 
     JsonBuffer() {}
@@ -229,6 +230,10 @@ private:
     bool serializingVector;
 
 public:
+
+    // Make the base class overloads visible in the derived class
+    using Serializer<JsonSerializer>::serialize;
+
     JsonSerializer(nlohmann::json& j, bool serializingVector = false)
         : j(j)
         , serializingVector(serializingVector) {}

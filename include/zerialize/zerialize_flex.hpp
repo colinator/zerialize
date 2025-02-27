@@ -168,6 +168,11 @@ private:
     flexbuffers::Builder& fbb;
 
 public:
+
+    // Make the base class overloads visible in the derived class
+    using Serializer<FlexSerializer>::serialize;
+
+
     FlexSerializer(FlexBuffer& fb): fbb(fb.fbb) {}
 
     void serialize(int8_t val) { fbb.Int(val); }
