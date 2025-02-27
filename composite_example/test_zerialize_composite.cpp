@@ -1,6 +1,6 @@
 #include <iostream>
 #include "zerialize_composite.hpp"
-#include "zerialize/test_zerialize.hpp"
+#include "zerialize/zerialize_testing_utils.hpp"
 #include "zerialize/zerialize_flex.hpp"
 #include "zerialize/zerialize_json.hpp"
 
@@ -12,7 +12,7 @@ void test_composite() {
 
     MyComposite<double, 3> c(3.14159, "yodude");
 
-    testit<SerializerType>("Initializer list: MyComposite<float, 3>{3.14159,\"yodude\"}",
+    test_serialization<SerializerType>("Initializer list: MyComposite<float, 3>{3.14159,\"yodude\"}",
         //[c](){ return zerialize::composite::serialize<SerializerType>(c); },
         [c](){ return zerialize::serialize<SerializerType>(serialize(c)); },
         [c](const auto& v) {
@@ -24,7 +24,7 @@ void test_composite() {
                 v["b"].asString() == "yodude";
         });
 
-    testit<SerializerType>("Initializer with serialized composite",
+    test_serialization<SerializerType>("Initializer with serialized composite",
         [c](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", serialize(c)}, { "b", 457835 } }
@@ -35,7 +35,7 @@ void test_composite() {
             return l == c && v["b"].asInt32() == 457835;
         });
 
-    testit<SerializerType>("Initializer with serializer function",
+    test_serialization<SerializerType>("Initializer with serializer function",
         [c](){ 
             return zerialize::serialize<SerializerType>(
                 { {"a", serializer<SerializerType>(c)}, { "b", 457835 } }

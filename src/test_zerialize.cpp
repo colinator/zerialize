@@ -13,7 +13,7 @@ using namespace zerialize;
 
 
 template <typename SerializerType>
-void testem() {
+void test_much_serialization() {
 
     using ST = SerializerType;
 
@@ -548,8 +548,8 @@ void test_conversion() {
 }
 
 int main() {
-    testem<zerialize::Flex>();
-    testem<zerialize::Json>();
+    test_much_serialization<zerialize::Flex>();
+    test_much_serialization<zerialize::Json>();
     test_conversion<zerialize::Flex, zerialize::Json>();
     test_conversion<zerialize::Json, zerialize::Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
