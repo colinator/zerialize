@@ -15,8 +15,12 @@ bool test_serialization(const string& name,
 {
     string str = string("TEST <") + SerializerType::Name + "> --- " + name + " ---";
     cout << "START " << str << std::endl;
+
+    // invoke the serializer function: that will give us a serialized buffer
     auto buffer = serializer();
     cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
+
+    // invoke the test predicate to determine whether that matched what we want
     bool res = test(buffer);
     cout << (res ? "   OK " : " FAIL ") << str << endl << endl;
     if (!res) {
@@ -30,9 +34,8 @@ bool test_serialization(const string& name,
     typename SerializerType::BufferType newBuffer = typename SerializerType::BufferType(bufferCopy);
     
     // Apply test to new buffer
-    bool newRes = test(newBuffer);
-    if (!newRes) {
-        throw std::runtime_error(string("test failed after buffer copy!!!") + str);
+    if (!test(newBuffer)) {
+        throw std::runtime_error(string("test failed after buffer copy!!! ") + str);
     }    
     
     // Get and compare addresses
@@ -45,6 +48,26 @@ bool test_serialization(const string& name,
     if (firstBufferAddr == secondBufferAddr && firstBufferAddr != 0) {
         throw std::runtime_error(string("Buffer addresses match! This indicates a potential memory issue. ") + str);
     }
+
+    // Deserialize from a span
+    auto span_view = std::span<const uint8_t>(newBuffer.buf().data(), newBuffer.buf().size());
+    auto spanBuffer = typename SerializerType::BufferType(span_view);
+    if (!test(spanBuffer)) {
+        throw std::runtime_error(string("test failed after span init!!! ") + str);
+    } 
+
+    // Deserialize from a moved vector
+    auto buf_to_move = std::vector<uint8_t>(newBuffer.buf());  // Make a copy to move from
+    auto moveBuffer = typename SerializerType::BufferType(std::move(buf_to_move));
+    if (!test(moveBuffer)) {
+        throw std::runtime_error(string("test failed after move init!!! ") + str);
+    } 
+
+    // Deserialize copy constructor
+    auto copiedBuffer = typename SerializerType::BufferType(newBuffer.buf());
+    if (!test(copiedBuffer)) {
+        throw std::runtime_error(string("test failed after copy init!!! ") + str);
+    } 
     
     return res;
 }

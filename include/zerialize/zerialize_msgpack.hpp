@@ -37,20 +37,22 @@ public:
 
     // Zero-copy view of existing data
     MsgPackBuffer(span<const uint8_t> data) {
-        msgpack::unpack(oh_, reinterpret_cast<const char*>(data.data()), data.size());
-        obj_ = oh_.get();
+        if (data.size() > 0) {
+            msgpack::unpack(oh_, reinterpret_cast<const char*>(data.data()), data.size());
+            obj_ = oh_.get();
+        }
     }
 
     // Zero-copy move of vector ownership
-    MsgPackBuffer(vector<uint8_t>&& buf)
-        : buf_(std::move(buf)) {
-        msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
-        obj_ = oh_.get();
+    MsgPackBuffer(vector<uint8_t>&& buf): buf_(std::move(buf)) {
+        if (buf_.size() > 0) {
+            msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
+            obj_ = oh_.get();
+        }
     }
 
     // Must copy for const reference
-    MsgPackBuffer(const vector<uint8_t>& buf)
-        : buf_(buf) {
+    MsgPackBuffer(const vector<uint8_t>& buf): buf_(buf) {
         if (buf_.size() > 0) {
             msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
             obj_ = oh_.get();

@@ -20,12 +20,12 @@ public:
 
     // Zero-copy view of existing data
     FlexBuffer(span<const uint8_t> data)
-        : ref_(flexbuffers::GetRoot(data.data(), data.size())) { }
+        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference()) { }
 
     // Zero-copy move of vector ownership
     FlexBuffer(vector<uint8_t>&& buf)
         : buf_(std::move(buf))
-        , ref_(flexbuffers::GetRoot(buf_)) { }
+        , ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) { }
 
     // Must copy for const reference
     FlexBuffer(const vector<uint8_t>& buf)
