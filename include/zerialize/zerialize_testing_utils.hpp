@@ -18,7 +18,7 @@ bool test_serialization(const string& name,
 
     // invoke the serializer function: that will give us a serialized buffer
     auto buffer = serializer();
-    cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
+   cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
 
     // invoke the test predicate to determine whether that matched what we want
     bool res = test(buffer);

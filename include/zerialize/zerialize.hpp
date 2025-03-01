@@ -445,10 +445,10 @@ void debug_stream(stringstream & s, int tabLevel, const Deserializable auto& v) 
         }
         s << tabString << "]" << endl;
     } else if (is_primitive(valueType)) {
-        if (v.isInt()) {
-            s << v.asInt64();
-        } else if (v.isUInt()) {
+        if (v.isUInt()) {
             s << v.asUInt64();
+        } else if (v.isInt()) {
+            s << v.asInt64();
         } else if (v.isFloat()) {
             s << v.asDouble();
         } else if (v.isString()) {

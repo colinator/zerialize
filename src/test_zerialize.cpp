@@ -483,6 +483,267 @@ void test_much_serialization() {
                 v[1]["d"].asInt32() == 4;
         });
 
+
+    // Boolean values
+    test_serialization<SerializerType>("Boolean values: true and false",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"true_val", true}, {"false_val", false} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["true_val"].asBool() == true &&
+                v["false_val"].asBool() == false;
+        });
+
+    // Different integer types
+    test_serialization<SerializerType>("Different integer types",
+        [](){ 
+            int8_t i8 = -42;
+            uint8_t ui8 = 200;
+            int16_t i16 = -12345;
+            uint16_t ui16 = 54321;
+            int32_t i32 = -12345789;
+            uint32_t ui32 = 54321234;
+            int64_t i64 = -9223372036854775807LL;
+            uint64_t ui64 = 18446744073709551615ULL;
+            return zerialize::serialize<SerializerType>(
+                { 
+                    {"int8", i8}, 
+                    {"uint8", ui8}, 
+                    {"int16", i16}, 
+                    {"uint16", ui16}, 
+                    {"int32", i32}, 
+                    {"uint32", ui32}, 
+                    {"int64", i64}, 
+                    {"uint64", ui64} 
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return v["int8"].asInt32() == -42 &&
+                v["uint8"].asUInt32() == 200 &&
+                v["int16"].asInt32() == -12345 &&
+                v["uint16"].asUInt32() == 54321 &&
+                v["int32"].asInt32() == -12345789 &&
+                v["uint32"].asUInt32() == 54321234 &&
+                v["int64"].asInt64() == -9223372036854775807LL &&
+                v["uint64"].asUInt64() == 18446744073709551615ULL;
+        });
+
+    // Float type (already testing double in other tests)
+    test_serialization<SerializerType>("Float values",
+        [](){ 
+            float f1 = 3.14159f;
+            float f2 = -2.71828f;
+            
+            return zerialize::serialize<SerializerType>(
+                { {"pi", f1}, {"neg_e", f2} }
+            ); 
+        },
+        [](const auto& v) {
+            return std::abs(v["pi"].asFloat() - 3.14159f) < 0.0001f &&
+                std::abs(v["neg_e"].asFloat() - (-2.71828f)) < 0.0001f;
+        });
+        
+/*
+    // Null values
+    test_serialization<SerializerType>("Null values",
+        [](){ 
+            return zerialize::serialize<SerializerType>(
+                { {"null_val", nullptr} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["null_val"].isNull();
+        });
+
+    // std::optional
+    test_serialization<SerializerType>("std::optional values",
+        [](){ 
+            std::optional<int> opt_with_value = 42;
+            std::optional<std::string> opt_without_value;
+            
+            return zerialize::serialize<SerializerType>(
+                { {"with_value", opt_with_value}, {"without_value", opt_without_value} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["with_value"].asInt32() == 42 &&
+                v["without_value"].isNull();
+        });
+
+    // std::variant
+    test_serialization<SerializerType>("std::variant values",
+        [](){ 
+            std::variant<int, double, std::string> var1 = 42;
+            std::variant<int, double, std::string> var2 = 3.14159;
+            std::variant<int, double, std::string> var3 = std::string("hello");
+            
+            return zerialize::serialize<SerializerType>(
+                { {"int_variant", var1}, {"double_variant", var2}, {"string_variant", var3} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["int_variant"].asInt32() == 42 &&
+                std::abs(v["double_variant"].asDouble() - 3.14159) < 0.0001 &&
+                v["string_variant"].asString() == "hello";
+        });
+
+    // std::tuple
+    test_serialization<SerializerType>("std::tuple values",
+        [](){ 
+            auto tuple1 = std::make_tuple(1, 2.5, "three");
+            auto tuple2 = std::make_tuple(true, 42);
+            
+            return zerialize::serialize<SerializerType>(
+                { {"tuple1", tuple1}, {"tuple2", tuple2} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["tuple1"].arraySize() == 3 &&
+                v["tuple1"][0].asInt32() == 1 &&
+                v["tuple1"][1].asDouble() == 2.5 &&
+                v["tuple1"][2].asString() == "three" &&
+                v["tuple2"].arraySize() == 2 &&
+                v["tuple2"][0].asBool() == true &&
+                v["tuple2"][1].asInt32() == 42;
+        });
+
+    // std::pair
+    test_serialization<SerializerType>("std::pair values",
+        [](){ 
+            auto pair1 = std::make_pair("key1", 100);
+            auto pair2 = std::make_pair(200, "value2");
+            
+            return zerialize::serialize<SerializerType>(
+                { {"pair1", pair1}, {"pair2", pair2} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["pair1"].arraySize() == 2 &&
+                v["pair1"][0].asString() == "key1" &&
+                v["pair1"][1].asInt32() == 100 &&
+                v["pair2"].arraySize() == 2 &&
+                v["pair2"][0].asInt32() == 200 &&
+                v["pair2"][1].asString() == "value2";
+        });
+
+    // std::set and std::unordered_set
+    test_serialization<SerializerType>("std::set and std::unordered_set",
+        [](){ 
+            std::set<int> set1 = {1, 2, 3, 4, 5};
+            std::unordered_set<std::string> set2 = {"apple", "banana", "cherry"};
+            
+            return zerialize::serialize<SerializerType>(
+                { {"set", set1}, {"unordered_set", set2} }
+            ); 
+        },
+        [](const auto& v) {
+            // Sets may not preserve order, so we check if all elements are present
+            auto set1 = v["set"];
+            auto set2 = v["unordered_set"];
+            
+            bool set1_valid = set1.arraySize() == 5 &&
+                (set1[0].asInt32() == 1 || set1[1].asInt32() == 1 || set1[2].asInt32() == 1 || 
+                 set1[3].asInt32() == 1 || set1[4].asInt32() == 1) &&
+                (set1[0].asInt32() == 2 || set1[1].asInt32() == 2 || set1[2].asInt32() == 2 || 
+                 set1[3].asInt32() == 2 || set1[4].asInt32() == 2) &&
+                (set1[0].asInt32() == 3 || set1[1].asInt32() == 3 || set1[2].asInt32() == 3 || 
+                 set1[3].asInt32() == 3 || set1[4].asInt32() == 3) &&
+                (set1[0].asInt32() == 4 || set1[1].asInt32() == 4 || set1[2].asInt32() == 4 || 
+                 set1[3].asInt32() == 4 || set1[4].asInt32() == 4) &&
+                (set1[0].asInt32() == 5 || set1[1].asInt32() == 5 || set1[2].asInt32() == 5 || 
+                 set1[3].asInt32() == 5 || set1[4].asInt32() == 5);
+                
+            bool set2_valid = set2.arraySize() == 3 &&
+                (set2[0].asString() == "apple" || set2[1].asString() == "apple" || set2[2].asString() == "apple") &&
+                (set2[0].asString() == "banana" || set2[1].asString() == "banana" || set2[2].asString() == "banana") &&
+                (set2[0].asString() == "cherry" || set2[1].asString() == "cherry" || set2[2].asString() == "cherry");
+                
+            return set1_valid && set2_valid;
+        });
+
+    // std::unordered_map
+    test_serialization<SerializerType>("std::unordered_map",
+        [](){ 
+            std::unordered_map<std::string, int> map1 = {{"one", 1}, {"two", 2}, {"three", 3}};
+            
+            return zerialize::serialize<SerializerType>(map1); 
+        },
+        [](const auto& v) {
+            return v["one"].asInt32() == 1 &&
+                v["two"].asInt32() == 2 &&
+                v["three"].asInt32() == 3;
+        });
+
+    // Empty containers
+    test_serialization<SerializerType>("Empty containers",
+        [](){ 
+            std::vector<int> empty_vec;
+            std::map<std::string, int> empty_map;
+            std::set<double> empty_set;
+            
+            return zerialize::serialize<SerializerType>(
+                { {"empty_vector", empty_vec}, {"empty_map", empty_map}, {"empty_set", empty_set} }
+            ); 
+        },
+        [](const auto& v) {
+            return v["empty_vector"].arraySize() == 0 &&
+                v["empty_map"].objectSize() == 0 &&
+                v["empty_set"].arraySize() == 0;
+        });
+
+    // Enum types
+    enum class TestEnum { Value1, Value2, Value3 };
+    test_serialization<SerializerType>("Enum types",
+        [](){ 
+            TestEnum e1 = TestEnum::Value1;
+            TestEnum e2 = TestEnum::Value2;
+            TestEnum e3 = TestEnum::Value3;
+            
+            return zerialize::serialize<SerializerType>(
+                { 
+                    {"enum1", static_cast<int>(e1)}, 
+                    {"enum2", static_cast<int>(e2)}, 
+                    {"enum3", static_cast<int>(e3)} 
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return v["enum1"].asInt32() == 0 &&
+                v["enum2"].asInt32() == 1 &&
+                v["enum3"].asInt32() == 2;
+        });
+
+    // Nested complex structure
+    test_serialization<SerializerType>("Nested complex structure",
+        [](){ 
+            std::map<std::string, std::any> nested_map = {
+                {"int_value", 42},
+                {"string_value", std::string("hello")},
+                {"vector", std::vector<int>{1, 2, 3}},
+                {"map", std::map<std::string, double>{{"a", 1.1}, {"b", 2.2}}},
+                {"optional", std::optional<int>(123)},
+                {"null_optional", std::optional<int>()}
+            };
+            
+            return zerialize::serialize<SerializerType>(nested_map); 
+        },
+        [](const auto& v) {
+            return v["int_value"].asInt32() == 42 &&
+                v["string_value"].asString() == "hello" &&
+                v["vector"].arraySize() == 3 &&
+                v["vector"][0].asInt32() == 1 &&
+                v["vector"][1].asInt32() == 2 &&
+                v["vector"][2].asInt32() == 3 &&
+                v["map"]["a"].asDouble() == 1.1 &&
+                v["map"]["b"].asDouble() == 2.2 &&
+                v["optional"].asInt32() == 123 &&
+                v["null_optional"].isNull();
+        });
+*/
+
     std::cout << "..END testing zerialize: <" << SerializerType::Name << ">" << endl << endl;
 }
 
