@@ -172,7 +172,6 @@ public:
     // Make the base class overloads visible in the derived class
     using Serializer<FlexSerializer>::serialize;
 
-
     FlexSerializer(FlexBuffer& fb): fbb(fb.fbb) {}
 
     void serialize(int8_t val) { fbb.Int(val); }
@@ -228,19 +227,41 @@ public:
         });
     }
 
-    void serialize(function<void(FlexSerializer& s)> f) {
-        f(*this);
+    // void serialize(function<void(FlexSerializer& s)> f) {
+    //     f(*this);
+    // }
+
+    template <typename F>
+    requires std::invocable<F, FlexSerializer&>
+    void serialize(F&& f) {
+        std::forward<F>(f)(*this);
     }
 
-    void serializeMap(function<void(FlexSerializer& s)> f) {
+    // void serializeMap(function<void(FlexSerializer& s)> f) {
+    //     fbb.Map([&]() {
+    //         f(*this);
+    //     });
+    // }
+
+    template <typename F>
+    requires std::invocable<F, FlexSerializer&>
+    void serializeMap(F&& f) {
         fbb.Map([&]() {
-            f(*this);
+            std::forward<F>(f)(*this);
         });
     }
 
-    void serializeVector(function<void(FlexSerializer& s)> f) {
+    // void serializeVector(function<void(FlexSerializer& s)> f) {
+    //     fbb.Vector([&]() {
+    //         f(*this);
+    //     });
+    // }
+
+    template <typename F>
+    requires std::invocable<F, FlexSerializer&>
+    void serializeVector(F&& f) {
         fbb.Vector([&]() {
-            f(*this);
+            std::forward<F>(f)(*this);
         });
     }
 };

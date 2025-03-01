@@ -22,6 +22,23 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# Fetch msgpack-c (MessagePack for C/C++)
+FetchContent_Declare(
+    msgpack
+    GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
+    GIT_TAG cpp_master
+)
+FetchContent_GetProperties(msgpack)
+if(NOT msgpack_POPULATED)
+    FetchContent_Populate(msgpack)
+    # Explicitly disable Boost
+    set(MSGPACK_BOOST OFF CACHE BOOL "Disable Boost dependency" FORCE)
+    set(MSGPACK_USE_BOOST OFF CACHE BOOL "Disable Boost dependency" FORCE)
+    set(MSGPACK_BUILD_EXAMPLES OFF CACHE BOOL "Don't build examples" FORCE)
+    set(MSGPACK_BUILD_TESTS OFF CACHE BOOL "Don't build tests" FORCE)
+    add_subdirectory(${msgpack_SOURCE_DIR} ${msgpack_BINARY_DIR})
+endif()
+
 # Download and configure xtl
 FetchContent_Declare(xtl
     URL https://github.com/xtensor-stack/xtl/archive/0.7.5.zip
@@ -84,10 +101,11 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${flatbuffers_SOURCE_DIR}/include
     nlohmann_json::nlohmann_json
+    ${msgpack_SOURCE_DIR}/include
     #$<INSTALL_INTERFACE:include/eigen3>
 )
 
-# Link against flatbuffers
+# Link against libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE 
     nlohmann_json::nlohmann_json 
     flatbuffers
@@ -95,6 +113,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     xsimd 
     xtl
     eigen
+    msgpack-cxx
 )
 
 # Optional: Add compiler warnings

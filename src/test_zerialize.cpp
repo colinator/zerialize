@@ -2,6 +2,7 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
+#include <zerialize/zerialize_msgpack.hpp>
 #include <zerialize/zerialize_testing_utils.hpp>
 #include <zerialize/zerialize_xtensor.hpp>
 #include <zerialize/zerialize_eigen.hpp>
@@ -318,8 +319,15 @@ void test_much_serialization() {
     test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
         [&iv](){ 
             //return zerialize::serialize<SerializerType>(iv); 
-            return zerialize::serialize<SerializerType>([&iv](SerializerType::Serializer& s){
-                s.serializeVector([&iv](SerializerType::Serializer& ser) {
+            // return zerialize::serialize<SerializerType>([&iv](SerializerType::Serializer& s){
+            //     s.serializeVector([&iv](SerializerType::Serializer& ser) {
+            //         for (auto z: iv) {
+            //             ser.serialize(z);
+            //         }
+            //     });
+            // });
+            return zerialize::serialize<SerializerType>([&iv](SerializingConcept auto& s){
+                s.serializeVector([&iv](SerializingConcept auto& ser) {
                     for (auto z: iv) {
                         ser.serialize(z);
                     }
@@ -550,6 +558,7 @@ void test_conversion() {
 int main() {
     test_much_serialization<zerialize::Flex>();
     test_much_serialization<zerialize::Json>();
+    test_much_serialization<zerialize::MsgPack>();
     test_conversion<zerialize::Flex, zerialize::Json>();
     test_conversion<zerialize::Json, zerialize::Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;

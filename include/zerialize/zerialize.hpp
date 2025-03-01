@@ -203,16 +203,19 @@ public:
             serializeFunction(any_cast<function<void(Derived&)>>(val));
         } else if (val.type() == typeid(map<string, any>)) {
             map<string, any> m = any_cast<map<string, any>>(val);
-            d->serializeMap([&](Derived& s){
+            //d->serializeMap([&](Derived& s){
+            d->serializeMap([&](SerializingConcept auto& s) {    
                 for (const auto& [key, value]: m) {
                     s.serialize(key, value);
                 }
             });
         } else if (val.type() == typeid(vector<any>)) {
             vector<any> v = any_cast<vector<any>>(val);
-            d->serializeVector([&](Derived& s){
+            //d->serializeVector([&](Derived& s){
+            d->serializeVector([&](SerializingConcept auto& s){
                 for (const any& value: v) {
-                    static_cast<Serializer*>(&s)->serializeAny(value);
+                    //static_cast<Serializer*>(&s)->serializeAny(value);
+                    s.serializeAny(value);
                 }
             });
         } else if (val.type() == typeid(int8_t)) {
@@ -253,7 +256,7 @@ public:
     void serialize(const SourceBufferType& value) {
         Derived* d = static_cast<Derived*>(this);
         if (value.isMap()) {
-            d->serializeMap([&](Derived& s){
+            d->serializeMap([&](SerializingConcept auto& s){
                 for (string_view key: value.mapKeys()) {
                     const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
                     Derived keySerializer = s.serializerForKey(k);
@@ -261,7 +264,7 @@ public:
                 }
             });
         } else if (value.isArray()) {
-            d->serializeVector([&](Derived& s){
+            d->serializeVector([&](SerializingConcept auto& s){
                 for (size_t i=0; i<value.arraySize(); i++) {
                     s.Serializer::serialize(value[i]);
                 }
@@ -299,9 +302,10 @@ public:
     requires std::ranges::range<Container>
     void serialize(const Container& v) {
         Derived* d = static_cast<Derived*>(this);
-        d->serializeVector([&](Derived& s) {
-            for (auto&& val : v)
+        d->serializeVector([&](SerializingConcept auto& s) {
+            for (auto&& val : v) {
                 s.serialize(val);
+            }
         });
     }
 
@@ -315,10 +319,10 @@ public:
     }
     void serialize(const Map& m) {
         Derived* d = static_cast<Derived*>(this);
-        d->serializeMap([&m](Derived& s){
+        d->serializeMap([&m](SerializingConcept auto& s){
             for (const auto& [key, value] : m) {
                 const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
-                Derived keySerializer = s.serializerForKey(k);
+                auto keySerializer = s.serializerForKey(k);
                 keySerializer.serialize(value);
             }
         });
@@ -485,7 +489,7 @@ typename SerializerType::BufferType serialize(initializer_list<any> list) {
     }
     typename SerializerType::BufferType buffer;
     typename SerializerType::Serializer serializer(buffer);
-    serializer.serializeVector([&list](SerializerType::Serializer& s){
+    serializer.serializeVector([&list](SerializingConcept auto& s){
         for (const any& val : list) {
             s.serializeAny(val);
         }           
@@ -496,14 +500,14 @@ typename SerializerType::BufferType serialize(initializer_list<any> list) {
 
 // Serialize a map from an initializer list of pair<string, any>.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(initializer_list<pair<string, any>> list) {
+typename SerializerType::BufferType serialize(initializer_list<pair<string, any>> l) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(initializer list/map)" << endl;
     }
     typename SerializerType::BufferType buffer;
     typename SerializerType::Serializer serializer(buffer);
-    serializer.serializeMap([&list](SerializerType::Serializer& s){
-        for (const auto& [key, val] : list) {
+    serializer.serializeMap([&l](SerializingConcept auto& s){
+        for (const auto& [key, val] : l) {
             s.serialize(key, val);
         }           
     });
@@ -532,10 +536,10 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
     }
     typename SerializerType::BufferType buffer;
     typename SerializerType::Serializer serializer(buffer);
-    serializer.serializeMap([&](typename SerializerType::Serializer& s){
+    serializer.serializeMap([&](SerializingConcept auto& s){
         ([&](auto&& pair) {
             string key(pair.first);
-            typename SerializerType::Serializer ks = s.serializerForKey(key);
+            SerializingConcept auto ks = s.serializerForKey(key);
             ks.serialize(std::forward<decltype(pair.second)>(pair.second));
         } (std::forward<decltype(values)>(values)), ...);
     });
@@ -551,9 +555,15 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     }
     typename SerializerType::BufferType buffer;
     typename SerializerType::Serializer serializer(buffer);
-    serializer.serializeVector([&](typename SerializerType::Serializer& s){
+
+    serializer.serializeVector([&](SerializingConcept auto& s){
         (s.serialize(std::forward<ValueTypes>(values)), ...);      
     });
+
+    // serializer.serializeVector([&](typename SerializerType::Serializer& s){
+    //     (s.serialize(std::forward<ValueTypes>(values)), ...);      
+    // });
+
     buffer.finish();
     return buffer;
 }
