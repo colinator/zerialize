@@ -311,22 +311,28 @@ public:
         }
     }
 
-    void serialize(function<void(JsonSerializer& s)> f) {
-        f(*this);
+    template <typename F>
+    requires InvocableSerializer<F, JsonSerializer&>
+    void serialize(F&& f) {
+        std::forward<F>(f)(*this);
     }
 
-    void serializeMap(function<void(JsonSerializer& s)> f) {
+    template <typename F>
+    requires InvocableSerializer<F, JsonSerializer&>
+    void serializeMap(F&& f) {
         nlohmann::json& ja = elem();
         ja = nlohmann::json::object();
         JsonSerializer s(ja);
-        f(s);
+        std::forward<F>(f)(s);
     }
 
-    void serializeVector(function<void(JsonSerializer& s)> f) {
+    template <typename F>
+    requires InvocableSerializer<F, JsonSerializer&>
+    void serializeVector(F&& f) {
         nlohmann::json& ja = elem();
         ja = nlohmann::json::array();
         JsonSerializer s(ja, true);
-        f(s);
+        std::forward<F>(f)(s);
     }
 };
 

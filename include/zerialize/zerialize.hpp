@@ -169,6 +169,7 @@ struct SerializingCallable {
 template <typename V>
 concept SerializingComposite = requires(V& v, const std::string& key) {
     typename V::Serializer;
+    { v.serialize(SerializingCallable{}) } -> std::same_as<void>;
     { v.serializeMap(SerializingCallable{}) } -> std::same_as<void>;
     { v.serializeVector(SerializingCallable{}) } -> std::same_as<void>;
 };
@@ -176,6 +177,11 @@ concept SerializingComposite = requires(V& v, const std::string& key) {
 // Finally, the concept we really want: just the union of the above.
 template <typename T>
 concept SerializingConcept = Serializing<T> && SerializingComposite<T>;
+
+// Defines the concept type of a function taking some arg.
+// NOTE: Why can't we add && SerializingConcept<Arg> ?
+template <typename F, typename Arg>
+concept InvocableSerializer = std::invocable<F, Arg>; 
 
 
 // --------------
@@ -203,7 +209,6 @@ public:
             serializeFunction(any_cast<function<void(Derived&)>>(val));
         } else if (val.type() == typeid(map<string, any>)) {
             map<string, any> m = any_cast<map<string, any>>(val);
-            //d->serializeMap([&](Derived& s){
             d->serializeMap([&](SerializingConcept auto& s) {    
                 for (const auto& [key, value]: m) {
                     s.serialize(key, value);
@@ -211,10 +216,8 @@ public:
             });
         } else if (val.type() == typeid(vector<any>)) {
             vector<any> v = any_cast<vector<any>>(val);
-            //d->serializeVector([&](Derived& s){
             d->serializeVector([&](SerializingConcept auto& s){
                 for (const any& value: v) {
-                    //static_cast<Serializer*>(&s)->serializeAny(value);
                     s.serializeAny(value);
                 }
             });
@@ -259,7 +262,7 @@ public:
             d->serializeMap([&](SerializingConcept auto& s){
                 for (string_view key: value.mapKeys()) {
                     const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
-                    Derived keySerializer = s.serializerForKey(k);
+                    auto keySerializer = s.serializerForKey(k);
                     keySerializer.Serializer::serialize(value[k]);
                 }
             });
@@ -285,16 +288,6 @@ public:
             throw SerializationError("Unsupported source buffer value type");
         }
     }
-
-    // template <typename T>
-    // void serialize(const vector<T>& v) {
-    //     Derived* d = static_cast<Derived*>(this);
-    //     d->serializeVector([&v](Derived& s){
-    //         for (const T& val: v) {
-    //             s.serialize(val);
-    //         }
-    //     });
-    // }
 
     // Serialize any vector-like container that we can iterate over.
     // Tested with array and vector
@@ -327,6 +320,51 @@ public:
             }
         });
     }
+};
+
+
+// --------------
+// A 'counting serializer': a 'Serializer' that doesn't 
+// serialize; instead it counts serialize invocations.
+// Useful for encoder types that need to know array or
+// map sizes in advance, like messagepack does. 
+//
+// Also: an example of how to write a serializer.
+struct SerializeCounter: public Serializer<SerializeCounter> {
+    size_t count = 0;
+
+    using Serializer<SerializeCounter>::serialize;
+
+    void serialize(int8_t) { count += 1; }
+    void serialize(int16_t) { count += 1; }
+    void serialize(int32_t) { count += 1; }
+    void serialize(int64_t) { count += 1; }
+    void serialize(uint8_t) { count += 1; }
+    void serialize(uint16_t) { count += 1; }
+    void serialize(uint32_t) { count += 1; }
+    void serialize(uint64_t) { count += 1; }
+    void serialize(bool) { count += 1; }
+    void serialize(double) { count += 1; }
+    void serialize(const char*) { count += 1; }
+    void serialize(const string&) { count += 1; }
+    void serialize(const span<const uint8_t>&) { count += 1; }
+    void serialize(const string&, const any&) { count += 1; }
+    void serialize(const map<string, any>&) { count += 1; }
+    void serialize(const vector<any>&) { count += 1; }
+
+    template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
+    void serialize(T&&) { count += 1; }
+
+    template <typename F> requires InvocableSerializer<F, SerializeCounter&>
+    void serialize(F&&) { count += 1; }
+
+    template <typename F> requires InvocableSerializer<F, SerializeCounter&>
+    void serializeMap(F&&) { count += 1; }
+
+    template <typename F> requires InvocableSerializer<F, SerializeCounter&>
+    void serializeVector(F&&) { count += 1; }
+
+    SerializeCounter serializerForKey(const string&) { count += 1; return *this; }
 };
 
 
@@ -555,18 +593,13 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     }
     typename SerializerType::BufferType buffer;
     typename SerializerType::Serializer serializer(buffer);
-
     serializer.serializeVector([&](SerializingConcept auto& s){
         (s.serialize(std::forward<ValueTypes>(values)), ...);      
     });
-
-    // serializer.serializeVector([&](typename SerializerType::Serializer& s){
-    //     (s.serialize(std::forward<ValueTypes>(values)), ...);      
-    // });
-
     buffer.finish();
     return buffer;
 }
+
 
 // --------------
 // ...and a special handle-it-all generic conversion function,

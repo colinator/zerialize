@@ -226,39 +226,23 @@ public:
             }
         });
     }
-
-    // void serialize(function<void(FlexSerializer& s)> f) {
-    //     f(*this);
-    // }
-
+    
     template <typename F>
-    requires std::invocable<F, FlexSerializer&>
+    requires InvocableSerializer<F, FlexSerializer&>
     void serialize(F&& f) {
         std::forward<F>(f)(*this);
     }
 
-    // void serializeMap(function<void(FlexSerializer& s)> f) {
-    //     fbb.Map([&]() {
-    //         f(*this);
-    //     });
-    // }
-
     template <typename F>
-    requires std::invocable<F, FlexSerializer&>
+    requires InvocableSerializer<F, FlexSerializer&>
     void serializeMap(F&& f) {
         fbb.Map([&]() {
             std::forward<F>(f)(*this);
         });
     }
 
-    // void serializeVector(function<void(FlexSerializer& s)> f) {
-    //     fbb.Vector([&]() {
-    //         f(*this);
-    //     });
-    // }
-
     template <typename F>
-    requires std::invocable<F, FlexSerializer&>
+    requires InvocableSerializer<F, FlexSerializer&>
     void serializeVector(F&& f) {
         fbb.Vector([&]() {
             std::forward<F>(f)(*this);

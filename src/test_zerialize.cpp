@@ -560,7 +560,11 @@ int main() {
     test_much_serialization<zerialize::Json>();
     test_much_serialization<zerialize::MsgPack>();
     test_conversion<zerialize::Flex, zerialize::Json>();
+    test_conversion<zerialize::Flex, zerialize::MsgPack>();
     test_conversion<zerialize::Json, zerialize::Flex>();
+    test_conversion<zerialize::Json, zerialize::MsgPack>();
+    test_conversion<zerialize::MsgPack, zerialize::Json>();
+    test_conversion<zerialize::MsgPack, zerialize::Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }

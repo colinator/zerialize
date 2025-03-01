@@ -19,6 +19,9 @@ namespace zerialize {
 
 using std::variant;
 
+using MsgPackStream = msgpack::sbuffer;
+using MsgPacker = msgpack::packer<MsgPackStream>;
+
 class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
 private:
     vector<uint8_t> buf_;
@@ -26,7 +29,7 @@ private:
     msgpack::object obj_;
 
 public:
-    msgpack::sbuffer sbuf;
+    MsgPackStream sbuf;
 
     MsgPackBuffer() {}
 
@@ -82,7 +85,7 @@ public:
     }
 
     bool isInt() const { 
-        return obj_.type == msgpack::type::NEGATIVE_INTEGER;
+        return obj_.type == msgpack::type::NEGATIVE_INTEGER || obj_.type == msgpack::type::POSITIVE_INTEGER;
     }
     
     bool isUInt() const { 
@@ -229,105 +232,22 @@ public:
     }
 };
 
-class MsgPackCounter: public Serializer<MsgPackCounter> {
-private:
-    size_t count = 0;
-public:
-    using Serializer<MsgPackCounter>::serialize;
-
-    MsgPackCounter() {}
-
-    size_t getCount() const { return count; }
-
-    void serialize(int8_t) { count += 1; }
-    void serialize(int16_t) { count += 1; }
-    void serialize(int32_t) { count += 1; }
-    void serialize(int64_t) { count += 1; }
-    void serialize(uint8_t) { count += 1; }
-    void serialize(uint16_t) { count += 1; }
-    void serialize(uint32_t) { count += 1; }
-    void serialize(uint64_t) { count += 1; }
-    void serialize(bool) { count += 1; }
-    void serialize(double) { count += 1; }
-    void serialize(const char*) { count += 1; }
-    void serialize(const string&) { count += 1; }
-    void serialize(const span<const uint8_t>&) { count += 1; }
-
-    template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
-    void serialize(T&&) { count += 1; }
-
-    void serialize(const string&, const any&) { count += 1; }
-
-    MsgPackCounter serializerForKey(const string&) { count += 1; return *this; }
-
-    void serialize(const map<string, any>&) { count += 1; }
-    void serialize(const vector<any>&) { count += 1; }
-
-    // void serialize(function<void(FlexSerializer& s)> f) {
-    //     f(*this);
-    // }
-
-    template <typename F>
-    requires std::invocable<F, MsgPackCounter&>
-    void serialize(F&&) { count += 1; }
-
-    // void serializeMap(function<void(FlexSerializer& s)> f) {
-    //     fbb.Map([&]() {
-    //         f(*this);
-    //     });
-    // }
-
-    template <typename F>
-    requires std::invocable<F, MsgPackCounter&>
-    void serializeMap(F&&) { count += 1; }
-
-    // void serializeVector(function<void(FlexSerializer& s)> f) {
-    //     fbb.Vector([&]() {
-    //         f(*this);
-    //     });
-    // }
-
-    template <typename F>
-    requires std::invocable<F, MsgPackCounter&>
-    void serializeVector(F&&) { count += 1; }
-};
-
-template <typename F, typename Arg>
-concept InvocableSerializing = std::invocable<F, Arg> && SerializingConcept<Arg>;
-
 class MsgPackSerializer: public Serializer<MsgPackSerializer> {
 private:
-
-    using MsgPacker = msgpack::packer<msgpack::sbuffer>;
 
     MsgPacker packer;
 
     //variant<MsgPacker, std::reference_wrapper<MsgPacker>> packer;
 
+    MsgPackStream& pack_stream;
+
 public:
     // Make the base class overloads visible in the derived class
     using Serializer<MsgPackSerializer>::serialize;
 
-    MsgPackSerializer(MsgPackBuffer& mb): packer(mb.sbuf) {}
-    //MsgPackSerializer(MsgPackBuffer& mb): packer(MsgPacker(mb.sbuf)) {}
+    MsgPackSerializer(MsgPackBuffer& mb): packer(mb.sbuf), pack_stream(mb.sbuf) {}
 
-    // Constructor that creates and owns a packer.
-    // MsgPackSerializer()
-    //   : packer_(MsgPacker{ /* construct with buffer if needed */ })
-    // {}
-
-    // // Constructor that uses an externally managed packer.
-    // MsgPackSerializer(MsgPacker& externalPacker)
-    //   : packer(std::ref(externalPacker))
-    // {}
-
-    // // Helper to get a reference to the packer.
-    // msgpack::packer<msgpack::sbuffer>& getPacker() {
-    //     if (std::holds_alternative<msgpack::packer<msgpack::sbuffer>>(packer_))
-    //         return std::get<msgpack::packer<msgpack::sbuffer>>(packer_);
-    //     else
-    //         return std::get<std::reference_wrapper<msgpack::packer<msgpack::sbuffer>>>(packer_).get();
-    // }
+    MsgPackSerializer(MsgPackStream& ps): packer(ps), pack_stream(ps) {}
 
     void serialize(int8_t val) { packer.pack(val); }
     void serialize(int16_t val) { packer.pack(val); }
@@ -371,14 +291,7 @@ public:
 
     MsgPackSerializer serializerForKey(const string& key) {
         serialize(key);
-        // We can't return a copy of this serializer because packer is not copyable
-        // Instead, we'll just return a dummy serializer
-        // This is a limitation of the current implementation
-
-        // NOTE wat!!!
-
-        static thread_local MsgPackBuffer dummy_buffer;
-        return MsgPackSerializer(dummy_buffer);
+        return MsgPackSerializer(pack_stream);
     }
 
     void serialize(const map<string, any>& m) {
@@ -395,66 +308,29 @@ public:
         }
     }
 
-    void serialize(function<void(MsgPackSerializer& s)> f) {
-        f(*this);
-    }
-
-    // template <typename F>
-    // void serialize(F&& f) {
-    //     f(*this);
-    // }
-
     template <typename F>
-    //requires InvocableSerializing<F, MsgPackSerializer&>
-    void serializeMap(F&& f) {
-
-    // void serializeMap(function<void(MsgPackSerializer& s)> f) {
-
-        // std::cout << ">>>>>>>>> serializeMap " << std::endl;
-
-        // // For MessagePack, we need to know the size in advance
-        // // Since we don't know it, we'll use a simpler approach
-        
-        // // Just pack a map with unknown size (we'll use 0 as a placeholder)
-        // packer.pack_map(0);
-        
-        // // Call the function to serialize the map contents
-        // f(*this);
-
-        MsgPackCounter counter;
-        std::forward<F>(f)(counter);
-
-std::cout << ">>>>>>>>> serializeMap " << counter.getCount() << std::endl;
-
-        packer.pack_map(counter.getCount());
+    requires InvocableSerializer<F, MsgPackSerializer&>
+    void serialize(F&& f) {
         std::forward<F>(f)(*this);
     }
 
-    // void serializeVector(function<void(MsgPackSerializer& s)> f) {
-
-    //     std::cout << ">>>>>>>>> serializeVector " << std::endl;
-
-    //     size_t count = 0;
-    //     auto counter = [&count](MsgPackSerializer& s){
-    //         count += 1;
-    //     };
-
-    //     // For MessagePack, we need to know the size in advance
-    //     // Since we don't know it, we'll use a simpler approach
-        
-    //     // Just pack an array with unknown size (we'll use 0 as a placeholder)
-    //     packer.pack_array(0);
-        
-    //     // Call the function to serialize the array contents
-    //     f(*this);
-    // }
+    template <typename F>
+    requires InvocableSerializer<F, MsgPackSerializer&>
+    void serializeMap(F&& f) {
+        // for message pack map serialization, we need the size in advance
+        SerializeCounter counter;
+        std::forward<F>(f)(counter);
+        packer.pack_map(counter.count);
+        std::forward<F>(f)(*this);
+    }
 
     template <typename F>
-    //requires InvocableSerializing<F, MsgPackSerializer&>
+    requires InvocableSerializer<F, MsgPackSerializer&>
     void serializeVector(F&& f) {
-        MsgPackCounter counter;
+        // for message pack array serialization, we need the size in advance
+        SerializeCounter counter;
         std::forward<F>(f)(counter);
-        packer.pack_array(counter.getCount());
+        packer.pack_array(counter.count);
         std::forward<F>(f)(*this);
     }
 };
