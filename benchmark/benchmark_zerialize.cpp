@@ -305,7 +305,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
 
        // Very large data: very large xtensor
     {
-        auto tensor = xt::xtensor<double, 3>::from_shape({3, 640, 480});
+        auto tensor = xt::xtensor<uint8_t, 3>::from_shape({3, 640, 480});
         for (size_t i = 0; i < 3; ++i) {
             for (size_t j = 0; j < 640; ++j) {
                 for (size_t k = 0; k < 480; ++k) {
@@ -331,9 +331,10 @@ std::vector<BenchmarkResult> runBenchmarks() {
         
         // Measure deserialization time
         double deserTime = benchmark([&]() {
-            auto t = xtensor::asXTensor<double, 3>(serialized["tensor"]);
+            auto t = xtensor::asXTensor<uint8_t, 3>(serialized["tensor"]);
             std::string s = serialized["name"].template as<std::string>();
-            return t(0, 0) + s.size();  // Just to use the values
+            //return xt::sum(t)() + s.size();  // Just to use the values
+            return t(0, 0, 0) + s.size();  // Just to use the values
         }, 100);  // Fewer iterations for large data
         
         results.push_back({
