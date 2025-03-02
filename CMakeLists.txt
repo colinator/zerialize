@@ -93,11 +93,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Add source files
 file(GLOB SOURCES "src/*.cpp")
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES})
+# Create executables
+add_executable(${PROJECT_NAME} src/test_zerialize.cpp)
+add_executable(benchmark_zerialize src/benchmark_zerialize.cpp)
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
+    ${flatbuffers_SOURCE_DIR}/include
+    nlohmann_json::nlohmann_json
+    ${msgpack_SOURCE_DIR}/include
+    #$<INSTALL_INTERFACE:include/eigen3>
+)
+
+target_include_directories(benchmark_zerialize PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${flatbuffers_SOURCE_DIR}/include
     nlohmann_json::nlohmann_json
@@ -116,9 +125,21 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     msgpack-cxx
 )
 
+target_link_libraries(benchmark_zerialize PRIVATE 
+    nlohmann_json::nlohmann_json 
+    flatbuffers
+    xtensor 
+    xsimd 
+    xtl
+    eigen
+    msgpack-cxx
+)
+
 # Optional: Add compiler warnings
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+    target_compile_options(benchmark_zerialize PRIVATE /W4)
 else()
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+    target_compile_options(benchmark_zerialize PRIVATE -Wall -Wextra)
 endif()

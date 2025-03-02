@@ -11,7 +11,7 @@
 #include <sstream>
 #include <functional>
 
-constexpr bool DEBUG_TRACE_CALLS = true;
+constexpr bool DEBUG_TRACE_CALLS = false;
 
 namespace zerialize {
 
