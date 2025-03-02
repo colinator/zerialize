@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Project name
-project(test_zerialize VERSION 1.0)
+project(benchmark_zerialize VERSION 1.0)
 
 # Include FetchContent
 include(FetchContent)
@@ -90,23 +89,19 @@ target_include_directories(eigen INTERFACE ${eigen_download_SOURCE_DIR})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add source files
-file(GLOB SOURCES "src/*.cpp")
-
 # Create executable
-add_executable(${PROJECT_NAME} src/test_zerialize.cpp)
+add_executable(benchmark_zerialize benchmark_zerialize.cpp)
 
 # Include directories
-target_include_directories(${PROJECT_NAME} PUBLIC
-    ${PROJECT_SOURCE_DIR}/include
+target_include_directories(benchmark_zerialize PUBLIC
+    ${PROJECT_SOURCE_DIR}/../include
     ${flatbuffers_SOURCE_DIR}/include
     nlohmann_json::nlohmann_json
     ${msgpack_SOURCE_DIR}/include
-    #$<INSTALL_INTERFACE:include/eigen3>
 )
 
 # Link against libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE 
+target_link_libraries(benchmark_zerialize PRIVATE 
     nlohmann_json::nlohmann_json 
     flatbuffers
     xtensor 
@@ -118,10 +113,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # Optional: Add compiler warnings
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+    target_compile_options(benchmark_zerialize PRIVATE /W4)
 else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+    target_compile_options(benchmark_zerialize PRIVATE -Wall -Wextra)
 endif()
-
-# Add benchmark subdirectory
-add_subdirectory(benchmark)

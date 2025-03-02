@@ -40,18 +40,18 @@ struct BenchmarkResult {
 
 // Print benchmark results in a table
 void printResults(const std::vector<BenchmarkResult>& results) {
-    std::cout << std::left << std::setw(40) << "Test Name" 
-              << std::right << std::setw(20) << "Serialization (µs)" 
-              << std::setw(20) << "Deserialization (µs)" 
-              << std::setw(15) << "Data Size (bytes)" << std::endl;
+    std::cout << std::left << std::setw(35) << "Test Name" 
+              << std::right << std::setw(25) << "Serialization (µs)" 
+              << std::setw(25) << "Deserialization (µs)" 
+              << std::setw(23) << "Data Size (bytes)" << std::endl;
     
-    std::cout << std::string(95, '-') << std::endl;
+    std::cout << std::string(106, '-') << std::endl;
     
     for (const auto& result : results) {
-        std::cout << std::left << std::setw(40) << result.name 
-                  << std::right << std::setw(20) << std::fixed << std::setprecision(3) << result.serializationTime 
-                  << std::setw(20) << std::fixed << std::setprecision(3) << result.deserializationTime 
-                  << std::setw(15) << result.dataSize << std::endl;
+        std::cout << std::left << std::setw(35) << result.name 
+                  << std::right << std::setw(24) << std::fixed << std::setprecision(3) << result.serializationTime 
+                  << std::setw(24) << std::fixed << std::setprecision(3) << result.deserializationTime 
+                  << std::setw(23) << result.dataSize << std::endl;
     }
 }
 
