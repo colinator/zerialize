@@ -1,9 +1,15 @@
 # benchmarking code for zerialize
 
+    cd benchmark
+
 ## Build
 
     cmake -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build --config Release
+
+## Run
+
+    ./build/benchmark_zerialize
 
 ## Current results
 
