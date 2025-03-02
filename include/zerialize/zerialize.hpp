@@ -120,6 +120,40 @@ public:
     virtual const vector<uint8_t>& buf() const = 0;
     size_t size() const { return buf().size(); }
     virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
+
+    template<typename T>
+    T as() const {
+        const Derived* d = static_cast<const Derived*>(this);
+        if constexpr (std::is_same_v<T, int8_t>) {
+            return d->asInt8();
+        } else if constexpr (std::is_same_v<T, int16_t>) {
+            return d->asInt16();
+        } else if constexpr (std::is_same_v<T, int32_t>) {
+            return d->asInt32();
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return d->asInt64();
+        } else if constexpr (std::is_same_v<T, uint8_t>) {
+            return d->asUInt8();
+        } else if constexpr (std::is_same_v<T, uint16_t>) {
+            return d->asUInt16();
+        } else if constexpr (std::is_same_v<T, uint32_t>) {
+            return d->asUInt32();
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            return d->asUInt64();
+        } else if constexpr (std::is_same_v<T, float>) {
+            return d->asFloat();
+        } else if constexpr (std::is_same_v<T, double>) {
+            return d->asDouble();
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return d->asBool();
+        } else if constexpr (std::is_same_v<T, string>) {
+            return d->asString();
+        } else if constexpr (std::is_same_v<T, string_view>) {
+            return d->asStringView();
+        } else {
+            static_assert(false, "Unsupported type in as<T>()");
+        }
+    }
 };
 
 

@@ -64,7 +64,7 @@ void test_much_serialization() {
 
     // Passing multiple rvalues via parameter pack: { 3, 5.2, "asdf" }
     test_serialization<SerializerType>("{ 3, 5.2, \"asdf\" } (via parameter pack rvalues)",
-        [](){ return zerialize::serialize<SerializerType>(3, 5.2, "asdf"); },
+        [](){ return serialize<SerializerType>(3, 5.2, "asdf"); },
         [](const auto& v) {
             return v[0].asInt32() == 3 &&
                 v[1].asDouble() == 5.2 &&
@@ -73,7 +73,7 @@ void test_much_serialization() {
 
     // Passing an initializer list: { 3, 5.2, "asdf" }
     test_serialization<SerializerType>("3, 5.2, \"asdf\" (via initializer list)",
-        [](){ return zerialize::serialize<SerializerType>({ 3, 5.2, "asdf" }); },
+        [](){ return serialize<SerializerType>({ 3, 5.2, "asdf" }); },
         [](const auto& v) {
             return v[0].asInt32() == 3 &&
                 v[1].asDouble() == 5.2 &&
@@ -83,7 +83,7 @@ void test_much_serialization() {
     // Passing multiple values including a vector: 3, 5.2, "asdf", [7, 8.2]
     test_serialization<SerializerType>("3, 5.2, \"asdf\", [7, 8.2]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 3, 5.2, "asdf", std::vector<std::any>{7, 8.2}
             ); 
         },
@@ -98,7 +98,7 @@ void test_much_serialization() {
     // Using an initializer list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
     test_serialization<SerializerType>("{\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"} (via initializer list)",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"} }
             ); 
         },
@@ -111,7 +111,7 @@ void test_much_serialization() {
     // Using a generic rvalue list for a map: {"a": 3, "b": 5.2, "c": "asdf"}
     test_serialization<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\"}",
         [](){ 
-            return zerialize::serialize<SerializerType, int, double, std::string>(
+            return serialize<SerializerType, int, double, std::string>(
                 {"a", 3}, {"b", 5.2}, {"c", "asdf"}
             ); 
         },
@@ -125,7 +125,7 @@ void test_much_serialization() {
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
     test_serialization<SerializerType>("Generic rvalue list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
-            return zerialize::serialize<SerializerType, int, double, std::string, std::vector<std::any>>(
+            return serialize<SerializerType, int, double, std::string, std::vector<std::any>>(
                 {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}}
             ); 
         },
@@ -141,7 +141,7 @@ void test_much_serialization() {
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
     test_serialization<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2}} }
             ); 
         },
@@ -157,7 +157,7 @@ void test_much_serialization() {
     //     {"a": 3, "b": 5.2, "c": "asdf", "d": [7, 8.2]}
     test_serialization<SerializerType>("Initializer list: {\"a\": 5, \"b\": 5.3, \"c\": \"asdf\", \"d\": [7, 8.2]}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"a", 3}, {"b", 5.2}, {"c", "asdf"}, {"d", std::vector<std::any>{7, std::map<std::string, std::any>{ {"w", 3.2}, {"y", "yomamma"} }}} }
             ); 
         },
@@ -175,7 +175,7 @@ void test_much_serialization() {
     auto k = std::array<uint8_t, 4>({'a','b','c','z'});
     test_serialization<SerializerType>("Initializer list: {\"a\": std::span<const uint8_t>({'a','b','c','z'}), \"b\": 457835 }",
         [k](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"a", std::span<const uint8_t>(k)}, { "b", 457835 } }
             ); 
         },
@@ -191,15 +191,15 @@ void test_much_serialization() {
     auto t = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
     test_serialization<SerializerType>("Initializer list: {\"a\": xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
         [&t](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
-                  { "a", zerialize::xtensor::serializer<SerializerType>(t) }, 
+                  { "a", xtensor::serializer<SerializerType>(t) }, 
                   { "b", 457835 } 
                 }
             ); 
         },
         [&t](const auto& v) {
-            auto a = zerialize::xtensor::asXTensor<double, 2>(v["a"]);
+            auto a = xtensor::asXTensor<double, 2>(v["a"]);
             //std::cout << " ---- a " << std::endl << a << std::endl;
             //std::cout << " ---- t " << std::endl << t << std::endl;
             return
@@ -212,15 +212,15 @@ void test_much_serialization() {
     auto t2 = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
     test_serialization<SerializerType>("Initializer list: {\"a\": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, \"b\": 457835 }",
         [&t2](){
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
-                  { "a", zerialize::xtensor::serializer<SerializerType>(t2) }, 
+                  { "a", xtensor::serializer<SerializerType>(t2) }, 
                   { "b", 457835 } 
                 }
             );
         },
         [&t2](const auto& v) {
-            auto a = zerialize::xtensor::asXTensor<double>(v["a"]);
+            auto a = xtensor::asXTensor<double>(v["a"]);
             //std::cout << " ---- a " << std::endl << a << std::endl;
             //std::cout << " ---- t2 " << std::endl << t2 << std::endl;
             return
@@ -236,15 +236,15 @@ void test_much_serialization() {
          7, 8, 9;
     test_serialization<SerializerType>("Initializer list: {\"a\": Eigen::Matrix3f, \"b\": 457835 }",
         [&m](){
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
-                  { "a", zerialize::eigen::serializer<SerializerType>(m) }, 
+                  { "a", eigen::serializer<SerializerType>(m) }, 
                   { "b", 457835 } 
                 }
             );
         },
         [&m](const auto& v) {
-            auto a = zerialize::eigen::asEigenMatrix<float, 3, 3>(v["a"]);
+            auto a = eigen::asEigenMatrix<float, 3, 3>(v["a"]);
             // std::cout << " ---- a " << std::endl << a << std::endl;
             // std::cout << " ---- m " << std::endl << m << std::endl;
             return
@@ -256,7 +256,7 @@ void test_much_serialization() {
     // Vector of int
     test_serialization<SerializerType>("initializer list of int: {1, 2, 3, 4, 5}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 {1, 2, 3, 4, 5}
             ); 
         },
@@ -273,7 +273,7 @@ void test_much_serialization() {
     auto va = std::vector<any>{1, 2, 3, 4, 5};
     test_serialization<SerializerType>("Vector of any: [1, 2, 3, 4, 5]",
         [&va](){ 
-            return zerialize::serialize<SerializerType>(va); 
+            return serialize<SerializerType>(va); 
         },
         [](const auto& v) {
             return v.arraySize() == 5 &&
@@ -288,7 +288,7 @@ void test_much_serialization() {
     auto vi = std::vector<int>{1, 2, 3, 4, 5};
     test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
         [&vi](){ 
-            return zerialize::serialize<SerializerType>(vi); 
+            return serialize<SerializerType>(vi); 
         },
         [](const auto& v) {
             return v.arraySize() == 5 &&
@@ -303,7 +303,7 @@ void test_much_serialization() {
     auto ai = std::array<int, 5>{1, 2, 3, 4, 5};
     test_serialization<SerializerType>("array of int: [1, 2, 3, 4, 5]",
         [&ai](){ 
-            return zerialize::serialize<SerializerType>(ai); 
+            return serialize<SerializerType>(ai); 
         },
         [](const auto& v) {
             return v.arraySize() == 5 &&
@@ -318,7 +318,7 @@ void test_much_serialization() {
     auto iv = std::vector<int>{1, 2, 3, 4, 5};
     test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
         [&iv](){ 
-            return zerialize::serialize<SerializerType>([&iv](SerializingConcept auto& s){
+            return serialize<SerializerType>([&iv](SerializingConcept auto& s){
                 s.serializeVector([&iv](SerializingConcept auto& ser) {
                     for (auto z: iv) {
                         ser.serialize(z);
@@ -339,7 +339,7 @@ void test_much_serialization() {
     // Vector of int
     test_serialization<SerializerType>("Temporary vector of int: [1, 2, 3, 4, 5]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::vector<int>{1, 2, 3, 4, 5}
             ); 
         },
@@ -356,7 +356,7 @@ void test_much_serialization() {
     // Vector of double
     test_serialization<SerializerType>("Vector of double: [1.1, 2.2, 3.3, 4.4, 5.5]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::vector<double>{1.1, 2.2, 3.3, 4.4, 5.5}
             ); 
         },
@@ -372,7 +372,7 @@ void test_much_serialization() {
     // Vector of string
     test_serialization<SerializerType>("Vector of string: [\"one\", \"two\", \"three\"]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::vector<std::string>{"one", "two", "three"}
             ); 
         },
@@ -386,7 +386,7 @@ void test_much_serialization() {
     // Map with string keys and int values
     test_serialization<SerializerType>("Map with string keys and int values: {\"a\": 1, \"b\": 2, \"c\": 3}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::map<std::string, int>{{"a", 1}, {"b", 2}, {"c", 3}}
             ); 
         },
@@ -400,7 +400,7 @@ void test_much_serialization() {
     // Map with string keys and double values
     test_serialization<SerializerType>("Map with string keys and double values: {\"x\": 1.1, \"y\": 2.2, \"z\": 3.3}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::map<std::string, double>{{"x", 1.1}, {"y", 2.2}, {"z", 3.3}}
             ); 
         },
@@ -413,7 +413,7 @@ void test_much_serialization() {
     // Map with string keys and string values
     test_serialization<SerializerType>("Map with string keys and string values: {\"first\": \"one\", \"second\": \"two\", \"third\": \"three\"}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::map<std::string, std::string>{{"first", "one"}, {"second", "two"}, {"third", "three"}}
             ); 
         },
@@ -426,7 +426,7 @@ void test_much_serialization() {
     // Vector of vectors (nested vectors of int)
     test_serialization<SerializerType>("Vector of vectors: [[1, 2], [3, 4], [5, 6]]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::vector<std::vector<int>>{{1, 2}, {3, 4}, {5, 6}}
             ); 
         },
@@ -446,7 +446,7 @@ void test_much_serialization() {
     // Map with string keys and vector values
     test_serialization<SerializerType>("Map with string keys and vector values: {\"nums\": [1, 2, 3], \"decimals\": [4.4, 5.5, 6.6]}",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::map<std::string, std::vector<double>>{
                     {"nums", {1.0, 2.0, 3.0}}, 
                     {"decimals", {4.4, 5.5, 6.6}}
@@ -468,7 +468,7 @@ void test_much_serialization() {
     // Vector of maps
     test_serialization<SerializerType>("Vector of maps: [{\"a\": 1, \"b\": 2}, {\"c\": 3, \"d\": 4}]",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 std::vector<std::map<std::string, int>>{
                     {{"a", 1}, {"b", 2}},
                     {{"c", 3}, {"d", 4}}
@@ -487,7 +487,7 @@ void test_much_serialization() {
     // Boolean values
     test_serialization<SerializerType>("Boolean values: true and false",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"true_val", true}, {"false_val", false} }
             ); 
         },
@@ -507,7 +507,7 @@ void test_much_serialization() {
             uint32_t ui32 = 54321234;
             int64_t i64 = -9223372036854775807LL;
             uint64_t ui64 = 18446744073709551615ULL;
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
                     {"int8", i8}, 
                     {"uint8", ui8}, 
@@ -537,7 +537,7 @@ void test_much_serialization() {
             float f1 = 3.14159f;
             float f2 = -2.71828f;
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"pi", f1}, {"neg_e", f2} }
             ); 
         },
@@ -550,7 +550,7 @@ void test_much_serialization() {
     // Null values
     test_serialization<SerializerType>("Null values",
         [](){ 
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"null_val", nullptr} }
             ); 
         },
@@ -563,7 +563,7 @@ void test_much_serialization() {
         [](){ 
             std::unordered_map<std::string, int> map1 = {{"one", 1}, {"two", 2}, {"three", 3}};
             
-            return zerialize::serialize<SerializerType>(map1); 
+            return serialize<SerializerType>(map1); 
         },
         [](const auto& v) {
             return v["one"].asInt32() == 1 &&
@@ -577,7 +577,7 @@ void test_much_serialization() {
             std::vector<std::any> empty_vec;
             std::map<std::string, std::any> empty_map;
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
                     {"empty_vector", empty_vec}, 
                     {"empty_map", empty_map}
@@ -597,7 +597,7 @@ void test_much_serialization() {
             std::vector<int> empty_vec;
             std::map<std::string, int> empty_map;
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
                     {"empty_vector", empty_vec}, 
                     {"empty_map", empty_map} 
@@ -616,7 +616,7 @@ void test_much_serialization() {
             std::optional<int> opt_with_value = 42;
             std::optional<std::string> opt_without_value;
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"with_value", opt_with_value}, {"without_value", opt_without_value} }
             ); 
         },
@@ -632,7 +632,7 @@ void test_much_serialization() {
             std::variant<int, double, std::string> var2 = 3.14159;
             std::variant<int, double, std::string> var3 = std::string("hello");
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"int_variant", var1}, {"double_variant", var2}, {"string_variant", var3} }
             ); 
         },
@@ -648,7 +648,7 @@ void test_much_serialization() {
             auto tuple1 = std::make_tuple(1, 2.5, "three");
             auto tuple2 = std::make_tuple(true, 42);
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"tuple1", tuple1}, {"tuple2", tuple2} }
             ); 
         },
@@ -668,7 +668,7 @@ void test_much_serialization() {
             auto pair1 = std::make_pair("key1", 100);
             auto pair2 = std::make_pair(200, "value2");
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"pair1", pair1}, {"pair2", pair2} }
             ); 
         },
@@ -687,7 +687,7 @@ void test_much_serialization() {
             std::set<int> set1 = {1, 2, 3, 4, 5};
             std::unordered_set<std::string> set2 = {"apple", "banana", "cherry"};
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { {"set", set1}, {"unordered_set", set2} }
             ); 
         },
@@ -724,7 +724,7 @@ void test_much_serialization() {
             TestEnum e2 = TestEnum::Value2;
             TestEnum e3 = TestEnum::Value3;
             
-            return zerialize::serialize<SerializerType>(
+            return serialize<SerializerType>(
                 { 
                     {"enum1", static_cast<int>(e1)}, 
                     {"enum2", static_cast<int>(e2)}, 
@@ -750,7 +750,7 @@ void test_much_serialization() {
                 {"null_optional", std::optional<int>()}
             };
             
-            return zerialize::serialize<SerializerType>(nested_map); 
+            return serialize<SerializerType>(nested_map); 
         },
         [](const auto& v) {
             return v["int_value"].asInt32() == 42 &&
@@ -773,12 +773,12 @@ template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
     std::cout << "Testing conversion from " << SrcSerializerType::Name << " to " << DestSerializerType::Name << std::endl;
     auto m = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
-    auto v1 = zerialize::serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}, {"m", zerialize::xtensor::serializer<SrcSerializerType>(m)}}}}});
-    auto v2 = zerialize::convert<SrcSerializerType, DestSerializerType>(v1);
-    auto v3 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
-    auto v4 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
-    auto v5 = zerialize::convert<DestSerializerType, SrcSerializerType>(v2);
-    auto v6 = zerialize::convert<SrcSerializerType, DestSerializerType>(v3);
+    auto v1 = serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}, {"m", xtensor::serializer<SrcSerializerType>(m)}}}}});
+    auto v2 = convert<SrcSerializerType, DestSerializerType>(v1);
+    auto v3 = convert<DestSerializerType, SrcSerializerType>(v2);
+    auto v4 = convert<SrcSerializerType, DestSerializerType>(v3);
+    auto v5 = convert<DestSerializerType, SrcSerializerType>(v2);
+    auto v6 = convert<SrcSerializerType, DestSerializerType>(v3);
     std::cout << "1: " << v1.to_string() << std::endl;
     std::cout << "2: " << v2.to_string() << std::endl;
     std::cout << "3: " << v3.to_string() << std::endl;
@@ -789,15 +789,15 @@ void test_conversion() {
 }
 
 int main() {
-    test_much_serialization<zerialize::Flex>();
-    test_much_serialization<zerialize::Json>();
-    test_much_serialization<zerialize::MsgPack>();
-    test_conversion<zerialize::Flex, zerialize::Json>();
-    test_conversion<zerialize::Flex, zerialize::MsgPack>();
-    test_conversion<zerialize::Json, zerialize::Flex>();
-    test_conversion<zerialize::Json, zerialize::MsgPack>();
-    test_conversion<zerialize::MsgPack, zerialize::Json>();
-    test_conversion<zerialize::MsgPack, zerialize::Flex>();
+    test_much_serialization<Flex>();
+    test_much_serialization<Json>();
+    test_much_serialization<MsgPack>();
+    test_conversion<Flex, Json>();
+    test_conversion<Flex, MsgPack>();
+    test_conversion<Json, Flex>();
+    test_conversion<Json, MsgPack>();
+    test_conversion<MsgPack, Json>();
+    test_conversion<MsgPack, Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }
