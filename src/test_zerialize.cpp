@@ -590,7 +590,7 @@ void test_much_serialization() {
                 v["empty_map"].mapKeys().size() == 0;
         });
 
-/*
+
     // Empty non-any containers
     test_serialization<SerializerType>("Empty non-any containers",
         [](){ 
@@ -609,7 +609,7 @@ void test_much_serialization() {
                 v["empty_vector"].arraySize() == 0 &&
                 v["empty_map"].mapKeys().size() == 0; 
         });
-
+/*
     // std::optional
     test_serialization<SerializerType>("std::optional values",
         [](){ 

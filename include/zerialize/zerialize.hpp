@@ -254,6 +254,54 @@ public:
             d->serialize(any_cast<const char*>(val));
         } else if (val.type() == typeid(string)) {
             d->serialize(any_cast<string>(val));
+        } else if (val.type() == typeid(vector<int8_t>)) {
+            d->serialize(any_cast<vector<int8_t>>(val));
+        } else if (val.type() == typeid(vector<int16_t>)) {
+            d->serialize(any_cast<vector<int16_t>>(val));
+        } else if (val.type() == typeid(vector<int32_t>)) {
+            d->serialize(any_cast<vector<int32_t>>(val));
+        } else if (val.type() == typeid(vector<int64_t>)) {
+            d->serialize(any_cast<vector<int64_t>>(val));
+        } else if (val.type() == typeid(vector<uint8_t>)) {
+            d->serialize(any_cast<vector<uint8_t>>(val));
+        } else if (val.type() == typeid(vector<uint16_t>)) {
+            d->serialize(any_cast<vector<uint16_t>>(val));
+        } else if (val.type() == typeid(vector<uint32_t>)) {
+            d->serialize(any_cast<vector<uint32_t>>(val));
+        } else if (val.type() == typeid(vector<uint64_t>)) {
+            d->serialize(any_cast<vector<uint64_t>>(val));
+        } else if (val.type() == typeid(vector<float>)) {
+            d->serialize(any_cast<vector<float>>(val));
+        } else if (val.type() == typeid(vector<double>)) {
+            d->serialize(any_cast<vector<double>>(val));
+        } else if (val.type() == typeid(vector<bool>)) {
+            d->serialize(any_cast<vector<bool>>(val));
+        } else if (val.type() == typeid(vector<string>)) {
+            d->serialize(any_cast<vector<string>>(val));
+        } else if (val.type() == typeid(map<string, int8_t>)) {
+            d->serialize(any_cast<map<string, int8_t>>(val));
+        } else if (val.type() == typeid(map<string, int16_t>)) {
+            d->serialize(any_cast<map<string, int16_t>>(val));
+        } else if (val.type() == typeid(map<string, int32_t>)) {
+            d->serialize(any_cast<map<string, int32_t>>(val));
+        } else if (val.type() == typeid(map<string, int64_t>)) {
+            d->serialize(any_cast<map<string, int64_t>>(val));
+        } else if (val.type() == typeid(map<string, uint8_t>)) {
+            d->serialize(any_cast<map<string, uint8_t>>(val));
+        } else if (val.type() == typeid(map<string, uint16_t>)) {
+            d->serialize(any_cast<map<string, uint16_t>>(val));
+        } else if (val.type() == typeid(map<string, uint32_t>)) {
+            d->serialize(any_cast<map<string, uint32_t>>(val));
+        } else if (val.type() == typeid(map<string, uint64_t>)) {
+            d->serialize(any_cast<map<string, uint64_t>>(val));
+        } else if (val.type() == typeid(map<string, float>)) {
+            d->serialize(any_cast<map<string, float>>(val));
+        } else if (val.type() == typeid(map<string, double>)) {
+            d->serialize(any_cast<map<string, double>>(val));
+        } else if (val.type() == typeid(map<string, bool>)) {
+            d->serialize(any_cast<map<string, bool>>(val));
+        } else if (val.type() == typeid(map<string, string>)) {
+            d->serialize(any_cast<map<string, string>>(val));
         } else {
             throw SerializationError("-- Unsupported type in any");
         }
