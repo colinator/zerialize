@@ -50,9 +50,10 @@ public:
     string to_string() const override {
         return "FlexBuffer " + std::to_string(buf().size()) +
             " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
-            "\n" + debug_string(*this);;
+            "\n" + debug_string(*this);
     }
 
+    bool isNull() const { return ref_.IsNull(); }
     bool isInt() const { return ref_.IsInt(); }
     bool isUInt() const { return ref_.IsUInt(); }
     bool isFloat() const { return ref_.IsFloat(); }
@@ -173,6 +174,8 @@ public:
     using Serializer<FlexSerializer>::serialize;
 
     FlexSerializer(FlexBuffer& fb): fbb(fb.fbb) {}
+
+    void serialize(std::nullptr_t) { fbb.Null(); }
 
     void serialize(int8_t val) { fbb.Int(val); }
     void serialize(int16_t val) { fbb.Int(val); }

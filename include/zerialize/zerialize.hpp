@@ -52,6 +52,7 @@ concept NonBlobDeserializable = requires(const V& v, const string& key, size_t i
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
+    { v.isNull() } -> convertible_to<bool>;
     { v.isInt() } -> convertible_to<bool>;
     { v.isUInt() } -> convertible_to<bool>;
     { v.isFloat() } -> convertible_to<bool>;
@@ -138,6 +139,7 @@ concept Serializing = requires(V& v,
     const span<const uint8_t>& g, 
     const string_view& h, 
     const char* i,
+    std::nullptr_t j,
     const string& key
 ) {
 
@@ -151,6 +153,7 @@ concept Serializing = requires(V& v,
     { v.serialize(g) } -> std::same_as<void>;
     { v.serialize(h) } -> std::same_as<void>;
     { v.serialize(i) } -> std::same_as<void>;
+    { v.serialize(j) } -> std::same_as<void>;
 
     // Must support v.serialize(key, any)
     { v.serialize(key, a) } -> std::same_as<void>;
@@ -221,6 +224,8 @@ public:
                     s.serializeAny(value);
                 }
             });
+        } else if (val.type() == typeid(std::nullptr_t)) {
+            d->serialize(nullptr);
         } else if (val.type() == typeid(int8_t)) {
             d->serialize(static_cast<int64_t>(any_cast<int8_t>(val)));
         } else if (val.type() == typeid(int16_t)) {
@@ -272,6 +277,8 @@ public:
                     s.Serializer::serialize(value[i]);
                 }
             });
+        } else if (value.isNull()) {
+            d->serialize(nullptr);
         } else if (value.isInt()) {
             d->serialize(value.asInt64());
         } else if (value.isUInt()) {
@@ -335,6 +342,7 @@ struct SerializeCounter: public Serializer<SerializeCounter> {
 
     using Serializer<SerializeCounter>::serialize;
 
+    void serialize(std::nullptr_t) { count += 1; }
     void serialize(int8_t) { count += 1; }
     void serialize(int16_t) { count += 1; }
     void serialize(int32_t) { count += 1; }
@@ -453,6 +461,8 @@ void debug_stream(stringstream & s, int tabLevel, const Deserializable auto& v) 
             s << v.asDouble();
         } else if (v.isString()) {
             s << "\"" << v.asString() << "\"";
+        } else if (v.isNull()) {
+            s << "<null/>";
         } else if (v.isBool()) {
             s << v.asBool();
         } else if (v.isBlob()) {

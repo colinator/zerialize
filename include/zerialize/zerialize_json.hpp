@@ -120,6 +120,7 @@ public:
             " : " + json_.dump() + "\n" + debug_string(*this);
     }
 
+    bool isNull() const { return json_.is_null(); }
     bool isInt() const { return json_.is_number_integer(); }
     bool isUInt() const { return json_.is_number_unsigned(); }
     bool isFloat() const { return json_.is_number_float(); }
@@ -254,6 +255,8 @@ public:
     void writeT(T val) {
         elem() = val;
     }
+
+    void serialize(std::nullptr_t) { writeT(nullptr); }
 
     void serialize(int8_t val) { writeT(val); }
     void serialize(int16_t val) { writeT(val); }

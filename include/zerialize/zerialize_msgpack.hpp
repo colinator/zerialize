@@ -86,6 +86,10 @@ public:
         return ss.str();
     }
 
+    bool isNull() const { 
+        return obj_.type == msgpack::type::NIL; 
+    }
+
     bool isInt() const { 
         return obj_.type == msgpack::type::NEGATIVE_INTEGER || obj_.type == msgpack::type::POSITIVE_INTEGER;
     }
@@ -250,6 +254,8 @@ public:
     MsgPackSerializer(MsgPackBuffer& mb): packer(mb.sbuf), pack_stream(mb.sbuf) {}
 
     MsgPackSerializer(MsgPackStream& ps): packer(ps), pack_stream(ps) {}
+
+    void serialize(std::nullptr_t) { packer.pack_nil(); }
 
     void serialize(int8_t val) { packer.pack(val); }
     void serialize(int16_t val) { packer.pack(val); }

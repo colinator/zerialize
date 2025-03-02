@@ -545,8 +545,8 @@ void test_much_serialization() {
             return std::abs(v["pi"].asFloat() - 3.14159f) < 0.0001f &&
                 std::abs(v["neg_e"].asFloat() - (-2.71828f)) < 0.0001f;
         });
-        
-/*
+
+
     // Null values
     test_serialization<SerializerType>("Null values",
         [](){ 
@@ -556,6 +556,58 @@ void test_much_serialization() {
         },
         [](const auto& v) {
             return v["null_val"].isNull();
+        });
+
+    // std::unordered_map
+    test_serialization<SerializerType>("std::unordered_map",
+        [](){ 
+            std::unordered_map<std::string, int> map1 = {{"one", 1}, {"two", 2}, {"three", 3}};
+            
+            return zerialize::serialize<SerializerType>(map1); 
+        },
+        [](const auto& v) {
+            return v["one"].asInt32() == 1 &&
+                v["two"].asInt32() == 2 &&
+                v["three"].asInt32() == 3;
+        });
+
+    // Empty containers
+    test_serialization<SerializerType>("Empty containers of any",
+        [](){ 
+            std::vector<std::any> empty_vec;
+            std::map<std::string, std::any> empty_map;
+            
+            return zerialize::serialize<SerializerType>(
+                { 
+                    {"empty_vector", empty_vec}, 
+                    {"empty_map", empty_map}
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return 
+                v["empty_vector"].arraySize() == 0 &&
+                v["empty_map"].mapKeys().size() == 0;
+        });
+
+/*
+    // Empty non-any containers
+    test_serialization<SerializerType>("Empty non-any containers",
+        [](){ 
+            std::vector<int> empty_vec;
+            std::map<std::string, int> empty_map;
+            
+            return zerialize::serialize<SerializerType>(
+                { 
+                    {"empty_vector", empty_vec}, 
+                    {"empty_map", empty_map} 
+                }
+            ); 
+        },
+        [](const auto& v) {
+            return 
+                v["empty_vector"].arraySize() == 0 &&
+                v["empty_map"].mapKeys().size() == 0; 
         });
 
     // std::optional
@@ -662,36 +714,6 @@ void test_much_serialization() {
                 (set2[0].asString() == "cherry" || set2[1].asString() == "cherry" || set2[2].asString() == "cherry");
                 
             return set1_valid && set2_valid;
-        });
-
-    // std::unordered_map
-    test_serialization<SerializerType>("std::unordered_map",
-        [](){ 
-            std::unordered_map<std::string, int> map1 = {{"one", 1}, {"two", 2}, {"three", 3}};
-            
-            return zerialize::serialize<SerializerType>(map1); 
-        },
-        [](const auto& v) {
-            return v["one"].asInt32() == 1 &&
-                v["two"].asInt32() == 2 &&
-                v["three"].asInt32() == 3;
-        });
-
-    // Empty containers
-    test_serialization<SerializerType>("Empty containers",
-        [](){ 
-            std::vector<int> empty_vec;
-            std::map<std::string, int> empty_map;
-            std::set<double> empty_set;
-            
-            return zerialize::serialize<SerializerType>(
-                { {"empty_vector", empty_vec}, {"empty_map", empty_map}, {"empty_set", empty_set} }
-            ); 
-        },
-        [](const auto& v) {
-            return v["empty_vector"].arraySize() == 0 &&
-                v["empty_map"].objectSize() == 0 &&
-                v["empty_set"].arraySize() == 0;
         });
 
     // Enum types
