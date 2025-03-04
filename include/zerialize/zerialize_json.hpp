@@ -105,10 +105,9 @@ public:
         : buf_(buf),
           json_(nlohmann::json::parse(buf_)) { }
 
-    void finish() {
-        string str = json_.dump();
-        buf_ = vector<uint8_t>(str.begin(), str.end());
-    }
+    JsonBuffer(vector<uint8_t>&& buf, nlohmann::json&& json)
+        : buf_(buf)
+        , json_(json) { }
 
     const vector<uint8_t>& buf() const override {
         return buf_;
@@ -225,6 +224,17 @@ public:
     }
 };
 
+class JsonRootSerializer {
+public:
+    nlohmann::json json;
+
+    JsonBuffer finish() {
+        string str = json.dump();
+        auto buf = vector<uint8_t>(str.begin(), str.end());
+        return JsonBuffer(std::move(buf), std::move(json));
+    }
+};
+
 class JsonSerializer: public Serializer<JsonSerializer> {
 private:
     nlohmann::json& j;
@@ -239,8 +249,8 @@ public:
         : j(j)
         , serializingVector(serializingVector) {}
 
-    JsonSerializer(JsonBuffer& jb, bool serializingVector = false)
-        : j(jb.json())
+    JsonSerializer(JsonRootSerializer& jb, bool serializingVector = false)
+        : j(jb.json)
         , serializingVector(serializingVector) {}
 
     nlohmann::json& elem() {
@@ -344,6 +354,7 @@ class Json {
 public:
     using BufferType = JsonBuffer;
     using Serializer = JsonSerializer;
+    using RootSerializer = JsonRootSerializer;
     using SerializingFunction = JsonSerializer::SerializingFunction;
 
     static inline constexpr const char* Name = "JSON";

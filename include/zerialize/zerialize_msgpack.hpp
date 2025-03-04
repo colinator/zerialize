@@ -2,7 +2,6 @@
 
 #include <zerialize/zerialize.hpp>
 #include <msgpack.hpp>
-#include <variant>
 
 // Define endianness manually since we're not using Boost
 // #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && defined(__ORDER_BIG_ENDIAN__)
@@ -17,8 +16,6 @@
 
 namespace zerialize {
 
-using std::variant;
-
 using MsgPackStream = msgpack::sbuffer;
 using MsgPacker = msgpack::packer<MsgPackStream>;
 
@@ -29,7 +26,6 @@ private:
     msgpack::object obj_;
 
 public:
-    MsgPackStream sbuf;
 
     MsgPackBuffer() {}
 
@@ -54,17 +50,6 @@ public:
     // Must copy for const reference
     MsgPackBuffer(const vector<uint8_t>& buf): buf_(buf) {
         if (buf_.size() > 0) {
-            msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
-            obj_ = oh_.get();
-        }
-    }
-
-    void finish() {
-        if (sbuf.size() > 0) {
-            buf_.resize(sbuf.size());
-            std::memcpy(buf_.data(), sbuf.data(), sbuf.size());
-            
-            // Parse the buffer to get the object
             msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
             obj_ = oh_.get();
         }
@@ -238,20 +223,32 @@ public:
     }
 };
 
+class MsgPackRootSerializer {
+public:
+    MsgPackStream sbuf;
+
+    MsgPackBuffer finish() {
+        if (sbuf.size() > 0) {
+            size_t size = sbuf.size();
+            uint8_t* data = (uint8_t*)sbuf.release();
+            std::vector<uint8_t> vec(data, data + size);
+            return MsgPackBuffer(std::move(vec));
+        }
+        return MsgPackBuffer();
+    }
+};
+
 class MsgPackSerializer: public Serializer<MsgPackSerializer> {
 private:
 
     MsgPacker packer;
-
-    //variant<MsgPacker, std::reference_wrapper<MsgPacker>> packer;
-
     MsgPackStream& pack_stream;
 
 public:
     // Make the base class overloads visible in the derived class
     using Serializer<MsgPackSerializer>::serialize;
 
-    MsgPackSerializer(MsgPackBuffer& mb): packer(mb.sbuf), pack_stream(mb.sbuf) {}
+    MsgPackSerializer(MsgPackRootSerializer& mb): packer(mb.sbuf), pack_stream(mb.sbuf) {}
 
     MsgPackSerializer(MsgPackStream& ps): packer(ps), pack_stream(ps) {}
 
@@ -347,6 +344,7 @@ class MsgPack {
 public:
     using BufferType = MsgPackBuffer;
     using Serializer = MsgPackSerializer;
+    using RootSerializer = MsgPackRootSerializer;
     using SerializingFunction = MsgPackSerializer::SerializingFunction;
 
     static inline constexpr const char* Name = "MsgPack";

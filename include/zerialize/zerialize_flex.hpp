@@ -1,23 +1,14 @@
 #pragma once
 
-#include <optional>
 #include <zerialize/zerialize.hpp>
-#include <zerialize/swl_optional.hpp>
 #include "flatbuffers/flexbuffers.h"
 
 namespace zerialize {
 
-using std::optional;
-
 class FlexBuffer : public DataBuffer<FlexBuffer> {
 private:
     vector<uint8_t> buf_;
-    //const vector<uint8_t>& rbuf_;
-
     flexbuffers::Reference ref_;
-
-    swl::optional<flexbuffers::Builder> fbb; // { flexbuffers::Builder() };
-    //flexbuffers::Builder fbb;
 
 public:
 
@@ -38,38 +29,6 @@ public:
     FlexBuffer(const vector<uint8_t>& buf)
         : buf_(buf)
         , ref_(buf.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) { }
-
-    void finish() {
-        if (fbb.has_value()) {
-
-            // std::cout << "Alignment of flexbuffers::Builder: " 
-            //   << alignof(flexbuffers::Builder) << "\n";
-
-            // Note! For some weird reason, 'StartVector()' returns
-            // the current stack size.
-            if (fbb->StartVector() > 0) {
-                fbb->Finish(); 
-                buf_ = fbb->GetBuffer(); // copy? hmph... do we need to? No, no we don't!!!
-                ref_ = flexbuffers::GetRoot(buf_);
-            }
-        }
-
-        // if (fbb.StartVector() > 0) {
-        //     fbb.Finish(); 
-        //     buf_ = fbb.GetBuffer(); // copy? hmph... do we need to? No, no we don't!!!
-        //     ref_ = flexbuffers::GetRoot(buf_);
-        // }
-    }
-
-    flexbuffers::Builder& getFBB() {
-        //return fbb;
-        if (!fbb.has_value()) {
-            fbb = flexbuffers::Builder();
-        }
-        //flexbuffers::Builder& rbb = fbb.value();
-        //lexbuffers::Builder& rbb = *fbb;
-        return *fbb;
-    }
 
     // change to span?, yeah probably!!!
     const vector<uint8_t>& buf() const override {
@@ -193,23 +152,43 @@ public:
     }
 };
 
+class FlexRootSerializer {
+public:
+    flexbuffers::Builder fbb;
+
+    FlexBuffer finish() {
+        if (fbb.StartVector() > 0) {
+            fbb.Finish(); 
+
+            // Move the data out of the builder into the Buffer class
+
+            // You might think this is unsafe...
+            const std::vector<uint8_t>& orig = fbb.GetBuffer();
+
+            // ...and this even more so...
+            std::vector<uint8_t>& nonConstOrig = const_cast<std::vector<uint8_t>&>(orig);
+
+            // ...but we'll be fine...
+            return FlexBuffer(std::move(nonConstOrig));
+        }
+        return FlexBuffer();
+    }
+};
+
 class FlexSerializer: public Serializer<FlexSerializer> {
 private:
     flexbuffers::Builder& fbb;
+
+    //variant<flexbuffers::Builder, flexbuffers::Builder&> fbb;
 
 public:
 
     // Make the base class overloads visible in the derived class
     using Serializer<FlexSerializer>::serialize;
 
-    FlexSerializer() = delete;
-    FlexSerializer(const FlexSerializer& o): Serializer<FlexSerializer>(), fbb(o.fbb) { 
-        std::cout << "--------- COPY CONSTRUCTOR " << (void*)this << std::endl;
-    }
-    ~FlexSerializer() {
-        std::cout << "--------- DESTRUCTOR " << (void*)this << std::endl;
-    }
-    FlexSerializer(FlexBuffer& fb): Serializer(), fbb(fb.getFBB()) {}
+    FlexSerializer(const FlexSerializer& o): Serializer<FlexSerializer>(), fbb(o.fbb) { }
+
+    FlexSerializer(FlexRootSerializer& fb): Serializer(), fbb(fb.fbb) {}
 
     void serialize(std::nullptr_t) { fbb.Null(); }
 
@@ -246,10 +225,7 @@ public:
     }
 
     FlexSerializer serializerForKey(const string& key) {
-        std::cout << "========= 0 " << key << std::endl;
-        std::cout << "========= P " << (void*)(&fbb) << " this: " << (void*)(this) <<  std::endl;
         fbb.Key(key);
-        std::cout << "========= 1 " << key << std::endl;
         return *this;
     }
 
@@ -296,6 +272,7 @@ class Flex {
 public:
     using BufferType = FlexBuffer;
     using Serializer = FlexSerializer;
+    using RootSerializer = FlexRootSerializer;
     using SerializingFunction = FlexSerializer::SerializingFunction;
 
     static inline constexpr const char* Name = "FLEX";

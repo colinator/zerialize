@@ -253,7 +253,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serialized.size()
         });
     }
-/*
+
     // Medium data: small xtensor
     {
         auto tensor = xt::xtensor<double, 2>{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
@@ -492,7 +492,6 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serialized.size()
         });
     }
-*/
     
     return results;
 }
@@ -507,15 +506,15 @@ int main() {
     printResults(flexResults);
     std::cout << std::endl;
     
-    // std::cout << "JSON Serializer:" << std::endl;
-    // auto jsonResults = runBenchmarks<Json>();
-    // printResults(jsonResults);
-    // std::cout << std::endl;
+    std::cout << "JSON Serializer:" << std::endl;
+    auto jsonResults = runBenchmarks<Json>();
+    printResults(jsonResults);
+    std::cout << std::endl;
     
-    // std::cout << "MsgPack Serializer:" << std::endl;
-    // auto msgpackResults = runBenchmarks<MsgPack>();
-    // printResults(msgpackResults);
-    // std::cout << std::endl;
+    std::cout << "MsgPack Serializer:" << std::endl;
+    auto msgpackResults = runBenchmarks<MsgPack>();
+    printResults(msgpackResults);
+    std::cout << std::endl;
     
     std::cout << "Benchmark complete!" << std::endl;
     return 0;
