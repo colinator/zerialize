@@ -37,24 +37,27 @@ struct BenchmarkResult {
     double deserializationTime;
     double readTime;
     size_t dataSize;
+    int iterations;
 };
 
 // Print benchmark results in a table
 void printResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::left << std::setw(35) << "Test Name" 
-              << std::right << std::setw(20) << "Serialize (µs)" 
-              << std::setw(20) << "Deserialize (µs)" 
-              << std::setw(20) << "Read (µs)"
-              << std::setw(20) << "Data Size (bytes)" << std::endl;
+              << std::right << std::setw(18) << "Serialize (µs)" 
+              << std::setw(18) << "Deserialize (µs)" 
+              << std::setw(18) << "Read (µs)"
+              << std::setw(18) << "Data Size (bytes)"
+              << std::setw(14) << "(samples)" << std::endl;
     
-    std::cout << std::string(112, '-') << std::endl;
+    std::cout << std::string(118, '-') << std::endl;
     
     for (const auto& result : results) {
         std::cout << std::left << std::setw(35) << result.name 
-                  << std::right << std::setw(19) << std::fixed << std::setprecision(3) << result.serializationTime 
-                  << std::setw(19) << std::fixed << std::setprecision(3) << result.deserializationTime 
-                  << std::setw(19) << std::fixed << std::setprecision(3) << result.readTime
-                  << std::setw(20) << result.dataSize << std::endl;
+                  << std::right << std::setw(17) << std::fixed << std::setprecision(3) << result.serializationTime 
+                  << std::setw(17) << std::fixed << std::setprecision(3) << result.deserializationTime 
+                  << std::setw(17) << std::fixed << std::setprecision(3) << result.readTime
+                  << std::setw(17) << result.dataSize
+                  << std::setw(15) << result.iterations << std::endl;
     }
 }
 
@@ -88,7 +91,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            counter
+            counter,
+            1000000
         });
     }
 
@@ -123,7 +127,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
 
@@ -162,7 +167,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
     
@@ -198,7 +204,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
 
@@ -250,7 +257,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
 
@@ -294,7 +302,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
     
@@ -339,7 +348,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000000
         });
     }
     
@@ -388,7 +398,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000
         });
     }
     
@@ -437,7 +448,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000
         });
     }
 
@@ -489,7 +501,8 @@ std::vector<BenchmarkResult> runBenchmarks() {
             serTime, 
             deserTime,
             readTime,
-            serialized.size()
+            serialized.size(),
+            1000
         });
     }
     

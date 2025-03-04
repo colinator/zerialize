@@ -20,44 +20,44 @@
 
 ```
 Flex Serializer:
-Test Name                               Serialize (µs)   Deserialize (µs)          Read (µs)   Data Size (bytes)
-----------------------------------------------------------------------------------------------------------------
-Function call only baseline                      0.000              0.000              0.000               20000
-Null                                             0.052              0.042              0.000                   0
-Small: Single Int                                0.134              0.055              0.002                   3
-Small: Int, Double, String                       0.601              0.099              0.268                  46
-Medium: Map with Nested Values                   2.067              0.070              1.064                 127
-Medium: Small XTensor (2x3)                      1.525              0.063              1.474                 123
-Medium: Small Eigen Matrix (3x3)                 1.382              0.055              1.042                 147
-Large: XTensor (20x20)                           1.365              0.048              1.330                3290
-Large: Eigen Matrix (20x20)                      1.410              0.044              1.022                3290
-Very large: XTensor (3x640x480)                 87.471              0.042              1.270              921726
+Test Name                             Serialize (µs) Deserialize (µs)        Read (µs) Data Size (bytes)     (samples)
+----------------------------------------------------------------------------------------------------------------------
+Function call only baseline                    0.000            0.000            0.000          3000000        1000000
+Null                                           0.055            0.000            0.000                0        1000000
+Small: Single Int                              0.077            0.000            0.002                3        1000000
+Small: Int, Double, String                     0.230            0.000            0.019               46        1000000
+Medium: Map with Nested Values                 1.096            0.000            0.143              127        1000000
+Medium: Small XTensor (2x3)                    1.171            0.000            0.757              123        1000000
+Medium: Small Eigen Matrix (3x3)               1.209            0.000            0.481              147        1000000
+Large: XTensor (20x20)                         1.278            0.000            0.760             3290           1000
+Large: Eigen Matrix (20x20)                    1.330            0.000            0.501             3290           1000
+Very large: XTensor (3x640x480)               73.157            0.000            0.799           921726           1000
 
 JSON Serializer:
-Test Name                               Serialize (µs)   Deserialize (µs)          Read (µs)   Data Size (bytes)
-----------------------------------------------------------------------------------------------------------------
-Function call only baseline                      0.000              0.000              0.000               20000
-Null                                             0.148              0.149              0.000                   4
-Small: Single Int                                0.154              0.153              0.002                   2
-Small: Int, Double, String                       0.528              0.650              0.039                  17
-Medium: Map with Nested Values                   1.854              1.647              0.366                  81
-Medium: Small XTensor (2x3)                      2.340              1.799              1.882                 133
-Medium: Small Eigen Matrix (3x3)                 2.459              1.970              1.693                 165
-Large: XTensor (20x20)                          20.569             17.509              6.350                4339
-Large: Eigen Matrix (20x20)                     20.020             17.320              6.293                4339
-Very large: XTensor (3x640x480)               5479.200           4623.025           1392.264             1228874
+Test Name                             Serialize (µs) Deserialize (µs)        Read (µs) Data Size (bytes)     (samples)
+----------------------------------------------------------------------------------------------------------------------
+Function call only baseline                    0.000            0.000            0.000          3000000        1000000
+Null                                           0.208            0.165            0.000                4        1000000
+Small: Single Int                              0.211            0.164            0.002                2        1000000
+Small: Int, Double, String                     0.786            0.669            0.041               17        1000000
+Medium: Map with Nested Values                 2.666            1.825            0.376               81        1000000
+Medium: Small XTensor (2x3)                    3.705            2.052            1.954              133        1000000
+Medium: Small Eigen Matrix (3x3)               3.386            2.226            1.779              165        1000000
+Large: XTensor (20x20)                        24.170           19.225            7.500             4339           1000
+Large: Eigen Matrix (20x20)                   24.670           18.982            7.219             4339           1000
+Very large: XTensor (3x640x480)             6519.578         5126.119         1673.905          1228874           1000
 
 MsgPack Serializer:
-Test Name                               Serialize (µs)   Deserialize (µs)          Read (µs)   Data Size (bytes)
-----------------------------------------------------------------------------------------------------------------
-Function call only baseline                      0.000              0.000              0.000               20000
-Null                                             0.020              0.021              0.000                   0
-Small: Single Int                                0.204              0.159              0.001                   1
-Small: Int, Double, String                       0.247              0.168              0.064                  17
-Medium: Map with Nested Values                   0.717              0.230              0.329                  58
-Medium: Small XTensor (2x3)                      0.906              0.233              0.868                  98
-Medium: Small Eigen Matrix (3x3)                 0.938              0.237              0.642                 122
-Large: XTensor (20x20)                           0.984              0.270              0.950                3251
-Large: Eigen Matrix (20x20)                      1.080              0.276              0.683                3251
-Very large: XTensor (3x640x480)                 89.859             14.821              0.959              921658
+Test Name                             Serialize (µs) Deserialize (µs)        Read (µs) Data Size (bytes)     (samples)
+----------------------------------------------------------------------------------------------------------------------
+Function call only baseline                    0.000            0.000            0.000          3000000        1000000
+Null                                           0.019            0.002            0.000                0        1000000
+Small: Single Int                              0.871            0.124            0.002                1        1000000
+Small: Int, Double, String                     0.899            0.144            0.013               17        1000000
+Medium: Map with Nested Values                 1.544            0.217            0.079               58        1000000
+Medium: Small XTensor (2x3)                    1.666            0.226            0.600               98        1000000
+Medium: Small Eigen Matrix (3x3)               1.646            0.224            0.349              122        1000000
+Large: XTensor (20x20)                         1.638            0.253            0.580             3251           1000
+Large: Eigen Matrix (20x20)                    1.670            0.264            0.346             3251           1000
+Very large: XTensor (3x640x480)              181.606           15.972            0.647           921658           1000
 ```
