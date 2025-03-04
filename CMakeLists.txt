@@ -123,5 +123,5 @@ else()
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 endif()
 
-# Add benchmark subdirectory
-add_subdirectory(benchmark)
+# # Add benchmark subdirectory
+# add_subdirectory(benchmark)

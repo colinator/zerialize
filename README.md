@@ -16,3 +16,9 @@ Zero-copy multi-format serialization/deserialization for c++.
 JSON
 
 Flexbuffers
+
+## Building
+
+    cmake -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --config Release
+

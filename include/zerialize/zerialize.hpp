@@ -11,7 +11,7 @@
 #include <sstream>
 #include <functional>
 
-constexpr bool DEBUG_TRACE_CALLS = false;
+constexpr bool DEBUG_TRACE_CALLS = true;
 
 namespace zerialize {
 
@@ -668,9 +668,13 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
     typename SerializerType::Serializer serializer(buffer);
     serializer.serializeMap([&](SerializingConcept auto& s){
         ([&](auto&& pair) {
-            string key(pair.first);
+            std::cout << "--------- 0" << std::endl;
+            string key(pair.first); // don't like copy!
+            std::cout << "--------- 1 " << key << std::endl;
             SerializingConcept auto ks = s.serializerForKey(key);
+            std::cout << "--------- 2" << std::endl;
             ks.serialize(std::forward<decltype(pair.second)>(pair.second));
+            std::cout << "--------- 3" << std::endl;
         } (std::forward<decltype(values)>(values)), ...);
     });
     buffer.finish();
