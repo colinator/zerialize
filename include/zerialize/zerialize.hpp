@@ -11,7 +11,7 @@
 #include <sstream>
 #include <functional>
 
-constexpr bool DEBUG_TRACE_CALLS = true;
+constexpr bool DEBUG_TRACE_CALLS = false;
 
 namespace zerialize {
 
@@ -592,10 +592,9 @@ typename SerializerType::BufferType serialize() {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize()" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
-    buffer.finish();
-    return buffer;
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
+    return rootSerializer.finish();
 }
 
 // Serialize anything, as an 'any' value.
@@ -604,11 +603,10 @@ typename SerializerType::BufferType serialize(const any& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(any: " << value.type().name() << ")" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeAny(value);
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 // Serialize a vector from an initializer list of any.
@@ -617,15 +615,14 @@ typename SerializerType::BufferType serialize(initializer_list<any> list) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(initializer list)" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeVector([&list](SerializingConcept auto& s){
         for (const any& val : list) {
             s.serializeAny(val);
         }           
     });
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 // Serialize a map from an initializer list of pair<string, any>.
@@ -634,15 +631,14 @@ typename SerializerType::BufferType serialize(initializer_list<pair<string, any>
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(initializer list/map)" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeMap([&l](SerializingConcept auto& s){
         for (const auto& [key, val] : l) {
             s.serialize(key, val);
         }           
     });
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 // Serialize a perfect-forwarded value.
@@ -651,11 +647,10 @@ typename SerializerType::BufferType serialize(ValueType&& value) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(&&value)" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serialize(std::forward<ValueType>(value));
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 // Serialize a map from pairs of string keys and  perfectly-forwarded values.
@@ -664,21 +659,16 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(&& value pairs)" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeMap([&](SerializingConcept auto& s){
         ([&](auto&& pair) {
-            std::cout << "--------- 0" << std::endl;
             string key(pair.first); // don't like copy!
-            std::cout << "--------- 1 " << key << std::endl;
             SerializingConcept auto ks = s.serializerForKey(key);
-            std::cout << "--------- 2" << std::endl;
             ks.serialize(std::forward<decltype(pair.second)>(pair.second));
-            std::cout << "--------- 3" << std::endl;
         } (std::forward<decltype(values)>(values)), ...);
     });
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 // Serialize a vector from a perfectly-forwarded parameter pack.
@@ -687,13 +677,12 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "serialize(&&values)" << endl;
     }
-    typename SerializerType::BufferType buffer;
-    typename SerializerType::Serializer serializer(buffer);
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeVector([&](SerializingConcept auto& s){
         (s.serialize(std::forward<ValueTypes>(values)), ...);      
     });
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 
@@ -706,11 +695,10 @@ typename DstSerializerType::BufferType convert(const typename SrcSerializerType:
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "convert(" << SrcSerializerType::Name << ") to: " << DstSerializerType::Name << endl;
     }
-    typename DstSerializerType::BufferType buffer;
-    typename DstSerializerType::Serializer serializer(buffer);
+    typename DstSerializerType::RootSerializer rootSerializer;
+    typename DstSerializerType::Serializer serializer(rootSerializer);
     serializer.Serializer::serialize(src);
-    buffer.finish();
-    return buffer;
+    return rootSerializer.finish();
 }
 
 }
