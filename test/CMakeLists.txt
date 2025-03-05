@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(benchmark_zerialize)
+project(test_zerialize)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
 
-add_executable(benchmark_zerialize benchmark_zerialize.cpp)
-target_link_libraries(benchmark_zerialize PRIVATE zerialize)
+add_executable(test_zerialize test_zerialize.cpp)
+target_link_libraries(test_zerialize PRIVATE zerialize)
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)
