@@ -7,14 +7,6 @@
 namespace zerialize {
 namespace eigen {
 
-template <typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
-span<const uint8_t> _blob_from_eigen_matrix(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
-    const T* actual_data = m.data();
-    const uint8_t* byte_data = (const uint8_t*)actual_data;
-    size_t num_bytes = m.size() * sizeof(T);
-    return span<const uint8_t>(byte_data, num_bytes);
-}
-
 // Serialize an eigen matrix
 template <typename S, typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
 S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
@@ -24,14 +16,14 @@ S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>&
                 std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
                 ser.serialize(ShapeKey, shape);
                 ser.serialize(DTypeKey, tensor_dtype_index<T>);
-                ser.serialize(DataKey, _blob_from_eigen_matrix(m));
+                ser.serialize(DataKey, span_from_data_of(m));
             });
         } else {
             s.serializeVector([&m](SerializingConcept auto& ser) {
                 std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
                 ser.serialize(tensor_dtype_index<T>);
                 ser.serialize(shape);
-                ser.serialize(_blob_from_eigen_matrix(m));
+                ser.serialize(span_from_data_of(m));
             });   
         }
     };
@@ -81,8 +73,7 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     // read actual data
     auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
     auto blob = data_ref.asBlob();
-    const uint8_t * data_bytes = blob.data();
-    const T * data_typed = (const T*)data_bytes;
+    T* data_typed = data_from_blobby<T>(blob);
 
     // Create a Map object. If all is well, then this
     // should perform no copies - it should basically

@@ -98,6 +98,35 @@ TensorShape tensor_shape(const Deserializable auto& d) {
     return vshape;
 }
 
+template <typename C>
+concept HasDataAndSize = requires(const C& c) {
+    { c.data() } -> std::convertible_to<const typename C::value_type*>; 
+    { c.size() } -> std::convertible_to<std::size_t>;
+};
+
+template <HasDataAndSize C>
+std::span<const std::uint8_t> span_from_data_of(const C& container) {
+    using T = typename C::value_type; 
+    const T* actual_data = container.data();
+    const std::uint8_t* byte_data = reinterpret_cast<const std::uint8_t*>(actual_data);
+    std::size_t num_bytes = container.size() * sizeof(T);
+    return std::span<const std::uint8_t>(byte_data, num_bytes);
+}
+
+template <typename C>
+concept Blobby = requires(const C& c) {
+    { c.data() } -> std::convertible_to<const uint8_t*>; 
+    { c.size() } -> std::convertible_to<std::size_t>;
+};
+
+template <typename T>
+T* data_from_blobby(const Blobby auto& blob) {
+    const uint8_t * data_bytes = blob.data();
+    const T * data_typed_const = (const T*)data_bytes;
+    T* data_typed = const_cast<T*>(data_typed_const);
+    return data_typed;
+}
+
 template <typename T>
 bool isTensor(const Deserializable auto& buf) {
     if constexpr (TensorIsMap) {

@@ -5,34 +5,29 @@
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xio.hpp>
+#include <xtensor/xexpression.hpp>
 #include "zerialize_tensor_utils.h"
 
 namespace zerialize {
 namespace xtensor {
 
-template <typename T>
-span<const uint8_t> _blob_from_xtensor(const auto& t) {
-    const T* actual_data = t.data();
-    const uint8_t* byte_data = (const uint8_t*)actual_data;
-    size_t num_bytes = t.size() * sizeof(T);
-    return span<const uint8_t>(byte_data, num_bytes);
-}
 
-// Serialize an xtensor or xarray
+// Serialize an xtensor or xarray - anything that conforms to is_xexpression
 template <typename S, typename X>
+requires xt::is_xexpression<X>::value
 S::SerializingFunction serializer(const X& t) {
     return [&t](SerializingConcept auto& s) {
         if constexpr (TensorIsMap) {
             s.serializeMap([&t](SerializingConcept auto& ser) {
                 ser.serialize(ShapeKey, shape_of_any(t.shape()));
                 ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
-                ser.serialize(DataKey, _blob_from_xtensor<typename X::value_type>(t));
+                ser.serialize(DataKey, span_from_data_of(t));
             });
         } else {
             s.serializeVector([&t](SerializingConcept auto& ser) {
                 ser.serialize(tensor_dtype_index<typename X::value_type>);
                 ser.serialize(shape_of_any(t.shape()));
-                ser.serialize(_blob_from_xtensor<typename X::value_type>(t));
+                ser.serialize(span_from_data_of(t));
             });
         }
     };
@@ -78,9 +73,7 @@ auto asXTensor(const Deserializable auto& buf) {
     // get the blob data, through old-school c-typing as a T*
     auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
     auto blob = data_ref.asBlob();
-    const uint8_t * data_bytes = blob.data();
-    const T * data_typed_const = (const T*)data_bytes;
-    T* data_typed = const_cast<T*>(data_typed_const);
+    T* data_typed = data_from_blobby<T>(blob);
 
     // create an xtensor-adapter that can perform 
     // in-place adaptation of the blob into an xtensor
