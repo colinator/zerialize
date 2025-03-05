@@ -6,9 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
-
-add_executable(test_zerialize test_zerialize.cpp)
-target_link_libraries(test_zerialize PRIVATE zerialize)
+add_executable(${PROJECT_NAME} test_zerialize.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE zerialize)
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)

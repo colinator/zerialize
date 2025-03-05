@@ -1,46 +1,16 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
-project(test_zerialize_composite VERSION 1.0)
-
-include(FetchContent)
-
-FetchContent_Declare(
-    flatbuffers
-    GIT_REPOSITORY https://github.com/google/flatbuffers.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(flatbuffers)
-
-FetchContent_Declare(
-    json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(json)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+project(test_zerialize_composite)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(test_zerialize_composite test_zerialize_composite.cpp)
+add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
+add_executable(${PROJECT_NAME} test_zerialize_composite.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE zerialize)
 
-# Include directories
-target_include_directories(${PROJECT_NAME} PUBLIC
-    ${PROJECT_SOURCE_DIR}/include
-    ${flatbuffers_SOURCE_DIR}/include
-    nlohmann_json::nlohmann_json
-)
-
-# Link against flatbuffers
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-    nlohmann_json::nlohmann_json 
-    flatbuffers
-)
-
-# Add compiler warnings
 if(MSVC)
-    target_compile_options(test_zerialize_composite PRIVATE /W4)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
 else()
-    target_compile_options(test_zerialize_composite PRIVATE -Wall -Wextra)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 endif()
