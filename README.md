@@ -14,11 +14,10 @@ Zero-copy multi-format serialization/deserialization for c++.
 ## Current support
 
 JSON
-
 Flexbuffers
+MessagePack
 
 ## Building
 
-    cmake -B build -DCMAKE_BUILD_TYPE=Release
-    cmake --build build --config Release
+This is a header-only library, and contains nothing to build. The `test/`, `benchmark/`, and `composite_example/` directories contain executables with examples of how to organize cmake projects.
 
