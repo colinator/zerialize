@@ -15,29 +15,25 @@ span<const uint8_t> _blob_from_eigen_matrix(const Eigen::Matrix<T, NRows, NCols,
     return span<const uint8_t>(byte_data, num_bytes);
 }
 
-// // Serialize an eigen matrix
-// template <typename S, typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
-// S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
-//     return [&m](S::Serializer& s) {
-//         s.serializeMap([&m](S::Serializer& ser) {
-//             std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
-//             ser.serialize(ShapeKey, shape);
-//             ser.serialize(DTypeKey, tensor_dtype_index<T>);
-//             ser.serialize(DataKey, _blob_from_eigen_matrix(m));
-//         });
-//     };
-// }
-
 // Serialize an eigen matrix
 template <typename S, typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
 S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
     return [&m](SerializingConcept auto& s) {
-        s.serializeMap([&m](SerializingConcept auto& ser) {
-            std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
-            ser.serialize(ShapeKey, shape);
-            ser.serialize(DTypeKey, tensor_dtype_index<T>);
-            ser.serialize(DataKey, _blob_from_eigen_matrix(m));
-        });
+        if constexpr (TensorIsMap) {
+            s.serializeMap([&m](SerializingConcept auto& ser) {
+                std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
+                ser.serialize(ShapeKey, shape);
+                ser.serialize(DTypeKey, tensor_dtype_index<T>);
+                ser.serialize(DataKey, _blob_from_eigen_matrix(m));
+            });
+        } else {
+            s.serializeVector([&m](SerializingConcept auto& ser) {
+                std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
+                ser.serialize(tensor_dtype_index<T>);
+                ser.serialize(shape);
+                ser.serialize(_blob_from_eigen_matrix(m));
+            });   
+        }
     };
 }
 
@@ -50,14 +46,16 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }
 
     // Check that the serialized dtype matches T
-    auto dtype = buf[DTypeKey].asInt32();
+    auto dtype_ref = TensorIsMap ? buf[DTypeKey] : buf[0];
+    auto dtype = dtype_ref.asInt32();
     if (dtype != tensor_dtype_index<T>) {
         throw DeserializationError(string("asEigenMatrix asked to deserialize a matrix of type ") + 
             string(tensor_dtype_name<T>) + " but found a matrix of type " + string(type_name_from_code(dtype)));
     }
 
     // get the shape
-    TensorShape vshape = tensor_shape(buf[ShapeKey]);
+    auto shape_ref = TensorIsMap ? buf[ShapeKey] : buf[1];
+    TensorShape vshape = tensor_shape(shape_ref);
 
     // perform dimension check
     if (vshape.size() != 2) {
@@ -81,7 +79,8 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     }
 
     // read actual data
-    auto blob = buf[DataKey].asBlob();
+    auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
+    auto blob = data_ref.asBlob();
     const uint8_t * data_bytes = blob.data();
     const T * data_typed = (const T*)data_bytes;
 

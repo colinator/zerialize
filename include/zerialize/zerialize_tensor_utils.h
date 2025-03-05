@@ -73,6 +73,8 @@ constexpr char DataKey[] = "data";
 using TensorShapeElement = uint32_t;
 using TensorShape = vector<TensorShapeElement>;
 
+constexpr bool TensorIsMap = false;
+
 inline vector<any> shape_of_any(const auto& tshape) {
     // get a vector of the shape as a vector of any.
     // we really should do something about that...
@@ -89,20 +91,30 @@ TensorShape tensor_shape(const Deserializable auto& d) {
         return {};
     }
     TensorShape vshape;
+    vshape.reserve(d.arraySize());
     for (size_t i=0; i<d.arraySize(); i++) {
-        uint64_t shape_element = d[i].asUInt64();
-        vshape.push_back(shape_element);
+        vshape.push_back(d[i].asUInt64());
     }
     return vshape;
 }
 
 template <typename T>
 bool isTensor(const Deserializable auto& buf) {
-    if (!buf.isMap()) return false;
-    set<string_view> keys = buf.mapKeys();
-    return keys.contains(ShapeKey) && buf[ShapeKey].isArray() && 
-           keys.contains(DTypeKey) && buf[DTypeKey].isInt() && buf[DTypeKey].asInt8() == tensor_dtype_index<T> &&
-           keys.contains(DataKey) && buf[DataKey].isBlob();
+    if constexpr (TensorIsMap) {
+        if (!buf.isMap()) return false;
+        set<string_view> keys = buf.mapKeys();
+        return 
+            keys.contains(ShapeKey) && buf[ShapeKey].isArray() && 
+            keys.contains(DTypeKey) && buf[DTypeKey].isInt() && buf[DTypeKey].asInt8() == tensor_dtype_index<T> &&
+            keys.contains(DataKey) && buf[DataKey].isBlob();
+    } else {
+       if (!buf.isArray()) return false;
+        if (buf.arraySize() < 3) return false;
+        return 
+            buf[0].isInt() && buf[0].asInt8() == tensor_dtype_index<T> &&
+            buf[1].isArray() && 
+            buf[2].isBlob();
+    }
 }
 
 } // namespace zerialize

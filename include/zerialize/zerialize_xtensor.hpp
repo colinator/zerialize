@@ -18,54 +18,25 @@ span<const uint8_t> _blob_from_xtensor(const auto& t) {
     return span<const uint8_t>(byte_data, num_bytes);
 }
 
-// // Serialize an xtensor
-// template <typename S, typename T, size_t D>
-// S::SerializingFunction serializer(const xt::xtensor<T, D>& t) {
-//     return [&t](S::Serializer& s) {
-//         s.serializeMap([&t](S::Serializer& ser) {
-//             ser.serialize(ShapeKey, shape_of_any(t.shape()));
-//             ser.serialize(DTypeKey, tensor_dtype_index<T>);
-//             ser.serialize(DataKey, _blob_from_xtensor<T>(t));
-//         });
-//     };
-// }
-
-// // Serialize an xarray
-// template <typename S, typename T>
-// S::SerializingFunction serializer(const xt::xarray<T>& t) {
-//     return [&t](S::Serializer& s) {
-//         s.serializeMap([&t](S::Serializer& ser) {
-//             ser.serialize(ShapeKey, shape_of_any(t.shape()));
-//             ser.serialize(DTypeKey, tensor_dtype_index<T>);
-//             ser.serialize(DataKey, _blob_from_xtensor<T>(t));
-//         });
-//     };
-// }
-
-// Serialize an xtensor
-template <typename S, typename T, size_t D>
-S::SerializingFunction serializer(const xt::xtensor<T, D>& t) {
+// Serialize an xtensor or xarray
+template <typename S, typename X>
+S::SerializingFunction serializer(const X& t) {
     return [&t](SerializingConcept auto& s) {
-        s.serializeMap([&t](SerializingConcept auto& ser) {
-            ser.serialize(ShapeKey, shape_of_any(t.shape()));
-            ser.serialize(DTypeKey, tensor_dtype_index<T>);
-            ser.serialize(DataKey, _blob_from_xtensor<T>(t));
-        });
+        if constexpr (TensorIsMap) {
+            s.serializeMap([&t](SerializingConcept auto& ser) {
+                ser.serialize(ShapeKey, shape_of_any(t.shape()));
+                ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
+                ser.serialize(DataKey, _blob_from_xtensor<typename X::value_type>(t));
+            });
+        } else {
+            s.serializeVector([&t](SerializingConcept auto& ser) {
+                ser.serialize(tensor_dtype_index<typename X::value_type>);
+                ser.serialize(shape_of_any(t.shape()));
+                ser.serialize(_blob_from_xtensor<typename X::value_type>(t));
+            });
+        }
     };
 }
-
-// Serialize an xarray
-template <typename S, typename T>
-S::SerializingFunction serializer(const xt::xarray<T>& t) {
-    return [&t](SerializingConcept auto& s) {
-        s.serializeMap([&t](SerializingConcept auto& ser) {
-            ser.serialize(ShapeKey, shape_of_any(t.shape()));
-            ser.serialize(DTypeKey, tensor_dtype_index<T>);
-            ser.serialize(DataKey, _blob_from_xtensor<T>(t));
-        });
-    };
-}
-
 
 
 // The actual type that the call to xt::adapt returns is this.
@@ -89,11 +60,13 @@ auto asXTensor(const Deserializable auto& buf) {
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }
 
     // Check that the serialized dtype matches T
-    auto dtype = buf[DTypeKey].asInt32();
+    auto dtype_ref = TensorIsMap ? buf[DTypeKey] : buf[0];
+    auto dtype = dtype_ref.asInt32();
     if (dtype != tensor_dtype_index<T>) throw DeserializationError(string("asXTensor asked to deserialize a tensor of type ") + string(tensor_dtype_name<T>) + " but found a tensor of type " + string(type_name_from_code(dtype)));
 
     // get the shape
-    TensorShape vshape = tensor_shape(buf[ShapeKey]);
+    auto shape_ref = TensorIsMap ? buf[ShapeKey] : buf[1];
+    TensorShape vshape = tensor_shape(shape_ref);
 
     // perform dimension check
     if constexpr(D >= 0) {
@@ -103,7 +76,8 @@ auto asXTensor(const Deserializable auto& buf) {
     }
 
     // get the blob data, through old-school c-typing as a T*
-    auto blob = buf[DataKey].asBlob();
+    auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
+    auto blob = data_ref.asBlob();
     const uint8_t * data_bytes = blob.data();
     const T * data_typed_const = (const T*)data_bytes;
     T* data_typed = const_cast<T*>(data_typed_const);

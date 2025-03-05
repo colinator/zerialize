@@ -151,7 +151,6 @@ std::vector<BenchmarkResult> runBenchmarks() {
         
         // Measure deserialization time (instantiating Buffer from copy)
         double deserTime = benchmark([&]() {
-            // Instantiate Buffer from copy
             typename SerializerType::BufferType buffer(newBuf);
             return buffer;
         });
@@ -209,7 +208,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         });
     }
 
-    // Medium data: map with nested values
+    // Medium data: Map nested values
     {
         // Measure serialization time
         double serTime = benchmark([&]() {
@@ -253,7 +252,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         });
         
         results.push_back({
-            "Medium: Map with Nested Values", 
+            "Medium: Map Nested Values", 
             serTime, 
             deserTime,
             readTime,
@@ -261,7 +260,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
             1000000
         });
     }
-
+    
     // Medium data: small xtensor
     {
         auto tensor = xt::xtensor<double, 2>{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
@@ -298,7 +297,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         });
         
         results.push_back({
-            "Medium: Small XTensor (2x3)", 
+            "Medium: Map XTensor (2x3)", 
             serTime, 
             deserTime,
             readTime,
@@ -344,7 +343,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         });
         
         results.push_back({
-            "Medium: Small Eigen Matrix (3x3)", 
+            "Medium: Map Eigen Matrix (3x3)", 
             serTime, 
             deserTime,
             readTime,
@@ -394,7 +393,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         }, 100);  // Fewer iterations for large data
         
         results.push_back({
-            "Large: XTensor (20x20)", 
+            "Large: Map XTensor (20x20)", 
             serTime, 
             deserTime,
             readTime,
@@ -444,7 +443,7 @@ std::vector<BenchmarkResult> runBenchmarks() {
         }, 1000);  // Fewer iterations for large data
         
         results.push_back({
-            "Large: Eigen Matrix (20x20)", 
+            "Large: Map Eigen Matrix (20x20)", 
             serTime, 
             deserTime,
             readTime,
@@ -466,18 +465,12 @@ std::vector<BenchmarkResult> runBenchmarks() {
         
         // Measure serialization time
         double serTime = benchmark([&]() {
-            auto serialized = serialize<SerializerType>({
-                {"tensor", xtensor::serializer<SerializerType>(tensor)},
-                {"name", "large tensor"}
-            });
+            auto serialized = serialize<SerializerType>(xtensor::serializer<SerializerType>(tensor));
             return serialized;
         }, 1000);  // Fewer iterations for large data
         
         // Create serialized data once for deserialization tests
-        auto serialized = serialize<SerializerType>({
-            {"tensor", xtensor::serializer<SerializerType>(tensor)},
-            {"name", "large tensor"}
-        });
+        auto serialized = serialize<SerializerType>(xtensor::serializer<SerializerType>(tensor));
 
         std::vector<uint8_t> bufferCopy(serialized.buf());
         span<const uint8_t> newBuf(bufferCopy);
@@ -490,10 +483,10 @@ std::vector<BenchmarkResult> runBenchmarks() {
         
         // Measure read time
         double readTime = benchmark([&]() {
-            auto t = xtensor::asXTensor<uint8_t, 3>(serialized["tensor"]);
-            std::string s = serialized["name"].template as<std::string>();
+            auto t = xtensor::asXTensor<uint8_t, 3>(serialized);
             //return xt::sum(t)() + s.size();  // Just to use the values
-            return t(0, 0, 0) + s.size();  // Just to use the values
+            auto r = t(1, 100, 200); 
+            return r;
         }, 1000);  // Fewer iterations for large data
         
         results.push_back({
