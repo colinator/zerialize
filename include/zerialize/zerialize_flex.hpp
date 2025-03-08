@@ -52,80 +52,80 @@ public:
     bool isArray() const { return ref_.IsAnyVector(); }
 
     int8_t asInt8() const {
-        if (!isInt()) { throw DeserializationError("not an int"); }
+        //if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt8();
     }
 
     int16_t asInt16() const {
-        if (!isInt()) { throw DeserializationError("not an int"); }
+        //if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt16();
     }
 
     int32_t asInt32() const {
-        if (!isInt()) { throw DeserializationError("not an int"); }
+        //if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt32();
     }
 
     int64_t asInt64() const {
-        if (!isInt()) { throw DeserializationError("not an int"); }
+        //if (!isInt()) { throw DeserializationError("not an int"); }
         return ref_.AsInt64();
     }
 
     uint8_t asUInt8() const {
-        if (!isUInt()) { throw DeserializationError("not a uint"); }
+        //if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint8_t>(ref_.AsUInt8());
     }
 
     uint16_t asUInt16() const {
-        if (!isUInt()) { throw DeserializationError("not a uint"); }
+        //if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint16_t>(ref_.AsUInt16());
     }
 
     uint32_t asUInt32() const {
-        if (!isUInt()) { throw DeserializationError("not a uint"); }
+        //if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint32_t>(ref_.AsUInt32());
     }
 
     uint64_t asUInt64() const {
-        if (!isUInt()) { throw DeserializationError("not a uint"); }
+        //if (!isUInt()) { throw DeserializationError("not a uint"); }
         return static_cast<uint64_t>(ref_.AsUInt64());
     }
 
     float asFloat() const {
-        if (!isFloat()) { throw DeserializationError("not a float"); }
+        //if (!isFloat()) { throw DeserializationError("not a float"); }
         return static_cast<float>(ref_.AsFloat());
     }
 
     double asDouble() const { 
-        if (!isFloat()) { throw DeserializationError("not a float"); }
+        //if (!isFloat()) { throw DeserializationError("not a float"); }
         return ref_.AsDouble();
     }
 
     bool asBool() const {
-        if (!isBool()) { throw DeserializationError("not a bool"); }
+        //if (!isBool()) { throw DeserializationError("not a bool"); }
         return ref_.AsBool();
     }
 
     string asString() const {
-        if (!isString()) { throw DeserializationError("not a string"); }
+        //if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
         return str.str();
     }
 
     string_view asStringView() const {
-        if (!isString()) { throw DeserializationError("not a string"); }
+        //if (!isString()) { throw DeserializationError("not a string"); }
         auto str = ref_.AsString();
         return string_view(str.c_str(), str.size());
     }
 
     span<const uint8_t> asBlob() const {
-        if (!isBlob()) { throw DeserializationError("not a blob"); }
+       //if (!isBlob()) { throw DeserializationError("not a blob"); }
         auto b = ref_.AsBlob();
         return span<const uint8_t>(b.data(), b.size());
     }
 
     set<string_view> mapKeys() const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
+        //if (!isMap()) { throw DeserializationError("not a map"); }
         set<string_view> keys;
         for (size_t i=0; i < ref_.AsMap().Keys().size(); i++) {
             string_view key(
@@ -137,18 +137,25 @@ public:
     }
 
     FlexBuffer operator[] (const string& key) const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
+        //if (!isMap()) { throw DeserializationError("not a map"); }
         return FlexBuffer(ref_.AsMap()[key]);
     }
 
     size_t arraySize() const {
-        if (!isArray()) { throw DeserializationError("not an array"); }
+        //if (!isArray()) { throw DeserializationError("not an array"); }
         return ref_.AsVector().size();
     }
 
     FlexBuffer operator[] (size_t index) const {
-        if (!isArray()) { throw DeserializationError("not an array"); }
-        return FlexBuffer(ref_.AsVector()[index]);
+        // if (!isArray()) {
+        //     throw DeserializationError("not an array");
+        // }
+        auto vec = ref_.AsVector();
+        auto val = vec[index];
+        auto ret = FlexBuffer(val);
+        return ret;
+        // if (!isArray()) { throw DeserializationError("not an array"); }
+        //return FlexBuffer(ref_.AsVector()[index]);
     }
 };
 

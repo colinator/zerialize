@@ -242,99 +242,145 @@ public:
 
     void serializeAny(const any& val) {
         Derived* d = static_cast<Derived*>(this);
-        if (val.type() == typeid(function<void(Derived&)>)) {
+
+        // Cache hash codes for each type.
+        static const std::size_t FunctionTypeHash           = typeid(function<void(Derived&)>).hash_code();
+        static const std::size_t MapStringAnyTypeHash       = typeid(map<string, any>).hash_code();
+        static const std::size_t VectorAnyTypeHash          = typeid(vector<any>).hash_code();
+        static const std::size_t NullptrTypeHash            = typeid(std::nullptr_t).hash_code();
+        static const std::size_t Int8TypeHash               = typeid(int8_t).hash_code();
+        static const std::size_t Int16TypeHash              = typeid(int16_t).hash_code();
+        static const std::size_t Int32TypeHash              = typeid(int32_t).hash_code();
+        static const std::size_t Int64TypeHash              = typeid(int64_t).hash_code();
+        static const std::size_t UInt8TypeHash              = typeid(uint8_t).hash_code();
+        static const std::size_t UInt16TypeHash             = typeid(uint16_t).hash_code();
+        static const std::size_t UInt32TypeHash             = typeid(uint32_t).hash_code();
+        static const std::size_t UInt64TypeHash             = typeid(uint64_t).hash_code();
+        static const std::size_t BoolTypeHash               = typeid(bool).hash_code();
+        static const std::size_t DoubleTypeHash             = typeid(double).hash_code();
+        static const std::size_t FloatTypeHash              = typeid(float).hash_code();
+        static const std::size_t SpanConstUInt8TypeHash     = typeid(span<const uint8_t>).hash_code();
+        static const std::size_t ConstCharPtrTypeHash       = typeid(const char*).hash_code();
+        static const std::size_t StringTypeHash             = typeid(string).hash_code();
+        static const std::size_t VectorInt8TypeHash         = typeid(vector<int8_t>).hash_code();
+        static const std::size_t VectorInt16TypeHash        = typeid(vector<int16_t>).hash_code();
+        static const std::size_t VectorInt32TypeHash        = typeid(vector<int32_t>).hash_code();
+        static const std::size_t VectorInt64TypeHash        = typeid(vector<int64_t>).hash_code();
+        static const std::size_t VectorUInt8TypeHash        = typeid(vector<uint8_t>).hash_code();
+        static const std::size_t VectorUInt16TypeHash       = typeid(vector<uint16_t>).hash_code();
+        static const std::size_t VectorUInt32TypeHash       = typeid(vector<uint32_t>).hash_code();
+        static const std::size_t VectorUInt64TypeHash       = typeid(vector<uint64_t>).hash_code();
+        static const std::size_t VectorFloatTypeHash        = typeid(vector<float>).hash_code();
+        static const std::size_t VectorDoubleTypeHash       = typeid(vector<double>).hash_code();
+        static const std::size_t VectorBoolTypeHash         = typeid(vector<bool>).hash_code();
+        static const std::size_t VectorStringTypeHash       = typeid(vector<string>).hash_code();
+        static const std::size_t MapStringInt8TypeHash      = typeid(map<string, int8_t>).hash_code();
+        static const std::size_t MapStringInt16TypeHash     = typeid(map<string, int16_t>).hash_code();
+        static const std::size_t MapStringInt32TypeHash     = typeid(map<string, int32_t>).hash_code();
+        static const std::size_t MapStringInt64TypeHash     = typeid(map<string, int64_t>).hash_code();
+        static const std::size_t MapStringUInt8TypeHash     = typeid(map<string, uint8_t>).hash_code();
+        static const std::size_t MapStringUInt16TypeHash    = typeid(map<string, uint16_t>).hash_code();
+        static const std::size_t MapStringUInt32TypeHash    = typeid(map<string, uint32_t>).hash_code();
+        static const std::size_t MapStringUInt64TypeHash    = typeid(map<string, uint64_t>).hash_code();
+        static const std::size_t MapStringFloatTypeHash     = typeid(map<string, float>).hash_code();
+        static const std::size_t MapStringDoubleTypeHash    = typeid(map<string, double>).hash_code();
+        static const std::size_t MapStringBoolTypeHash      = typeid(map<string, bool>).hash_code();
+        static const std::size_t MapStringStringTypeHash    = typeid(map<string, string>).hash_code();
+
+        // Get the hash code of the runtime type.
+        const std::size_t vt_hash = val.type().hash_code();
+
+        if (vt_hash == FunctionTypeHash) {
             serializeFunction(any_cast<function<void(Derived&)>>(val));
-        } else if (val.type() == typeid(map<string, any>)) {
-            map<string, any> m = any_cast<map<string, any>>(val);
-            d->serializeMap([&](SerializingConcept auto& s) {    
-                for (const auto& [key, value]: m) {
+        } else if (vt_hash == MapStringAnyTypeHash) {
+            auto m = any_cast<map<string, any>>(val);
+            d->serializeMap([&](SerializingConcept auto& s) {
+                for (const auto& [key, value] : m)
                     s.serialize(key, value);
-                }
             });
-        } else if (val.type() == typeid(vector<any>)) {
-            vector<any> v = any_cast<vector<any>>(val);
-            d->serializeVector([&](SerializingConcept auto& s){
-                for (const any& value: v) {
+        } else if (vt_hash == VectorAnyTypeHash) {
+            auto v = any_cast<vector<any>>(val);
+            d->serializeVector([&](SerializingConcept auto& s) {
+                for (const any& value : v)
                     s.serializeAny(value);
-                }
             });
-        } else if (val.type() == typeid(std::nullptr_t)) {
+        } else if (vt_hash == NullptrTypeHash) {
             d->serialize(nullptr);
-        } else if (val.type() == typeid(int8_t)) {
+        } else if (vt_hash == Int8TypeHash) {
             d->serialize(static_cast<int64_t>(any_cast<int8_t>(val)));
-        } else if (val.type() == typeid(int16_t)) {
+        } else if (vt_hash == Int16TypeHash) {
             d->serialize(static_cast<int64_t>(any_cast<int16_t>(val)));
-        } else if (val.type() == typeid(int32_t)) {
+        } else if (vt_hash == Int32TypeHash) {
             d->serialize(static_cast<int64_t>(any_cast<int32_t>(val)));
-        } else if (val.type() == typeid(int64_t)) {
-            d->serialize(static_cast<int64_t>(any_cast<int64_t>(val)));
-        } else if (val.type() == typeid(uint8_t)) {
+        } else if (vt_hash == Int64TypeHash) {
+            d->serialize(any_cast<int64_t>(val));
+        } else if (vt_hash == UInt8TypeHash) {
             d->serialize(static_cast<uint64_t>(any_cast<uint8_t>(val)));
-        } else if (val.type() == typeid(uint16_t)) {
+        } else if (vt_hash == UInt16TypeHash) {
             d->serialize(static_cast<uint64_t>(any_cast<uint16_t>(val)));
-        } else if (val.type() == typeid(uint32_t)) {
+        } else if (vt_hash == UInt32TypeHash) {
             d->serialize(static_cast<uint64_t>(any_cast<uint32_t>(val)));
-        } else if (val.type() == typeid(uint64_t)) {
+        } else if (vt_hash == UInt64TypeHash) {
             d->serialize(static_cast<uint64_t>(any_cast<uint64_t>(val)));
-        } else if (val.type() == typeid(bool)) {
+        } else if (vt_hash == BoolTypeHash) {
             d->serialize(any_cast<bool>(val));
-        } else if (val.type() == typeid(double)) {
+        } else if (vt_hash == DoubleTypeHash) {
             d->serialize(any_cast<double>(val));
-        } else if (val.type() == typeid(float)) {
+        } else if (vt_hash == FloatTypeHash) {
             d->serialize(static_cast<double>(any_cast<float>(val)));
-        } else if (val.type() == typeid(span<const uint8_t>)) {
+        } else if (vt_hash == SpanConstUInt8TypeHash) {
             d->serialize(any_cast<span<const uint8_t>>(val));
-        } else if (val.type() == typeid(const char*)) {
+        } else if (vt_hash == ConstCharPtrTypeHash) {
             d->serialize(any_cast<const char*>(val));
-        } else if (val.type() == typeid(string)) {
+        } else if (vt_hash == StringTypeHash) {
             d->serialize(any_cast<string>(val));
-        } else if (val.type() == typeid(vector<int8_t>)) {
+        } else if (vt_hash == VectorInt8TypeHash) {
             d->serialize(any_cast<vector<int8_t>>(val));
-        } else if (val.type() == typeid(vector<int16_t>)) {
+        } else if (vt_hash == VectorInt16TypeHash) {
             d->serialize(any_cast<vector<int16_t>>(val));
-        } else if (val.type() == typeid(vector<int32_t>)) {
+        } else if (vt_hash == VectorInt32TypeHash) {
             d->serialize(any_cast<vector<int32_t>>(val));
-        } else if (val.type() == typeid(vector<int64_t>)) {
+        } else if (vt_hash == VectorInt64TypeHash) {
             d->serialize(any_cast<vector<int64_t>>(val));
-        } else if (val.type() == typeid(vector<uint8_t>)) {
+        } else if (vt_hash == VectorUInt8TypeHash) {
             d->serialize(any_cast<vector<uint8_t>>(val));
-        } else if (val.type() == typeid(vector<uint16_t>)) {
+        } else if (vt_hash == VectorUInt16TypeHash) {
             d->serialize(any_cast<vector<uint16_t>>(val));
-        } else if (val.type() == typeid(vector<uint32_t>)) {
+        } else if (vt_hash == VectorUInt32TypeHash) {
             d->serialize(any_cast<vector<uint32_t>>(val));
-        } else if (val.type() == typeid(vector<uint64_t>)) {
+        } else if (vt_hash == VectorUInt64TypeHash) {
             d->serialize(any_cast<vector<uint64_t>>(val));
-        } else if (val.type() == typeid(vector<float>)) {
+        } else if (vt_hash == VectorFloatTypeHash) {
             d->serialize(any_cast<vector<float>>(val));
-        } else if (val.type() == typeid(vector<double>)) {
+        } else if (vt_hash == VectorDoubleTypeHash) {
             d->serialize(any_cast<vector<double>>(val));
-        } else if (val.type() == typeid(vector<bool>)) {
+        } else if (vt_hash == VectorBoolTypeHash) {
             d->serialize(any_cast<vector<bool>>(val));
-        } else if (val.type() == typeid(vector<string>)) {
+        } else if (vt_hash == VectorStringTypeHash) {
             d->serialize(any_cast<vector<string>>(val));
-        } else if (val.type() == typeid(map<string, int8_t>)) {
+        } else if (vt_hash == MapStringInt8TypeHash) {
             d->serialize(any_cast<map<string, int8_t>>(val));
-        } else if (val.type() == typeid(map<string, int16_t>)) {
+        } else if (vt_hash == MapStringInt16TypeHash) {
             d->serialize(any_cast<map<string, int16_t>>(val));
-        } else if (val.type() == typeid(map<string, int32_t>)) {
+        } else if (vt_hash == MapStringInt32TypeHash) {
             d->serialize(any_cast<map<string, int32_t>>(val));
-        } else if (val.type() == typeid(map<string, int64_t>)) {
+        } else if (vt_hash == MapStringInt64TypeHash) {
             d->serialize(any_cast<map<string, int64_t>>(val));
-        } else if (val.type() == typeid(map<string, uint8_t>)) {
+        } else if (vt_hash == MapStringUInt8TypeHash) {
             d->serialize(any_cast<map<string, uint8_t>>(val));
-        } else if (val.type() == typeid(map<string, uint16_t>)) {
+        } else if (vt_hash == MapStringUInt16TypeHash) {
             d->serialize(any_cast<map<string, uint16_t>>(val));
-        } else if (val.type() == typeid(map<string, uint32_t>)) {
+        } else if (vt_hash == MapStringUInt32TypeHash) {
             d->serialize(any_cast<map<string, uint32_t>>(val));
-        } else if (val.type() == typeid(map<string, uint64_t>)) {
+        } else if (vt_hash == MapStringUInt64TypeHash) {
             d->serialize(any_cast<map<string, uint64_t>>(val));
-        } else if (val.type() == typeid(map<string, float>)) {
+        } else if (vt_hash == MapStringFloatTypeHash) {
             d->serialize(any_cast<map<string, float>>(val));
-        } else if (val.type() == typeid(map<string, double>)) {
+        } else if (vt_hash == MapStringDoubleTypeHash) {
             d->serialize(any_cast<map<string, double>>(val));
-        } else if (val.type() == typeid(map<string, bool>)) {
+        } else if (vt_hash == MapStringBoolTypeHash) {
             d->serialize(any_cast<map<string, bool>>(val));
-        } else if (val.type() == typeid(map<string, string>)) {
+        } else if (vt_hash == MapStringStringTypeHash) {
             d->serialize(any_cast<map<string, string>>(val));
         } else {
             throw SerializationError("-- Unsupported type in any");

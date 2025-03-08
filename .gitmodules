@@ -1,0 +1,6 @@
+[submodule "benchmark_compare/third_party/reflect-cpp"]
+	path = benchmark_compare/third_party/reflect-cpp
+	url = https://github.com/getml/reflect-cpp.git
+[submodule "benchmark_compare/third_party/flatbuffers"]
+	path = benchmark_compare/third_party/flatbuffers
+	url = https://github.com/google/flatbuffers.git
