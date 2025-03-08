@@ -17,16 +17,6 @@
 #include <rfl/flexbuf.hpp>
 #include <rfl.hpp>
 
-// #include <rfl/json.hpp>
-// #include <rfl.hpp>
-// #include <reflect-cpp/json.hpp>
-// #include <rfl.hpp>
-
-// #include <reflect-cpp/reflect.h>
-// #include <reflect-cpp/json.h>
-// #include <reflect-cpp/flexbuffers.h>
-// #include <reflect-cpp/msgpack.h>
-
 using namespace zerialize;
 using namespace std::chrono;
 
@@ -201,7 +191,6 @@ std::vector<BenchmarkResult> runReflectCppJsonBenchmarks() {
     
     // Create serialized data once for deserialization tests
     auto serialized = rfl::json::write(testData);
-    //std::cout << "RFCPP JSON: " << serialized << std::endl;
     
     // Measure deserialization time
     double deserTime = benchmark([&]() {
