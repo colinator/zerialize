@@ -8,365 +8,579 @@ namespace zerialize {
 // Buffer for MessagePack serialization
 using MsgPackStream = msgpack_sbuffer;
 
+// Helpers for reading big-endian numbers from a byte array.
+inline uint16_t read_be16(const uint8_t* data) {
+    return (static_cast<uint16_t>(data[0]) << 8) | data[1];
+}
+
+inline uint32_t read_be32(const uint8_t* data) {
+    return (static_cast<uint32_t>(data[0]) << 24) |
+           (static_cast<uint32_t>(data[1]) << 16) |
+           (static_cast<uint32_t>(data[2]) << 8)  |
+           data[3];
+}
+
+inline uint64_t read_be64(const uint8_t* data) {
+    return (static_cast<uint64_t>(data[0]) << 56) |
+           (static_cast<uint64_t>(data[1]) << 48) |
+           (static_cast<uint64_t>(data[2]) << 40) |
+           (static_cast<uint64_t>(data[3]) << 32) |
+           (static_cast<uint64_t>(data[4]) << 24) |
+           (static_cast<uint64_t>(data[5]) << 16) |
+           (static_cast<uint64_t>(data[6]) << 8)  |
+           data[7];
+}
+
+// Forward declaration: given a span starting at a MessagePack element,
+// return how many bytes that element occupies.
+inline size_t skip_element(span<const uint8_t> view);
+
+inline size_t skip_element(span<const uint8_t> view) {
+    if (view.empty()) throw DeserializationError("empty view in skip_element");
+    uint8_t marker = view[0];
+    size_t offset = 0;
+    // Single-byte types: positive fixint, negative fixint, nil, booleans.
+    if ((marker <= 0x7f) || (marker >= 0xe0) || marker == 0xc0 || marker == 0xc2 || marker == 0xc3)
+        return 1;
+    // fixstr: marker 0xa0-0xbf; lower 5 bits = length.
+    if (marker >= 0xa0 && marker <= 0xbf) {
+        size_t len = marker & 0x1f;
+        return 1 + len;
+    }
+    // fixarray: marker 0x90-0x9f.
+    if (marker >= 0x90 && marker <= 0x9f) {
+        size_t count = marker & 0x0f;
+        offset = 1;
+        for (size_t i = 0; i < count; i++) {
+            size_t elemSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+            offset += elemSize;
+        }
+        return offset;
+    }
+    // fixmap: marker 0x80-0x8f.
+    if (marker >= 0x80 && marker <= 0x8f) {
+        size_t count = marker & 0x0f;
+        offset = 1;
+        for (size_t i = 0; i < count; i++) {
+            size_t keySize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+            offset += keySize;
+            size_t valSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+            offset += valSize;
+        }
+        return offset;
+    }
+    // Other markers:
+    switch (marker) {
+        case 0xcc: // uint8
+        case 0xd0: // int8
+            return 2;
+        case 0xcd: // uint16
+        case 0xd1: // int16
+            return 3;
+        case 0xce: // uint32
+        case 0xd2: // int32
+        case 0xca: // float32
+            return 5;
+        case 0xcf: // uint64
+        case 0xd3: // int64
+        case 0xcb: // float64
+            return 9;
+        case 0xd9: { // str8
+            if (view.size() < 2) throw DeserializationError("insufficient data for str8");
+            size_t len = view[1];
+            return 2 + len;
+        }
+        case 0xda: { // str16
+            if (view.size() < 3) throw DeserializationError("insufficient data for str16");
+            size_t len = read_be16(view.data() + 1);
+            return 3 + len;
+        }
+        case 0xdb: { // str32
+            if (view.size() < 5) throw DeserializationError("insufficient data for str32");
+            size_t len = read_be32(view.data() + 1);
+            return 5 + len;
+        }
+        case 0xdc: { // array16
+            if (view.size() < 3) throw DeserializationError("insufficient data for array16");
+            size_t count = read_be16(view.data() + 1);
+            offset = 3;
+            for (size_t i = 0; i < count; i++) {
+                size_t elemSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += elemSize;
+            }
+            return offset;
+        }
+        case 0xdd: { // array32
+            if (view.size() < 5) throw DeserializationError("insufficient data for array32");
+            size_t count = read_be32(view.data() + 1);
+            offset = 5;
+            for (size_t i = 0; i < count; i++) {
+                size_t elemSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += elemSize;
+            }
+            return offset;
+        }
+        case 0xde: { // map16
+            if (view.size() < 3) throw DeserializationError("insufficient data for map16");
+            size_t count = read_be16(view.data() + 1);
+            offset = 3;
+            for (size_t i = 0; i < count; i++) {
+                size_t keySize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += keySize;
+                size_t valSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += valSize;
+            }
+            return offset;
+        }
+        case 0xdf: { // map32
+            if (view.size() < 5) throw DeserializationError("insufficient data for map32");
+            size_t count = read_be32(view.data() + 1);
+            offset = 5;
+            for (size_t i = 0; i < count; i++) {
+                size_t keySize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += keySize;
+                size_t valSize = skip_element(span<const uint8_t>(view.data() + offset, view.size() - offset));
+                offset += valSize;
+            }
+            return offset;
+        }
+        case 0xc4: { // bin8
+            if (view.size() < 2) throw DeserializationError("insufficient data for bin8");
+            size_t len = view[1];
+            return 2 + len;
+        }
+        case 0xc5: { // bin16
+            if (view.size() < 3) throw DeserializationError("insufficient data for bin16");
+            size_t len = read_be16(view.data() + 1);
+            return 3 + len;
+        }
+        case 0xc6: { // bin32
+            if (view.size() < 5) throw DeserializationError("insufficient data for bin32");
+            size_t len = read_be32(view.data() + 1);
+            return 5 + len;
+        }
+        default:
+            throw DeserializationError("unsupported marker in skip_element");
+    }
+}
+
+// A minimal MsgPackBuffer that parses MessagePack data dynamically.
+// The root buffer owns its vector and sets its view to cover it; non-root buffers
+// have an empty buf_ and a view over the appropriate subrange.
 class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
 private:
-    vector<uint8_t> buf_;
-    msgpack_unpacked unpacked_;
-    msgpack_object obj_;
-    bool initialized_ = false;
+    vector<uint8_t> buf_;      // Only nonempty for root buffers.
+    span<const uint8_t> view_; // Always the view for this element.
 
 public:
-    MsgPackBuffer() {
-        msgpack_unpacked_init(&unpacked_);
-    }
+    // Default constructor.
+    MsgPackBuffer() : view_() {}
 
-    ~MsgPackBuffer() {
-        if (initialized_) {
-            msgpack_unpacked_destroy(&unpacked_);
-        }
-    }
+    // Root constructor: takes ownership of a vector.
+    MsgPackBuffer(vector<uint8_t>&& buf)
+        : buf_(std::move(buf)), view_(buf_.data(), buf_.size()) {}
 
-    // Constructor from msgpack_object
-    MsgPackBuffer(const msgpack_object& obj): obj_(obj) {
-        msgpack_unpacked_init(&unpacked_);
-        initialized_ = true;
-    }
+    // Root constructor: copy.
+    MsgPackBuffer(const vector<uint8_t>& buf)
+        : buf_(buf), view_(buf_.data(), buf_.size()) {}
 
-    // Zero-copy view of existing data
-    MsgPackBuffer(span<const uint8_t> data) {
-        msgpack_unpacked_init(&unpacked_);
-        if (data.size() > 0) {
-            msgpack_unpack_return ret = msgpack_unpack_next(
-                &unpacked_, 
-                reinterpret_cast<const char*>(data.data()), 
-                data.size(), 
-                NULL
-            );
-            if (ret == MSGPACK_UNPACK_SUCCESS) {
-                obj_ = unpacked_.data;
-                initialized_ = true;
-            }
-        }
-    }
+    // Non-root constructor: takes a span.
+    MsgPackBuffer(span<const uint8_t> sp)
+        : view_(sp) {}
 
-    // Zero-copy move of vector ownership
-    MsgPackBuffer(vector<uint8_t>&& buf): buf_(std::move(buf)) {
-        msgpack_unpacked_init(&unpacked_);
-        if (buf_.size() > 0) {
-            msgpack_unpack_return ret = msgpack_unpack_next(
-                &unpacked_, 
-                reinterpret_cast<const char*>(buf_.data()), 
-                buf_.size(), 
-                NULL
-            );
-            if (ret == MSGPACK_UNPACK_SUCCESS) {
-                obj_ = unpacked_.data;
-                initialized_ = true;
-            }
-        }
-    }
-
-    // Must copy for const reference
-    MsgPackBuffer(const vector<uint8_t>& buf): buf_(buf) {
-        msgpack_unpacked_init(&unpacked_);
-        if (buf_.size() > 0) {
-            msgpack_unpack_return ret = msgpack_unpack_next(
-                &unpacked_, 
-                reinterpret_cast<const char*>(buf_.data()), 
-                buf_.size(), 
-                NULL
-            );
-            if (ret == MSGPACK_UNPACK_SUCCESS) {
-                obj_ = unpacked_.data;
-                initialized_ = true;
-            }
-        }
-    }
-
-    // Copy constructor
-    MsgPackBuffer(const MsgPackBuffer& other): buf_(other.buf_), obj_(other.obj_) {
-        msgpack_unpacked_init(&unpacked_);
-        if (buf_.size() > 0) {
-            msgpack_unpack_return ret = msgpack_unpack_next(
-                &unpacked_, 
-                reinterpret_cast<const char*>(buf_.data()), 
-                buf_.size(), 
-                NULL
-            );
-            if (ret == MSGPACK_UNPACK_SUCCESS) {
-                initialized_ = true;
-            }
-        }
-    }
-
-    // Move constructor
-    MsgPackBuffer(MsgPackBuffer&& other) noexcept 
-        : buf_(std::move(other.buf_)), obj_(other.obj_), initialized_(other.initialized_) {
-        msgpack_unpacked_init(&unpacked_);
-        if (initialized_) {
-            // We need to re-unpack since we can't move msgpack_unpacked
-            if (buf_.size() > 0) {
-                msgpack_unpack_next(
-                    &unpacked_, 
-                    reinterpret_cast<const char*>(buf_.data()), 
-                    buf_.size(), 
-                    NULL
-                );
-            }
-        }
-        other.initialized_ = false;
-    }
-
-    // Assignment operator
-    MsgPackBuffer& operator=(const MsgPackBuffer& other) {
-        if (this != &other) {
-            if (initialized_) {
-                msgpack_unpacked_destroy(&unpacked_);
-            }
-            
-            buf_ = other.buf_;
-            obj_ = other.obj_;
-            
-            msgpack_unpacked_init(&unpacked_);
-            if (buf_.size() > 0) {
-                msgpack_unpack_return ret = msgpack_unpack_next(
-                    &unpacked_, 
-                    reinterpret_cast<const char*>(buf_.data()), 
-                    buf_.size(), 
-                    NULL
-                );
-                if (ret == MSGPACK_UNPACK_SUCCESS) {
-                    initialized_ = true;
-                }
-            }
-        }
-        return *this;
-    }
-
-    // Move assignment operator
-    MsgPackBuffer& operator=(MsgPackBuffer&& other) noexcept {
-        if (this != &other) {
-            if (initialized_) {
-                msgpack_unpacked_destroy(&unpacked_);
-            }
-            
-            buf_ = std::move(other.buf_);
-            obj_ = other.obj_;
-            initialized_ = other.initialized_;
-            
-            msgpack_unpacked_init(&unpacked_);
-            if (initialized_ && buf_.size() > 0) {
-                msgpack_unpack_next(
-                    &unpacked_, 
-                    reinterpret_cast<const char*>(buf_.data()), 
-                    buf_.size(), 
-                    NULL
-                );
-            }
-            
-            other.initialized_ = false;
-        }
-        return *this;
-    }
-
+    // Return the root buffer (empty for non-root).
     const vector<uint8_t>& buf() const override {
         return buf_;
     }
 
+    // A simple debug string.
+    // string to_string() const override {
+    //     std::stringstream ss;
+    //     ss << "MsgPackBuffer: view size = " << view_.size();
+    //     return ss.str();
+    // }
+
     string to_string() const override {
-        std::stringstream ss;
-        ss << "MsgPackBuffer " << buf().size() 
-           << " bytes at: " << std::format("{}", static_cast<const void*>(buf_.data()));
-        
-        if (buf_.size() > 0) {
-            ss << "\n" << debug_string(*this);
-        }
-        
-        return ss.str();
+        return "MsgPackBuffer " + std::to_string(buf().size()) +
+            " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
+            "\n" + debug_string(*this);
     }
 
-    bool isNull() const { 
-        return obj_.type == MSGPACK_OBJECT_NIL; 
+    // --- Type predicates ---
+
+    bool isNull() const {
+        if (view_.empty()) return false;
+        return view_[0] == 0xc0;
     }
 
-    bool isInt() const { 
-        return obj_.type == MSGPACK_OBJECT_NEGATIVE_INTEGER || obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER;
+    bool isBool() const {
+        if (view_.empty()) return false;
+        return (view_[0] == 0xc2 || view_[0] == 0xc3);
     }
-    
-    bool isUInt() const { 
-        return obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER;
+
+    bool isInt() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        // Positive fixint or negative fixint.
+        if (marker <= 0x7f || marker >= 0xe0) return true;
+        return (marker == 0xd0 || marker == 0xd1 || marker == 0xd2 || marker == 0xd3);
     }
-    
-    bool isFloat() const { 
-        return obj_.type == MSGPACK_OBJECT_FLOAT || obj_.type == MSGPACK_OBJECT_FLOAT32;
+
+    bool isUInt() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        if (marker <= 0x7f) return true;
+        return (marker == 0xcc || marker == 0xcd || marker == 0xce || marker == 0xcf);
     }
-    
-    bool isBool() const { 
-        return obj_.type == MSGPACK_OBJECT_BOOLEAN;
+
+    bool isFloat() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        return (marker == 0xca || marker == 0xcb);
     }
-    
-    bool isString() const { 
-        return obj_.type == MSGPACK_OBJECT_STR;
+
+    bool isString() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        if (marker >= 0xa0 && marker <= 0xbf) return true; // fixstr
+        return (marker == 0xd9 || marker == 0xda || marker == 0xdb);
     }
-    
+
     bool isBlob() const { 
-        return obj_.type == MSGPACK_OBJECT_BIN;
-    }
-    
-    bool isMap() const { 
-        return obj_.type == MSGPACK_OBJECT_MAP;
-    }
-    
-    bool isArray() const { 
-        return obj_.type == MSGPACK_OBJECT_ARRAY;
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        return (marker == 0xc4 || marker == 0xc5 || marker == 0xc6);
     }
 
+    bool isArray() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        if (marker >= 0x90 && marker <= 0x9f) return true;
+        return (marker == 0xdc || marker == 0xdd);
+    }
+
+    bool isMap() const {
+        if (view_.empty()) return false;
+        uint8_t marker = view_[0];
+        if (marker >= 0x80 && marker <= 0x8f) return true;
+        return (marker == 0xde || marker == 0xdf);
+    }
+
+    // --- Conversion methods ---
+    // Each method checks that the type marker matches, then reads the appropriate bytes.
     int8_t asInt8() const {
-        if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<int8_t>(obj_.via.u64);
-        } else {
-            return static_cast<int8_t>(obj_.via.i64);
+        if (!(isInt() || isUInt())) throw DeserializationError("MsgPackBuffer: not an int (asInt8)");
+        uint8_t marker = view_[0];
+        if (marker <= 0x7f) return static_cast<int8_t>(marker);
+        if (marker >= 0xe0) return static_cast<int8_t>(marker);
+        if (marker == 0xd0 || marker == 0xcc) {
+            if (view_.size() < 2) throw DeserializationError("insufficient data for int8");
+            return static_cast<int8_t>(view_[1]);
         }
+        throw DeserializationError("MsgPackBuffer: not int8");
     }
 
     int16_t asInt16() const {
-        if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<int16_t>(obj_.via.u64);
-        } else {
-            return static_cast<int16_t>(obj_.via.i64);
+        if (!(isInt() || isUInt())) throw DeserializationError("MsgPackBuffer: not an int (asInt16)");
+        uint8_t marker = view_[0];
+        if (marker == 0xd1 || marker == 0xcd) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for int16");
+            return static_cast<int16_t>(read_be16(view_.data() + 1));
         }
+        return static_cast<int16_t>(asInt8());
     }
 
     int32_t asInt32() const {
-        if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<int32_t>(obj_.via.u64);
-        } else {
-            return static_cast<int32_t>(obj_.via.i64);
+        if (!(isInt() || isUInt())) throw DeserializationError("MsgPackBuffer: not an int (asInt32)");
+        uint8_t marker = view_[0];
+        if (marker == 0xd2 || marker == 0xce) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for int32");
+            return static_cast<int32_t>(read_be32(view_.data() + 1));
         }
+        return static_cast<int32_t>(asInt16());
     }
 
     int64_t asInt64() const {
-        if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<int64_t>(obj_.via.u64);
-        } else {
-            return obj_.via.i64;
+        if (!(isInt() || isUInt())) throw DeserializationError("MsgPackBuffer: not an int (asInt64)");
+        uint8_t marker = view_[0];
+        if (marker == 0xd3 || marker == 0xcf) {
+            if (view_.size() < 9) throw DeserializationError("insufficient data for int64");
+            return static_cast<int64_t>(read_be64(view_.data() + 1));
         }
+        return static_cast<int64_t>(asInt32());
     }
 
     uint8_t asUInt8() const {
-        if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<uint8_t>(obj_.via.u64);
-        } else {
-            return static_cast<uint8_t>(obj_.via.i64);
+        if (!isUInt()) throw DeserializationError("MsgPackBuffer: not a uint (asUInt8)");
+        uint8_t marker = view_[0];
+        if (marker <= 0x7f) return marker;
+        if (marker == 0xcc) {
+            if (view_.size() < 2) throw DeserializationError("insufficient data for uint8");
+            return view_[1];
         }
+        throw DeserializationError("MsgPackBuffer: not uint8");
     }
 
     uint16_t asUInt16() const {
-        if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<uint16_t>(obj_.via.u64);
-        } else {
-            return static_cast<uint16_t>(obj_.via.i64);
+        if (!isUInt()) throw DeserializationError("MsgPackBuffer: not a uint (asUInt16)");
+        uint8_t marker = view_[0];
+        if (marker == 0xcd) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for uint16");
+            return read_be16(view_.data() + 1);
         }
+        return static_cast<uint16_t>(asUInt8());
     }
 
     uint32_t asUInt32() const {
-        if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return static_cast<uint32_t>(obj_.via.u64);
-        } else {
-            return static_cast<uint32_t>(obj_.via.i64);
+        if (!isUInt()) throw DeserializationError("MsgPackBuffer: not a uint (asUInt32)");
+        uint8_t marker = view_[0];
+        if (marker == 0xce) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for uint32");
+            return read_be32(view_.data() + 1);
         }
+        return static_cast<uint32_t>(asUInt16());
     }
 
     uint64_t asUInt64() const {
-        if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
-            return obj_.via.u64;
-        } else {
-            return static_cast<uint64_t>(obj_.via.i64);
+        if (!isUInt()) throw DeserializationError("MsgPackBuffer: not a uint (asUInt64)");
+        uint8_t marker = view_[0];
+        if (marker == 0xcf) {
+            if (view_.size() < 9) throw DeserializationError("insufficient data for uint64");
+            return read_be64(view_.data() + 1);
         }
+        return static_cast<uint64_t>(asUInt32());
     }
 
     float asFloat() const {
-        if (!isFloat()) { throw DeserializationError("not a float"); }
-        if (obj_.type == MSGPACK_OBJECT_FLOAT32) {
-            return obj_.via.f64;  // In C API, both float32 and float64 use f64 field
-        } else {
-            return static_cast<float>(obj_.via.f64);
+        if (!isFloat()) throw DeserializationError("MsgPackBuffer: not a float");
+        uint8_t marker = view_[0];
+        if (marker == 0xca) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for float32");
+            uint32_t be = read_be32(view_.data() + 1);
+            float f;
+            std::memcpy(&f, &be, sizeof(float));
+            return f;
         }
+        if (marker == 0xcb) {
+            if (view_.size() < 9) throw DeserializationError("insufficient data for float64");
+            uint64_t be = read_be64(view_.data() + 1);
+            double d;
+            std::memcpy(&d, &be, sizeof(double));
+            return static_cast<float>(d);
+        }
+        throw DeserializationError("MsgPackBuffer: unknown float type");
     }
 
     double asDouble() const {
-        if (!isFloat()) { throw DeserializationError("not a float"); }
-        return obj_.via.f64;
+        if (!isFloat()) throw DeserializationError("MsgPackBuffer: not a float");
+        uint8_t marker = view_[0];
+        if (marker == 0xcb) {
+            if (view_.size() < 9) throw DeserializationError("insufficient data for float64");
+            uint64_t be = read_be64(view_.data() + 1);
+            double d;
+            std::memcpy(&d, &be, sizeof(double));
+            return d;
+        }
+        if (marker == 0xca) {
+            return static_cast<double>(asFloat());
+        }
+        throw DeserializationError("MsgPackBuffer: unknown float type");
     }
 
     bool asBool() const {
-        if (!isBool()) { throw DeserializationError("not a bool"); }
-        return obj_.via.boolean;
+        if (!isBool()) throw DeserializationError("MsgPackBuffer: not a bool");
+        return view_[0] == 0xc3;
     }
 
     string asString() const {
-        if (!isString()) { throw DeserializationError("not a string"); }
-        return string(obj_.via.str.ptr, obj_.via.str.size);
+        if (!isString()) throw DeserializationError("MsgPackBuffer: not a string");
+        uint8_t marker = view_[0];
+        size_t str_len = 0;
+        const uint8_t* str_ptr = nullptr;
+        if (marker >= 0xa0 && marker <= 0xbf) {
+            str_len = marker & 0x1f;
+            str_ptr = view_.data() + 1;
+        } else if (marker == 0xd9) {
+            if (view_.size() < 2) throw DeserializationError("insufficient data for str8");
+            str_len = view_[1];
+            str_ptr = view_.data() + 2;
+        } else if (marker == 0xda) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for str16");
+            str_len = read_be16(view_.data() + 1);
+            str_ptr = view_.data() + 3;
+        } else if (marker == 0xdb) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for str32");
+            str_len = read_be32(view_.data() + 1);
+            str_ptr = view_.data() + 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown string type");
+        }
+        return string(reinterpret_cast<const char*>(str_ptr), str_len);
     }
 
     string_view asStringView() const {
-        if (!isString()) { throw DeserializationError("not a string"); }
-        return string_view(obj_.via.str.ptr, obj_.via.str.size);
+        if (!isString()) throw DeserializationError("MsgPackBuffer: not a string");
+        uint8_t marker = view_[0];
+        size_t str_len = 0;
+        const uint8_t* str_ptr = nullptr;
+        if (marker >= 0xa0 && marker <= 0xbf) {
+            str_len = marker & 0x1f;
+            str_ptr = view_.data() + 1;
+        } else if (marker == 0xd9) {
+            if (view_.size() < 2) throw DeserializationError("insufficient data for str8");
+            str_len = view_[1];
+            str_ptr = view_.data() + 2;
+        } else if (marker == 0xda) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for str16");
+            str_len = read_be16(view_.data() + 1);
+            str_ptr = view_.data() + 3;
+        } else if (marker == 0xdb) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for str32");
+            str_len = read_be32(view_.data() + 1);
+            str_ptr = view_.data() + 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown string type");
+        }
+        return string_view(reinterpret_cast<const char*>(str_ptr), str_len);
     }
 
+    // For simplicity, asBlob() supports only the bin types.
     span<const uint8_t> asBlob() const {
-        if (!isBlob()) { throw DeserializationError("not a blob"); }
-        const uint8_t* ptr = reinterpret_cast<const uint8_t*>(obj_.via.bin.ptr);
-        std::size_t size = obj_.via.bin.size;
-        return span<const uint8_t>(ptr, size);
+        if (view_.empty()) throw DeserializationError("MsgPackBuffer: empty blob");
+        uint8_t marker = view_[0];
+        size_t blob_len = 0;
+        const uint8_t* blob_ptr = nullptr;
+        if (marker == 0xc4) {
+            if (view_.size() < 2) throw DeserializationError("insufficient data for bin8");
+            blob_len = view_[1];
+            blob_ptr = view_.data() + 2;
+        } else if (marker == 0xc5) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for bin16");
+            blob_len = read_be16(view_.data() + 1);
+            blob_ptr = view_.data() + 3;
+        } else if (marker == 0xc6) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for bin32");
+            blob_len = read_be32(view_.data() + 1);
+            blob_ptr = view_.data() + 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unsupported blob type");
+        }
+        return span<const uint8_t>(blob_ptr, blob_len);
     }
 
-    set<string_view> mapKeys() const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
-        set<string_view> keys;
-        for (uint32_t i = 0; i < obj_.via.map.size; ++i) {
-            const msgpack_object& key = obj_.via.map.ptr[i].key;
-            if (key.type != MSGPACK_OBJECT_STR) {
-                throw DeserializationError("map key is not a string");
-            }
-            keys.insert(string_view(key.via.str.ptr, key.via.str.size));
+    // Map: get the keys in the map.
+    std::set<string_view> mapKeys() const {
+        if (!isMap()) throw DeserializationError("MsgPackBuffer: not a map");
+        std::set<string_view> keys;
+        size_t offset = 0;
+        uint8_t marker = view_[0];
+        size_t map_size = 0;
+        if (marker >= 0x80 && marker <= 0x8f) {
+            map_size = marker & 0x0f;
+            offset = 1;
+        } else if (marker == 0xde) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for map16");
+            map_size = read_be16(view_.data() + 1);
+            offset = 3;
+        } else if (marker == 0xdf) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for map32");
+            map_size = read_be32(view_.data() + 1);
+            offset = 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown map type");
+        }
+        for (size_t i = 0; i < map_size; i++) {
+            MsgPackBuffer keyBuffer(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+            size_t keySize = skip_element(keyBuffer.view_);
+            string_view keyStr = keyBuffer.asStringView();
+            offset += keySize;
+            size_t valSize =skip_element(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+            // (We don’t use the value here; just collect the key.)
+            keys.insert(keyStr);
+            offset += valSize;
         }
         return keys;
     }
 
-    MsgPackBuffer operator[] (const string& key) const {
-        if (!isMap()) { throw DeserializationError("not a map"); }
-        for (uint32_t i = 0; i < obj_.via.map.size; ++i) {
-            const msgpack_object& k = obj_.via.map.ptr[i].key;
-            if (k.type == MSGPACK_OBJECT_STR) {
-                string_view sv(k.via.str.ptr, k.via.str.size);
-                if (sv == key) {
-                    return MsgPackBuffer(obj_.via.map.ptr[i].val);
-                }
-            }
-        }
-        throw DeserializationError("key not found in map: " + key);
-    }
-
     size_t arraySize() const {
-        if (!isArray()) { throw DeserializationError("not an array"); }
-        return obj_.via.array.size;
+        if (!isArray()) throw DeserializationError("MsgPackBuffer: not an array");
+        uint8_t marker = view_[0];
+        size_t array_size = 0;
+        if (marker >= 0x90 && marker <= 0x9f) {
+            array_size = marker & 0x0f;
+        } else if (marker == 0xdc) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for array16");
+            array_size = read_be16(view_.data() + 1);
+        } else if (marker == 0xdd) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for array32");
+            array_size = read_be32(view_.data() + 1);
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown array type");
+        }
+        return array_size;
     }
 
-    MsgPackBuffer operator[] (size_t index) const {
-        if (!isArray()) { throw DeserializationError("not an array"); }
-        if (index >= obj_.via.array.size) {
-            throw DeserializationError("array index out of bounds");
+    // Array indexing: returns the element at the given index.
+    MsgPackBuffer operator[](size_t index) const {
+        if (!isArray()) throw DeserializationError("MsgPackBuffer: not an array");
+        size_t offset = 0;
+        uint8_t marker = view_[0];
+        size_t array_size = 0;
+        if (marker >= 0x90 && marker <= 0x9f) {
+            array_size = marker & 0x0f;
+            offset = 1;
+        } else if (marker == 0xdc) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for array16");
+            array_size = read_be16(view_.data() + 1);
+            offset = 3;
+        } else if (marker == 0xdd) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for array32");
+            array_size = read_be32(view_.data() + 1);
+            offset = 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown array type");
         }
-        return MsgPackBuffer(obj_.via.array.ptr[index]);
+        if (index >= array_size) throw DeserializationError("MsgPackBuffer: array index out of bounds");
+        for (size_t i = 0; i < index; i++) {
+            size_t elemSize = skip_element(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+            offset += elemSize;
+        }
+        size_t elemSize = skip_element(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+        return MsgPackBuffer(span<const uint8_t>(view_.data() + offset, elemSize));
+    }
+
+    // Map indexing: returns the value corresponding to the given key.
+    MsgPackBuffer operator[](const string& key) const {
+        if (!isMap()) throw DeserializationError("MsgPackBuffer: not a map");
+        size_t offset = 0;
+        uint8_t marker = view_[0];
+        size_t map_size = 0;
+        if (marker >= 0x80 && marker <= 0x8f) {
+            map_size = marker & 0x0f;
+            offset = 1;
+        } else if (marker == 0xde) {
+            if (view_.size() < 3) throw DeserializationError("insufficient data for map16");
+            map_size = read_be16(view_.data() + 1);
+            offset = 3;
+        } else if (marker == 0xdf) {
+            if (view_.size() < 5) throw DeserializationError("insufficient data for map32");
+            map_size = read_be32(view_.data() + 1);
+            offset = 5;
+        } else {
+            throw DeserializationError("MsgPackBuffer: unknown map type");
+        }
+        for (size_t i = 0; i < map_size; i++) {
+            MsgPackBuffer keyBuffer(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+            size_t keySize = skip_element(keyBuffer.view_);
+            string_view keyStr = keyBuffer.asStringView();
+            offset += keySize;
+            size_t valSize = skip_element(span<const uint8_t>(view_.data() + offset, view_.size() - offset));
+            if (string(keyStr) == key) {
+                return MsgPackBuffer(span<const uint8_t>(view_.data() + offset, valSize));
+            }
+            offset += valSize;
+        }
+        throw DeserializationError("MsgPackBuffer: key not found in map: " + key);
     }
 };
 

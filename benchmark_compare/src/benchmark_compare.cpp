@@ -27,9 +27,6 @@ struct TestData {
     double double_value;
     std::string string_value;
     std::vector<int> array_value;
-
-    // // Reflect-cpp reflection definition
-    // REFLECT(TestData, int_value, double_value, string_value, array_value)
 };
 
 // Simple benchmarking function that measures execution time
@@ -131,6 +128,29 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
         double deserTime = benchmark([&]() {
             typename SerializerType::BufferType buffer(newBuf);
             return buffer;
+
+            // int i = buffer["int_value"].template as<int>();
+            // double d = buffer["double_value"].template as<double>();
+            // std::string s = buffer["string_value"].template as<std::string>();
+            // auto arr = buffer["array_value"];
+            // int sum = 0;
+            // for (size_t i = 0; i < arr.arraySize(); i++) {
+            //     sum += arr[i].asInt32();
+            // }
+
+            // std::vector<int> vec;
+            // vec.reserve(arr.arraySize());
+            // for (size_t i = 0; i < arr.arraySize(); i++) {
+            //     vec.emplace_back(arr[i].asInt32());
+            // }
+            // TestData td{
+            //     .int_value = i,
+            //     .double_value = d,
+            //     .string_value = s,
+            //     .array_value = vec
+            // };
+
+            //return td;
         });
         
         // Measure read time
@@ -145,6 +165,19 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 for (size_t i = 0; i < arr.arraySize(); i++) {
                     sum += arr[i].asInt32();
                 }
+
+                std::vector<int> vec;
+                vec.reserve(arr.arraySize());
+                for (size_t i = 0; i < arr.arraySize(); i++) {
+                    vec.push_back(arr[i].asInt32());
+                }
+                TestData td{
+                    .int_value = serialized[0].template as<int>(),
+                    .double_value = serialized[1].template as<double>(),
+                    .string_value = serialized[2].template as<std::string>(),
+                    .array_value = vec
+                };
+
                 return i + d + s.size() + sum; 
             }) :
             benchmark([&]() {
@@ -156,6 +189,18 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 for (size_t i = 0; i < arr.arraySize(); i++) {
                     sum += arr[i].asInt32();
                 }
+
+                // std::vector<int> vec;
+                // vec.reserve(arr.arraySize());
+                // for (size_t i = 0; i < arr.arraySize(); i++) {
+                //     vec.emplace_back(arr[i].asInt32());
+                // }
+                // TestData td{
+                //     .int_value = i,
+                //     .double_value = d,
+                //     .string_value = s,
+                //     .array_value = vec
+                // };
                 return i + d + s.size() + sum;
             });
 
