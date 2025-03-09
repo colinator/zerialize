@@ -10,11 +10,12 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
-//#include <zerialize/zerialize_msgpack.hpp>
+#include <zerialize/zerialize_msgpack.hpp>
 
 // Reflect-cpp includes
 #include <rfl/json.hpp>
 #include <rfl/flexbuf.hpp>
+#include <rfl/msgpack.hpp>
 #include <rfl.hpp>
 
 using namespace zerialize;
@@ -280,43 +281,59 @@ std::vector<BenchmarkResult> runReflectCppFlexBuffersBenchmarks() {
     return results;
 }
 
-// // Run Reflect-cpp MessagePack benchmarks
-// std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
-//     std::vector<BenchmarkResult> results;
+// Run Reflect-cpp MessagePack benchmarks
+std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
+    std::vector<BenchmarkResult> results;
     
-//     // Create test data
-//     TestData testData{
-//         42,
-//         3.14159,
-//         "hello world",
-//         {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-//     };
+    // Create test data
+    TestData testData{
+        42,
+        3.14159,
+        "hello world",
+        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+    };
     
-//     // Measure serialization time
-//     double serTime = benchmark([&]() {
-//         auto serialized = rfl::flexbuf::write(testData);
-//         return serialized;
-//     });
+    // Measure serialization time
+    double serTime = benchmark([&]() {
+        auto serialized = rfl::msgpack::write(testData);
+        return serialized;
+    });
     
-//     // Create serialized data once for deserialization tests
-//     auto serialized = reflect::msgpack::to_vector(testData);
+    // Create serialized data once for deserialization tests
+    auto serialized = rfl::msgpack::write(testData);
     
-//     // Measure deserialization time
-//     double deserTime = benchmark([&]() {
-//         auto deserialized = reflect::msgpack::from_vector<TestData>(serialized);
-//         return deserialized;
-//     });
+    // Measure deserialization time
+    double deserTime = benchmark([&]() {
+        auto deserialized = rfl::msgpack::read<TestData>(serialized);
+        return deserialized;
+    });
     
-//     results.push_back({
-//         "Reflect-cpp: MessagePack", 
-//         serTime, 
-//         deserTime,
-//         serialized.size(),
-//         1000000
-//     });
+    auto deserialized = rfl::msgpack::read<TestData>(serialized).value();
+
+    // Measure read time
+    double readTime = benchmark([&]() {
+        int i = deserialized.int_value;
+        double d = deserialized.double_value;
+        std::string s = deserialized.string_value;
+        auto arr = deserialized.array_value;
+        int sum = 0;
+        for (size_t i = 0; i < arr.size(); i++) {
+            sum += arr[i];
+        }
+        return i + d + s.size() + sum;  // Just to use the values
+    });
+
+    results.push_back({
+        "Reflect-cpp: MessagePack", 
+        serTime, 
+        deserTime,
+        readTime,
+        serialized.size(),
+        1000000
+    });
     
-//     return results;
-// }
+    return results;
+}
 
 int main() {
     std::cout << "Benchmarking Zerialize vs Reflect-cpp" << std::endl;
@@ -334,12 +351,14 @@ int main() {
     printResults(zerializeFlexResults);
     std::cout << std::endl;
     
-    // std::cout << "Zerialize MsgPack Serializer:" << std::endl;
-    // auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
-    // printResults(zerializeMsgPackResults);
-    // std::cout << std::endl;
+    std::cout << "Zerialize MsgPack Serializer:" << std::endl;
+    auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
+    printResults(zerializeMsgPackResults);
+    std::cout << std::endl;
+    
     
     // Run Reflect-cpp benchmarks
+
     std::cout << "Reflect-cpp JSON:" << std::endl;
     auto reflectCppJsonResults = runReflectCppJsonBenchmarks();
     printResults(reflectCppJsonResults);
@@ -350,10 +369,10 @@ int main() {
     printResults(reflectCppFlexBuffersResults);
     std::cout << std::endl;
     
-    // std::cout << "Reflect-cpp MessagePack:" << std::endl;
-    // auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
-    // printResults(reflectCppMsgPackResults);
-    // std::cout << std::endl;
+    std::cout << "Reflect-cpp MessagePack:" << std::endl;
+    auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
+    printResults(reflectCppMsgPackResults);
+    std::cout << std::endl;
     
     std::cout << "Benchmark complete!" << std::endl;
     return 0;

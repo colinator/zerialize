@@ -1,58 +1,172 @@
 #pragma once
 
 #include <zerialize/zerialize.hpp>
-#include <msgpack.hpp>
-
-// Define endianness manually since we're not using Boost
-// #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && defined(__ORDER_BIG_ENDIAN__)
-//   #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-//     #define MSGPACK_ENDIAN_LITTLE_BYTE 1
-//   #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-//     #define MSGPACK_ENDIAN_BIG_BYTE 1
-//   #endif
-// #elif defined(_WIN32)
-//   #define MSGPACK_ENDIAN_LITTLE_BYTE 1
-// #endif
+#include <msgpack.h>
 
 namespace zerialize {
 
-using MsgPackStream = msgpack::sbuffer;
-using MsgPacker = msgpack::packer<MsgPackStream>;
+// Buffer for MessagePack serialization
+using MsgPackStream = msgpack_sbuffer;
 
 class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
 private:
     vector<uint8_t> buf_;
-    msgpack::object_handle oh_;
-    msgpack::object obj_;
+    msgpack_unpacked unpacked_;
+    msgpack_object obj_;
+    bool initialized_ = false;
 
 public:
+    MsgPackBuffer() {
+        msgpack_unpacked_init(&unpacked_);
+    }
 
-    MsgPackBuffer() {}
+    ~MsgPackBuffer() {
+        if (initialized_) {
+            msgpack_unpacked_destroy(&unpacked_);
+        }
+    }
 
-    MsgPackBuffer(const msgpack::object& obj): obj_(obj) {}
+    // Constructor from msgpack_object
+    MsgPackBuffer(const msgpack_object& obj): obj_(obj) {
+        msgpack_unpacked_init(&unpacked_);
+        initialized_ = true;
+    }
 
     // Zero-copy view of existing data
     MsgPackBuffer(span<const uint8_t> data) {
+        msgpack_unpacked_init(&unpacked_);
         if (data.size() > 0) {
-            msgpack::unpack(oh_, reinterpret_cast<const char*>(data.data()), data.size());
-            obj_ = oh_.get();
+            msgpack_unpack_return ret = msgpack_unpack_next(
+                &unpacked_, 
+                reinterpret_cast<const char*>(data.data()), 
+                data.size(), 
+                NULL
+            );
+            if (ret == MSGPACK_UNPACK_SUCCESS) {
+                obj_ = unpacked_.data;
+                initialized_ = true;
+            }
         }
     }
 
     // Zero-copy move of vector ownership
     MsgPackBuffer(vector<uint8_t>&& buf): buf_(std::move(buf)) {
+        msgpack_unpacked_init(&unpacked_);
         if (buf_.size() > 0) {
-            msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
-            obj_ = oh_.get();
+            msgpack_unpack_return ret = msgpack_unpack_next(
+                &unpacked_, 
+                reinterpret_cast<const char*>(buf_.data()), 
+                buf_.size(), 
+                NULL
+            );
+            if (ret == MSGPACK_UNPACK_SUCCESS) {
+                obj_ = unpacked_.data;
+                initialized_ = true;
+            }
         }
     }
 
     // Must copy for const reference
     MsgPackBuffer(const vector<uint8_t>& buf): buf_(buf) {
+        msgpack_unpacked_init(&unpacked_);
         if (buf_.size() > 0) {
-            msgpack::unpack(oh_, reinterpret_cast<const char*>(buf_.data()), buf_.size());
-            obj_ = oh_.get();
+            msgpack_unpack_return ret = msgpack_unpack_next(
+                &unpacked_, 
+                reinterpret_cast<const char*>(buf_.data()), 
+                buf_.size(), 
+                NULL
+            );
+            if (ret == MSGPACK_UNPACK_SUCCESS) {
+                obj_ = unpacked_.data;
+                initialized_ = true;
+            }
         }
+    }
+
+    // Copy constructor
+    MsgPackBuffer(const MsgPackBuffer& other): buf_(other.buf_), obj_(other.obj_) {
+        msgpack_unpacked_init(&unpacked_);
+        if (buf_.size() > 0) {
+            msgpack_unpack_return ret = msgpack_unpack_next(
+                &unpacked_, 
+                reinterpret_cast<const char*>(buf_.data()), 
+                buf_.size(), 
+                NULL
+            );
+            if (ret == MSGPACK_UNPACK_SUCCESS) {
+                initialized_ = true;
+            }
+        }
+    }
+
+    // Move constructor
+    MsgPackBuffer(MsgPackBuffer&& other) noexcept 
+        : buf_(std::move(other.buf_)), obj_(other.obj_), initialized_(other.initialized_) {
+        msgpack_unpacked_init(&unpacked_);
+        if (initialized_) {
+            // We need to re-unpack since we can't move msgpack_unpacked
+            if (buf_.size() > 0) {
+                msgpack_unpack_next(
+                    &unpacked_, 
+                    reinterpret_cast<const char*>(buf_.data()), 
+                    buf_.size(), 
+                    NULL
+                );
+            }
+        }
+        other.initialized_ = false;
+    }
+
+    // Assignment operator
+    MsgPackBuffer& operator=(const MsgPackBuffer& other) {
+        if (this != &other) {
+            if (initialized_) {
+                msgpack_unpacked_destroy(&unpacked_);
+            }
+            
+            buf_ = other.buf_;
+            obj_ = other.obj_;
+            
+            msgpack_unpacked_init(&unpacked_);
+            if (buf_.size() > 0) {
+                msgpack_unpack_return ret = msgpack_unpack_next(
+                    &unpacked_, 
+                    reinterpret_cast<const char*>(buf_.data()), 
+                    buf_.size(), 
+                    NULL
+                );
+                if (ret == MSGPACK_UNPACK_SUCCESS) {
+                    initialized_ = true;
+                }
+            }
+        }
+        return *this;
+    }
+
+    // Move assignment operator
+    MsgPackBuffer& operator=(MsgPackBuffer&& other) noexcept {
+        if (this != &other) {
+            if (initialized_) {
+                msgpack_unpacked_destroy(&unpacked_);
+            }
+            
+            buf_ = std::move(other.buf_);
+            obj_ = other.obj_;
+            initialized_ = other.initialized_;
+            
+            msgpack_unpacked_init(&unpacked_);
+            if (initialized_ && buf_.size() > 0) {
+                msgpack_unpack_next(
+                    &unpacked_, 
+                    reinterpret_cast<const char*>(buf_.data()), 
+                    buf_.size(), 
+                    NULL
+                );
+            }
+            
+            other.initialized_ = false;
+        }
+        return *this;
     }
 
     const vector<uint8_t>& buf() const override {
@@ -72,107 +186,140 @@ public:
     }
 
     bool isNull() const { 
-        return obj_.type == msgpack::type::NIL; 
+        return obj_.type == MSGPACK_OBJECT_NIL; 
     }
 
     bool isInt() const { 
-        return obj_.type == msgpack::type::NEGATIVE_INTEGER || obj_.type == msgpack::type::POSITIVE_INTEGER;
+        return obj_.type == MSGPACK_OBJECT_NEGATIVE_INTEGER || obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER;
     }
     
     bool isUInt() const { 
-        return obj_.type == msgpack::type::POSITIVE_INTEGER;
+        return obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER;
     }
     
     bool isFloat() const { 
-        return obj_.type == msgpack::type::FLOAT;
+        return obj_.type == MSGPACK_OBJECT_FLOAT || obj_.type == MSGPACK_OBJECT_FLOAT32;
     }
     
     bool isBool() const { 
-        return obj_.type == msgpack::type::BOOLEAN;
+        return obj_.type == MSGPACK_OBJECT_BOOLEAN;
     }
     
     bool isString() const { 
-        return obj_.type == msgpack::type::STR;
+        return obj_.type == MSGPACK_OBJECT_STR;
     }
     
     bool isBlob() const { 
-        return obj_.type == msgpack::type::BIN;
+        return obj_.type == MSGPACK_OBJECT_BIN;
     }
     
     bool isMap() const { 
-        return obj_.type == msgpack::type::MAP;
+        return obj_.type == MSGPACK_OBJECT_MAP;
     }
     
     bool isArray() const { 
-        return obj_.type == msgpack::type::ARRAY;
+        return obj_.type == MSGPACK_OBJECT_ARRAY;
     }
 
     int8_t asInt8() const {
         if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        return static_cast<int8_t>(obj_.as<int64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<int8_t>(obj_.via.u64);
+        } else {
+            return static_cast<int8_t>(obj_.via.i64);
+        }
     }
 
     int16_t asInt16() const {
         if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        return static_cast<int16_t>(obj_.as<int64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<int16_t>(obj_.via.u64);
+        } else {
+            return static_cast<int16_t>(obj_.via.i64);
+        }
     }
 
     int32_t asInt32() const {
         if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        return static_cast<int32_t>(obj_.as<int64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<int32_t>(obj_.via.u64);
+        } else {
+            return static_cast<int32_t>(obj_.via.i64);
+        }
     }
 
     int64_t asInt64() const {
         if (!isInt() && !isUInt()) { throw DeserializationError("not an int"); }
-        return obj_.as<int64_t>();
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<int64_t>(obj_.via.u64);
+        } else {
+            return obj_.via.i64;
+        }
     }
 
     uint8_t asUInt8() const {
         if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        return static_cast<uint8_t>(obj_.as<uint64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<uint8_t>(obj_.via.u64);
+        } else {
+            return static_cast<uint8_t>(obj_.via.i64);
+        }
     }
 
     uint16_t asUInt16() const {
         if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        return static_cast<uint16_t>(obj_.as<uint64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<uint16_t>(obj_.via.u64);
+        } else {
+            return static_cast<uint16_t>(obj_.via.i64);
+        }
     }
 
     uint32_t asUInt32() const {
         if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        return static_cast<uint32_t>(obj_.as<uint64_t>());
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return static_cast<uint32_t>(obj_.via.u64);
+        } else {
+            return static_cast<uint32_t>(obj_.via.i64);
+        }
     }
 
     uint64_t asUInt64() const {
         if (!isUInt() && !isInt()) { throw DeserializationError("not a uint"); }
-        return obj_.as<uint64_t>();
+        if (obj_.type == MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            return obj_.via.u64;
+        } else {
+            return static_cast<uint64_t>(obj_.via.i64);
+        }
     }
 
     float asFloat() const {
         if (!isFloat()) { throw DeserializationError("not a float"); }
-        return static_cast<float>(obj_.as<double>());
+        if (obj_.type == MSGPACK_OBJECT_FLOAT32) {
+            return obj_.via.f64;  // In C API, both float32 and float64 use f64 field
+        } else {
+            return static_cast<float>(obj_.via.f64);
+        }
     }
 
     double asDouble() const {
         if (!isFloat()) { throw DeserializationError("not a float"); }
-        return obj_.as<double>();
+        return obj_.via.f64;
     }
 
     bool asBool() const {
         if (!isBool()) { throw DeserializationError("not a bool"); }
-        return obj_.as<bool>();
+        return obj_.via.boolean;
     }
 
     string asString() const {
         if (!isString()) { throw DeserializationError("not a string"); }
-        return obj_.as<string>();
+        return string(obj_.via.str.ptr, obj_.via.str.size);
     }
 
     string_view asStringView() const {
         if (!isString()) { throw DeserializationError("not a string"); }
-        std::size_t size;
-        const char* ptr = obj_.via.str.ptr;
-        size = obj_.via.str.size;
-        return string_view(ptr, size);
+        return string_view(obj_.via.str.ptr, obj_.via.str.size);
     }
 
     span<const uint8_t> asBlob() const {
@@ -186,8 +333,8 @@ public:
         if (!isMap()) { throw DeserializationError("not a map"); }
         set<string_view> keys;
         for (uint32_t i = 0; i < obj_.via.map.size; ++i) {
-            const msgpack::object& key = obj_.via.map.ptr[i].key;
-            if (key.type != msgpack::type::STR) {
+            const msgpack_object& key = obj_.via.map.ptr[i].key;
+            if (key.type != MSGPACK_OBJECT_STR) {
                 throw DeserializationError("map key is not a string");
             }
             keys.insert(string_view(key.via.str.ptr, key.via.str.size));
@@ -198,8 +345,8 @@ public:
     MsgPackBuffer operator[] (const string& key) const {
         if (!isMap()) { throw DeserializationError("not a map"); }
         for (uint32_t i = 0; i < obj_.via.map.size; ++i) {
-            const msgpack::object& k = obj_.via.map.ptr[i].key;
-            if (k.type == msgpack::type::STR) {
+            const msgpack_object& k = obj_.via.map.ptr[i].key;
+            if (k.type == MSGPACK_OBJECT_STR) {
                 string_view sv(k.via.str.ptr, k.via.str.size);
                 if (sv == key) {
                     return MsgPackBuffer(obj_.via.map.ptr[i].val);
@@ -227,11 +374,27 @@ class MsgPackRootSerializer {
 public:
     MsgPackStream sbuf;
 
+    MsgPackRootSerializer() {
+        msgpack_sbuffer_init(&sbuf);
+    }
+
+    ~MsgPackRootSerializer() {
+        msgpack_sbuffer_destroy(&sbuf);
+    }
+
     MsgPackBuffer finish() {
-        if (sbuf.size() > 0) {
-            size_t size = sbuf.size();
-            uint8_t* data = (uint8_t*)sbuf.release();
+        if (sbuf.size > 0) {
+            size_t size = sbuf.size;
+            uint8_t* data = reinterpret_cast<uint8_t*>(sbuf.data);
+            
+            // Create a copy of the data since we're going to destroy the sbuffer
             std::vector<uint8_t> vec(data, data + size);
+            
+            // Reset the sbuffer without freeing the data (we've copied it)
+            sbuf.size = 0;
+            sbuf.data = nullptr;
+            sbuf.alloc = 0;
+            
             return MsgPackBuffer(std::move(vec));
         }
         return MsgPackBuffer();
@@ -240,53 +403,92 @@ public:
 
 class MsgPackSerializer: public Serializer<MsgPackSerializer> {
 private:
-
-    MsgPacker packer;
-    MsgPackStream& pack_stream;
+    msgpack_packer packer;
+    MsgPackStream* pack_stream;
 
 public:
     // Make the base class overloads visible in the derived class
     using Serializer<MsgPackSerializer>::serialize;
 
-    MsgPackSerializer(MsgPackRootSerializer& mb): packer(mb.sbuf), pack_stream(mb.sbuf) {}
+    MsgPackSerializer(MsgPackRootSerializer& mb) {
+        pack_stream = &mb.sbuf;
+        msgpack_packer_init(&packer, pack_stream, msgpack_sbuffer_write);
+    }
 
-    MsgPackSerializer(MsgPackStream& ps): packer(ps), pack_stream(ps) {}
+    MsgPackSerializer(MsgPackStream* ps) {
+        pack_stream = ps;
+        msgpack_packer_init(&packer, pack_stream, msgpack_sbuffer_write);
+    }
 
-    void serialize(std::nullptr_t) { packer.pack_nil(); }
+    void serialize(std::nullptr_t) { 
+        msgpack_pack_nil(&packer); 
+    }
 
-    void serialize(int8_t val) { packer.pack(val); }
-    void serialize(int16_t val) { packer.pack(val); }
-    void serialize(int32_t val) { packer.pack(val); }
-    void serialize(int64_t val) { packer.pack(val); }
+    void serialize(int8_t val) { 
+        msgpack_pack_int8(&packer, val); 
+    }
+    
+    void serialize(int16_t val) { 
+        msgpack_pack_int16(&packer, val); 
+    }
+    
+    void serialize(int32_t val) { 
+        msgpack_pack_int32(&packer, val); 
+    }
+    
+    void serialize(int64_t val) { 
+        msgpack_pack_int64(&packer, val); 
+    }
 
-    void serialize(uint8_t val) { packer.pack(val); }
-    void serialize(uint16_t val) { packer.pack(val); }
-    void serialize(uint32_t val) { packer.pack(val); }
-    void serialize(uint64_t val) { packer.pack(val); }
+    void serialize(uint8_t val) { 
+        msgpack_pack_uint8(&packer, val); 
+    }
+    
+    void serialize(uint16_t val) { 
+        msgpack_pack_uint16(&packer, val); 
+    }
+    
+    void serialize(uint32_t val) { 
+        msgpack_pack_uint32(&packer, val); 
+    }
+    
+    void serialize(uint64_t val) { 
+        msgpack_pack_uint64(&packer, val); 
+    }
 
-    void serialize(bool val) { packer.pack(val); }
-    void serialize(double val) { packer.pack(val); }
+    void serialize(bool val) { 
+        if (val) {
+            msgpack_pack_true(&packer);
+        } else {
+            msgpack_pack_false(&packer);
+        }
+    }
+    
+    void serialize(double val) { 
+        msgpack_pack_double(&packer, val); 
+    }
     
     void serialize(const char* val) { 
-        packer.pack_str(strlen(val));
-        packer.pack_str_body(val, strlen(val));
+        size_t len = strlen(val);
+        msgpack_pack_str(&packer, len);
+        msgpack_pack_str_body(&packer, val, len);
     }
     
     void serialize(const string& val) { 
-        packer.pack_str(val.size());
-        packer.pack_str_body(val.data(), val.size());
+        msgpack_pack_str(&packer, val.size());
+        msgpack_pack_str_body(&packer, val.data(), val.size());
     }
 
     void serialize(const span<const uint8_t>& val) { 
-        packer.pack_bin(val.size());
-        packer.pack_bin_body(reinterpret_cast<const char*>(val.data()), val.size());
+        msgpack_pack_bin(&packer, val.size());
+        msgpack_pack_bin_body(&packer, reinterpret_cast<const char*>(val.data()), val.size());
     }
 
     template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
     void serialize(T&& val) {
         string str(std::forward<T>(val));
-        packer.pack_str(str.size());
-        packer.pack_str_body(str.data(), str.size());
+        msgpack_pack_str(&packer, str.size());
+        msgpack_pack_str_body(&packer, str.data(), str.size());
     }
 
     void serialize(const string& key, const any& value) {
@@ -300,14 +502,14 @@ public:
     }
 
     void serialize(const map<string, any>& m) {
-        packer.pack_map(m.size());
+        msgpack_pack_map(&packer, m.size());
         for (const auto& [key, value]: m) {
             serialize(key, value);
         }
     }
 
     void serialize(const vector<any>& l) {
-        packer.pack_array(l.size());
+        msgpack_pack_array(&packer, l.size());
         for (const auto& value: l) {
             serializeAny(value);
         }
@@ -325,7 +527,7 @@ public:
         // for message pack map serialization, we need the size in advance
         SerializeCounter counter;
         std::forward<F>(f)(counter);
-        packer.pack_map(counter.count);
+        msgpack_pack_map(&packer, counter.count);
         std::forward<F>(f)(*this);
     }
 
@@ -335,7 +537,7 @@ public:
         // for message pack array serialization, we need the size in advance
         SerializeCounter counter;
         std::forward<F>(f)(counter);
-        packer.pack_array(counter.count);
+        msgpack_pack_array(&packer, counter.count);
         std::forward<F>(f)(*this);
     }
 };

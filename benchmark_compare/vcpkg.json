@@ -1,0 +1,10 @@
+{
+    "name": "benchmark-compare2",
+    "version-string": "0.0.1",
+    "dependencies": [
+      {
+        "name": "reflectcpp",
+        "features": [ "flexbuffers", "msgpack" ]
+      }
+    ]
+  }

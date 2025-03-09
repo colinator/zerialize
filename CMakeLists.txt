@@ -24,7 +24,7 @@ FetchContent_MakeAvailable(json)
 FetchContent_Declare(
     msgpack
     GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
-    GIT_TAG cpp_master
+    GIT_TAG c_master
 )
 FetchContent_GetProperties(msgpack)
 if(NOT msgpack_POPULATED)
@@ -105,5 +105,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     xsimd 
     xtl
     eigen
-    msgpack-cxx
+    msgpack-c
 )
