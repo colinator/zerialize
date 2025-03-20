@@ -231,8 +231,8 @@ public:
         Serializer::serializeAny(value);
     }
 
-    FlexSerializer serializerForKey(const string& key) {
-        fbb.Key(key);
+    FlexSerializer serializerForKey(const string_view& key) {
+        fbb.Key(string(key));
         return *this;
     }
 

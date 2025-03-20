@@ -705,7 +705,7 @@ public:
         Serializer::serializeAny(value);
     }
 
-    MsgPackSerializer serializerForKey(const string& key) {
+    MsgPackSerializer serializerForKey(const string_view& key) {
         serialize(key);
         return MsgPackSerializer(pack_stream);
     }

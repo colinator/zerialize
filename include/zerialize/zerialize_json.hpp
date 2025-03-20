@@ -300,7 +300,7 @@ public:
         s.serializeAny(value);
     }
 
-    JsonSerializer serializerForKey(const string& key) {
+    JsonSerializer serializerForKey(const string_view& key) {
         if (serializingVector) { throw SerializationError("Cannot serialize key/value to vector"); }
         j[key] = nullptr;
         return JsonSerializer(j[key]);

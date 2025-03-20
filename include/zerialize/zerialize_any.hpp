@@ -9,6 +9,22 @@
 #include <map>
 #include <span>
 
+/*
+ * This file implements a compile-time type map for efficient serialization of std::any values.
+ * 
+ * Instead of using a long if-else chain to check types (O(n) complexity), we:
+ * 1. Create a static array of {type_hash, handler_function} pairs at compile time
+ * 2. Sort this array by type hash codes
+ * 3. Use binary search (O(log n)) to find the appropriate handler for a given type
+ * 
+ * This approach significantly improves performance for type lookups, especially
+ * with many supported types. For 46 types, it reduces the maximum number of
+ * comparisons from 46 to about 6.
+ * 
+ * Template functions are used to reduce code duplication for similar types,
+ * making the code more maintainable and easier to extend.
+ */
+
 namespace zerialize {
 
 using std::string, std::string_view, std::vector, std::map, std::span;
@@ -38,7 +54,43 @@ struct TypeEntry {
     }
 };
 
-// Handler functions for different types
+// Generic template function for simple types
+template <typename Derived, typename T>
+void serializeAnySimple(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(any_cast<T>(v));
+}
+
+// Template function for integer types that need casting to int64_t
+template <typename Derived, typename T>
+void serializeAnyIntegral(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(static_cast<int64_t>(any_cast<T>(v)));
+}
+
+// Template function for unsigned integer types that need casting to uint64_t
+template <typename Derived, typename T>
+void serializeAnyUnsigned(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(static_cast<uint64_t>(any_cast<T>(v)));
+}
+
+// Template function for float that needs casting to double
+template <typename Derived>
+void serializeAnyFloat(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(static_cast<double>(any_cast<float>(v)));
+}
+
+// Template function for vector types
+template <typename Derived, typename T>
+void serializeAnyVector(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(any_cast<vector<T>>(v));
+}
+
+// Template function for map<string, T> types
+template <typename Derived, typename T>
+void serializeAnyMapString(Serializer<Derived>* self, const any& v) {
+    static_cast<Derived*>(self)->serialize(any_cast<map<string, T>>(v));
+}
+
+// Special case handlers that can't be templated easily
 template <typename Derived>
 void serializeAnyFunction(Serializer<Derived>* self, const any& v) {
     self->serializeFunction(any_cast<function<void(Derived&)>>(v));
@@ -68,193 +120,8 @@ void serializeAnyNullptr(Serializer<Derived>* self, const any& v) {
 }
 
 template <typename Derived>
-void serializeAnyInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<int64_t>(any_cast<int8_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<int64_t>(any_cast<int16_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<int64_t>(any_cast<int32_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<int64_t>(v));
-}
-
-template <typename Derived>
-void serializeAnyUInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<uint64_t>(any_cast<uint8_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyUInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<uint64_t>(any_cast<uint16_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyUInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<uint64_t>(any_cast<uint32_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyUInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<uint64_t>(any_cast<uint64_t>(v)));
-}
-
-template <typename Derived>
-void serializeAnyBool(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<bool>(v));
-}
-
-template <typename Derived>
-void serializeAnyDouble(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<double>(v));
-}
-
-template <typename Derived>
-void serializeAnyFloat(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(static_cast<double>(any_cast<float>(v)));
-}
-
-template <typename Derived>
 void serializeAnySpanConstUInt8(Serializer<Derived>* self, const any& v) {
     static_cast<Derived*>(self)->serialize(any_cast<span<const uint8_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyConstCharPtr(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<const char*>(v));
-}
-
-template <typename Derived>
-void serializeAnyString(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<string>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<int8_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<int16_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<int32_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<int64_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorUInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<uint8_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorUInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<uint16_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorUInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<uint32_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorUInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<uint64_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorFloat(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<float>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorDouble(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<double>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorBool(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<bool>>(v));
-}
-
-template <typename Derived>
-void serializeAnyVectorString(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<vector<string>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, int8_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, int16_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, int32_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, int64_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringUInt8(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, uint8_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringUInt16(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, uint16_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringUInt32(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, uint32_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringUInt64(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, uint64_t>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringFloat(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, float>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringDouble(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, double>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringBool(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, bool>>(v));
-}
-
-template <typename Derived>
-void serializeAnyMapStringString(Serializer<Derived>* self, const any& v) {
-    static_cast<Derived*>(self)->serialize(any_cast<map<string, string>>(v));
 }
 
 // Create and return a sorted array of type entries (hash code + handler function)
@@ -266,44 +133,44 @@ const std::array<TypeEntry<Derived>, 46>& getTypeHandlers() {
             { typeid(map<string, any>).hash_code(), serializeAnyMapStringAny<Derived> },
             { typeid(vector<any>).hash_code(), serializeAnyVectorAny<Derived> },
             { typeid(std::nullptr_t).hash_code(), serializeAnyNullptr<Derived> },
-            { typeid(int8_t).hash_code(), serializeAnyInt8<Derived> },
-            { typeid(int16_t).hash_code(), serializeAnyInt16<Derived> },
-            { typeid(int32_t).hash_code(), serializeAnyInt32<Derived> },
-            { typeid(int64_t).hash_code(), serializeAnyInt64<Derived> },
-            { typeid(uint8_t).hash_code(), serializeAnyUInt8<Derived> },
-            { typeid(uint16_t).hash_code(), serializeAnyUInt16<Derived> },
-            { typeid(uint32_t).hash_code(), serializeAnyUInt32<Derived> },
-            { typeid(uint64_t).hash_code(), serializeAnyUInt64<Derived> },
-            { typeid(bool).hash_code(), serializeAnyBool<Derived> },
-            { typeid(double).hash_code(), serializeAnyDouble<Derived> },
+            { typeid(int8_t).hash_code(), serializeAnyIntegral<Derived, int8_t> },
+            { typeid(int16_t).hash_code(), serializeAnyIntegral<Derived, int16_t> },
+            { typeid(int32_t).hash_code(), serializeAnyIntegral<Derived, int32_t> },
+            { typeid(int64_t).hash_code(), serializeAnySimple<Derived, int64_t> },
+            { typeid(uint8_t).hash_code(), serializeAnyUnsigned<Derived, uint8_t> },
+            { typeid(uint16_t).hash_code(), serializeAnyUnsigned<Derived, uint16_t> },
+            { typeid(uint32_t).hash_code(), serializeAnyUnsigned<Derived, uint32_t> },
+            { typeid(uint64_t).hash_code(), serializeAnySimple<Derived, uint64_t> },
+            { typeid(bool).hash_code(), serializeAnySimple<Derived, bool> },
+            { typeid(double).hash_code(), serializeAnySimple<Derived, double> },
             { typeid(float).hash_code(), serializeAnyFloat<Derived> },
             { typeid(span<const uint8_t>).hash_code(), serializeAnySpanConstUInt8<Derived> },
-            { typeid(const char*).hash_code(), serializeAnyConstCharPtr<Derived> },
-            { typeid(string).hash_code(), serializeAnyString<Derived> },
-            { typeid(vector<int8_t>).hash_code(), serializeAnyVectorInt8<Derived> },
-            { typeid(vector<int16_t>).hash_code(), serializeAnyVectorInt16<Derived> },
-            { typeid(vector<int32_t>).hash_code(), serializeAnyVectorInt32<Derived> },
-            { typeid(vector<int64_t>).hash_code(), serializeAnyVectorInt64<Derived> },
-            { typeid(vector<uint8_t>).hash_code(), serializeAnyVectorUInt8<Derived> },
-            { typeid(vector<uint16_t>).hash_code(), serializeAnyVectorUInt16<Derived> },
-            { typeid(vector<uint32_t>).hash_code(), serializeAnyVectorUInt32<Derived> },
-            { typeid(vector<uint64_t>).hash_code(), serializeAnyVectorUInt64<Derived> },
-            { typeid(vector<float>).hash_code(), serializeAnyVectorFloat<Derived> },
-            { typeid(vector<double>).hash_code(), serializeAnyVectorDouble<Derived> },
-            { typeid(vector<bool>).hash_code(), serializeAnyVectorBool<Derived> },
-            { typeid(vector<string>).hash_code(), serializeAnyVectorString<Derived> },
-            { typeid(map<string, int8_t>).hash_code(), serializeAnyMapStringInt8<Derived> },
-            { typeid(map<string, int16_t>).hash_code(), serializeAnyMapStringInt16<Derived> },
-            { typeid(map<string, int32_t>).hash_code(), serializeAnyMapStringInt32<Derived> },
-            { typeid(map<string, int64_t>).hash_code(), serializeAnyMapStringInt64<Derived> },
-            { typeid(map<string, uint8_t>).hash_code(), serializeAnyMapStringUInt8<Derived> },
-            { typeid(map<string, uint16_t>).hash_code(), serializeAnyMapStringUInt16<Derived> },
-            { typeid(map<string, uint32_t>).hash_code(), serializeAnyMapStringUInt32<Derived> },
-            { typeid(map<string, uint64_t>).hash_code(), serializeAnyMapStringUInt64<Derived> },
-            { typeid(map<string, float>).hash_code(), serializeAnyMapStringFloat<Derived> },
-            { typeid(map<string, double>).hash_code(), serializeAnyMapStringDouble<Derived> },
-            { typeid(map<string, bool>).hash_code(), serializeAnyMapStringBool<Derived> },
-            { typeid(map<string, string>).hash_code(), serializeAnyMapStringString<Derived> }
+            { typeid(const char*).hash_code(), serializeAnySimple<Derived, const char*> },
+            { typeid(string).hash_code(), serializeAnySimple<Derived, string> },
+            { typeid(vector<int8_t>).hash_code(), serializeAnyVector<Derived, int8_t> },
+            { typeid(vector<int16_t>).hash_code(), serializeAnyVector<Derived, int16_t> },
+            { typeid(vector<int32_t>).hash_code(), serializeAnyVector<Derived, int32_t> },
+            { typeid(vector<int64_t>).hash_code(), serializeAnyVector<Derived, int64_t> },
+            { typeid(vector<uint8_t>).hash_code(), serializeAnyVector<Derived, uint8_t> },
+            { typeid(vector<uint16_t>).hash_code(), serializeAnyVector<Derived, uint16_t> },
+            { typeid(vector<uint32_t>).hash_code(), serializeAnyVector<Derived, uint32_t> },
+            { typeid(vector<uint64_t>).hash_code(), serializeAnyVector<Derived, uint64_t> },
+            { typeid(vector<float>).hash_code(), serializeAnyVector<Derived, float> },
+            { typeid(vector<double>).hash_code(), serializeAnyVector<Derived, double> },
+            { typeid(vector<bool>).hash_code(), serializeAnyVector<Derived, bool> },
+            { typeid(vector<string>).hash_code(), serializeAnyVector<Derived, string> },
+            { typeid(map<string, int8_t>).hash_code(), serializeAnyMapString<Derived, int8_t> },
+            { typeid(map<string, int16_t>).hash_code(), serializeAnyMapString<Derived, int16_t> },
+            { typeid(map<string, int32_t>).hash_code(), serializeAnyMapString<Derived, int32_t> },
+            { typeid(map<string, int64_t>).hash_code(), serializeAnyMapString<Derived, int64_t> },
+            { typeid(map<string, uint8_t>).hash_code(), serializeAnyMapString<Derived, uint8_t> },
+            { typeid(map<string, uint16_t>).hash_code(), serializeAnyMapString<Derived, uint16_t> },
+            { typeid(map<string, uint32_t>).hash_code(), serializeAnyMapString<Derived, uint32_t> },
+            { typeid(map<string, uint64_t>).hash_code(), serializeAnyMapString<Derived, uint64_t> },
+            { typeid(map<string, float>).hash_code(), serializeAnyMapString<Derived, float> },
+            { typeid(map<string, double>).hash_code(), serializeAnyMapString<Derived, double> },
+            { typeid(map<string, bool>).hash_code(), serializeAnyMapString<Derived, bool> },
+            { typeid(map<string, string>).hash_code(), serializeAnyMapString<Derived, string> }
         }};
         
         // Sort by hash code for binary search

@@ -270,9 +270,8 @@ public:
         if (value.isMap()) {
             d->serializeMap([&](SerializingConcept auto& s){
                 for (string_view key: value.mapKeys()) {
-                    const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
-                    auto keySerializer = s.serializerForKey(k);
-                    keySerializer.Serializer::serialize(value[k]);
+                    auto keySerializer = s.serializerForKey(key);
+                    keySerializer.Serializer::serialize(value[key]);
                 }
             });
         } else if (value.isArray()) {
@@ -325,8 +324,7 @@ public:
         Derived* d = static_cast<Derived*>(this);
         d->serializeMap([&m](SerializingConcept auto& s){
             for (const auto& [key, value] : m) {
-                const string k(key);    // DO NOT LIKE COPY CONSTRUCTION
-                auto keySerializer = s.serializerForKey(k);
+                auto keySerializer = s.serializerForKey(key);
                 keySerializer.serialize(value);
             }
         });
@@ -376,7 +374,7 @@ struct SerializeCounter: public Serializer<SerializeCounter> {
     template <typename F> requires InvocableSerializer<F, SerializeCounter&>
     void serializeVector(F&&) { count += 1; }
 
-    SerializeCounter serializerForKey(const string&) { count += 1; return *this; }
+    SerializeCounter serializerForKey(const string_view&) { count += 1; return *this; }
 };
 
 
@@ -585,8 +583,7 @@ typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&...
     typename SerializerType::Serializer serializer(rootSerializer);
     serializer.serializeMap([&](SerializingConcept auto& s){
         ([&](auto&& pair) {
-            string key(pair.first); // don't like copy!
-            SerializingConcept auto ks = s.serializerForKey(key);
+            SerializingConcept auto ks = s.serializerForKey(pair.first);
             ks.serialize(std::forward<decltype(pair.second)>(pair.second));
         } (std::forward<decltype(values)>(values)), ...);
     });
