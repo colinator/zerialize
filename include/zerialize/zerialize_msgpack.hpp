@@ -193,13 +193,6 @@ public:
         return buf_;
     }
 
-    // A simple debug string.
-    // string to_string() const override {
-    //     std::stringstream ss;
-    //     ss << "MsgPackBuffer: view size = " << view_.size();
-    //     return ss.str();
-    // }
-
     string to_string() const override {
         return "MsgPackBuffer " + std::to_string(buf().size()) +
             " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
@@ -689,8 +682,10 @@ public:
     }
     
     void serialize(const string& val) { 
-        msgpack_pack_str(&packer, val.size());
-        msgpack_pack_str_body(&packer, val.data(), val.size());
+        // Optimize by storing the size in a local variable to avoid calculating it twice
+        const size_t size = val.size();
+        msgpack_pack_str(&packer, size);
+        msgpack_pack_str_body(&packer, val.data(), size);
     }
 
     void serialize(const span<const uint8_t>& val) { 
