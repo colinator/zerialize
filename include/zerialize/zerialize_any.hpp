@@ -115,7 +115,7 @@ void serializeAnyVectorAny(Serializer<Derived>* self, const any& v) {
 }
 
 template <typename Derived>
-void serializeAnyNullptr(Serializer<Derived>* self, const any& v) {
+void serializeAnyNullptr(Serializer<Derived>* self, const any&) {
     static_cast<Derived*>(self)->serialize(nullptr);
 }
 
