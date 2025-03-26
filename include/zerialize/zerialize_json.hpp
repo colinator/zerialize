@@ -109,8 +109,8 @@ public:
         : buf_(buf)
         , json_(json) { }
 
-    const vector<uint8_t>& buf() const override {
-        return buf_;
+    span<const uint8_t> buf() const override {
+        return std::span<const uint8_t>(buf_);
     }
 
     string to_string() const override {
@@ -208,7 +208,7 @@ public:
         return keys;
     }
 
-    JsonBuffer operator[] (const string& key) const { 
+    JsonBuffer operator[] (const string_view key) const { 
         if (!isMap()) { throw DeserializationError("not a map"); }
         return JsonBuffer(json_[key]); 
     }

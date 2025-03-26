@@ -9,6 +9,7 @@ class FlexBuffer : public DataBuffer<FlexBuffer> {
 private:
     vector<uint8_t> buf_;
     flexbuffers::Reference ref_;
+    span<const uint8_t> view_;
 
 public:
 
@@ -18,21 +19,22 @@ public:
 
     // Zero-copy view of existing data
     FlexBuffer(span<const uint8_t> data)
-        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference()) { }
+        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference()), view_(data) { }
 
     // Zero-copy move of vector ownership
     FlexBuffer(vector<uint8_t>&& buf)
         : buf_(std::move(buf))
-        , ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) { }
+        , ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
+        , view_(buf_) { }
 
     // Must copy for const reference
     FlexBuffer(const vector<uint8_t>& buf)
         : buf_(buf)
-        , ref_(buf.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) { }
+        , ref_(buf.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) 
+        , view_(buf_) { }
 
-    // change to span?, yeah probably!!!
-    const vector<uint8_t>& buf() const override {
-        return buf_;
+    span<const uint8_t> buf() const override {
+        return view_;
     }
 
     string to_string() const override {
@@ -136,9 +138,10 @@ public:
         return keys;
     }
 
-    FlexBuffer operator[] (const string& key) const {
+    FlexBuffer operator[] (const string_view key) const {
         //if (!isMap()) { throw DeserializationError("not a map"); }
-        return FlexBuffer(ref_.AsMap()[key]);
+        string s(key);
+        return FlexBuffer(ref_.AsMap()[s]);
     }
 
     size_t arraySize() const {
@@ -185,8 +188,6 @@ public:
 class FlexSerializer: public Serializer<FlexSerializer> {
 private:
     flexbuffers::Builder& fbb;
-
-    //variant<flexbuffers::Builder, flexbuffers::Builder&> fbb;
 
 public:
 

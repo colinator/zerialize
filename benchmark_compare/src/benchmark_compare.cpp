@@ -29,12 +29,21 @@ struct TestData {
     std::vector<int> array_value;
 };
 
+    
+// Create test data
+TestData testData{
+    42,
+    3.14159,
+    "hello world",
+    {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+};
+
 // Simple benchmarking function that measures execution time
 template<typename Func>
-double benchmark(Func&& func, int iterations = 1000000) {
+double benchmark(Func&& func, size_t iterations = 10000000) {
     auto start = high_resolution_clock::now();
     
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         func();
     }
     
@@ -81,12 +90,27 @@ constexpr bool ZerializeAsVector = false;
 template<typename SerializerType>
 std::vector<BenchmarkResult> runZerializeBenchmarks() {
     std::vector<BenchmarkResult> results;
-    
+
+    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
+    std::string sharedStr = "hello world";
+    std::string key1 = "hint_value";
+    std::string key2 = "double_value";
+    std::string key3 = "string_value";
+    std::string key4 = "array_value";
+
+    std::map<std::string, std::any> m = { 
+        { "int_value", 42 },
+        { "double_value", 3.14159 },
+        { "string_value", "hello world"},
+        { "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10} }
+    };
+
     // Medium data: Map nested values
     {
         // Benchmark serialization
         double serTime = ZerializeAsVector ?
             benchmark([&]() {
+                std::cout << "YOYOYO" << std::endl;
                 auto serialized = serialize<SerializerType>({
                     42,
                     3.14159,
@@ -96,16 +120,45 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 return serialized;
             }) :
             benchmark([&]() {
-                auto serialized = serialize<SerializerType>({
-                    {"int_value", 42},
-                    {"double_value", 3.14159},
-                    {"string_value", "hello world"},
-                    {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
-                });
+
+                auto serialized = serialize<SerializerType>(
+                    // {
+                    // {"int_value", 42},
+                    // {"double_value", 3.14159},
+                    // {"string_value", "hello world"},
+                    // {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }}
+                    // }
+
+                    kv( "int_value", 42 ),
+                    kv( "double_value", 3.14159 ),
+                    kv( "string_value", sharedStr ),
+                    kv( "array_value", sharedVec )
+
+                    // kv( "int_value", 42 ),
+                    // kv( "double_value", 3.14159 ),
+                    // kv( "string_value", "hello world" ),
+                    // kv( "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } )
+
+                    // kv( key1, 42 ),
+                    // kv( key2, 3.14159 ),
+                    // kv( key3, sharedStr ),
+                    // kv( key4, sharedVec )
+
+                    // kv( "string_value", "hello world" ),
+                    // kv( "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } )
+                );
                 return serialized;
             });
+            // benchmark([&]() {
+            //     auto serialized = serialize<SerializerType>(m);
+            //     return serialized;
+            // }) :
+            // benchmark([&]() {
+            //     auto serialized = serialize<SerializerType>(m);
+            //     return serialized;
+            // });
 
-        
+       
         // Create serialized data once for deserialization tests
         auto serialized = ZerializeAsVector ?
            serialize<SerializerType>({
@@ -121,7 +174,7 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
             });   
 
-        std::vector<uint8_t> bufferCopy(serialized.buf());
+        std::vector<uint8_t> bufferCopy(serialized.buf().begin(), serialized.buf().end());
         span<const uint8_t> newBuf(bufferCopy);
 
         // Measure deserialization time (instantiating Buffer from copy)
@@ -221,14 +274,6 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
 std::vector<BenchmarkResult> runReflectCppJsonBenchmarks() {
     std::vector<BenchmarkResult> results;
     
-    // Create test data
-    const TestData testData{
-        42,
-        3.14159,
-        "hello world",
-        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-    };
-    
     // Measure serialization time
     double serTime = benchmark([&]() {
         auto serialized = rfl::json::write(testData);
@@ -276,14 +321,6 @@ std::vector<BenchmarkResult> runReflectCppJsonBenchmarks() {
 std::vector<BenchmarkResult> runReflectCppFlexBuffersBenchmarks() {
     std::vector<BenchmarkResult> results;
     
-    // Create test data
-    TestData testData{
-        42,
-        3.14159,
-        "hello world",
-        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-    };
-    
     // Measure serialization time
     double serTime = benchmark([&]() {
         const auto serialized = rfl::flexbuf::write(testData);
@@ -330,14 +367,6 @@ std::vector<BenchmarkResult> runReflectCppFlexBuffersBenchmarks() {
 std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
     std::vector<BenchmarkResult> results;
     
-    // Create test data
-    TestData testData{
-        42,
-        3.14159,
-        "hello world",
-        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-    };
-    
     // Measure serialization time
     double serTime = benchmark([&]() {
         auto serialized = rfl::msgpack::write(testData);
@@ -374,7 +403,7 @@ std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
         deserTime,
         readTime,
         serialized.size(),
-        1000000
+        10000000
     });
     
     return results;
@@ -387,10 +416,10 @@ int main() {
     
     // Run Zerialize benchmarks
 
-    std::cout << "Zerialize JSON Serializer:" << std::endl;
-    auto zerializeJsonResults = runZerializeBenchmarks<Json>();
-    printResults(zerializeJsonResults);
-    std::cout << std::endl;
+    // std::cout << "Zerialize JSON Serializer:" << std::endl;
+    // auto zerializeJsonResults = runZerializeBenchmarks<Json>();
+    // printResults(zerializeJsonResults);
+    // std::cout << std::endl;
 
     std::cout << "Zerialize Flex Serializer:" << std::endl;
     auto zerializeFlexResults = runZerializeBenchmarks<Flex>();
@@ -419,6 +448,72 @@ int main() {
     auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
     printResults(reflectCppMsgPackResults);
     std::cout << std::endl;
+
+
+    unsigned long long ct = 0;
+
+    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
+
+    double pureSerTime = benchmark([&]() {
+        msgpack_sbuffer sbuf;
+        msgpack_packer pk;
+
+        msgpack_sbuffer_init(&sbuf);
+        msgpack_packer_init(&pk, &sbuf, msgpack_sbuffer_write);
+
+        msgpack_pack_map(&pk, 4);
+
+        const std::string k1 = "int_value";
+        const std::string k2 = "double_value";
+        const std::string k3 = "string_value";
+        const std::string k4 = "array_value";
+        const std::string v = "string_value";
+
+        msgpack_pack_str(&pk, k1.size()); 
+        msgpack_pack_str_body(&pk, k1.data(), k1.size());
+        msgpack_pack_int32(&pk, 42);
+
+        msgpack_pack_str(&pk, k2.size()); 
+        msgpack_pack_str_body(&pk, k2.data(), k2.size());
+        msgpack_pack_double(&pk, 3.14159);
+
+        msgpack_pack_str(&pk, k3.size()); 
+        msgpack_pack_str_body(&pk, k3.data(), k3.size());
+        msgpack_pack_str(&pk, v.size()); 
+        msgpack_pack_str_body(&pk, v.data(), v.size());
+
+        msgpack_pack_str(&pk, k4.size()); 
+        msgpack_pack_str_body(&pk, k4.data(), k4.size());
+
+        msgpack_pack_array(&pk, sharedVec.size());
+        for (auto & k: sharedVec) {
+            msgpack_pack_int32(&pk, k);
+        }
+        // for (int i = 1; i <= 10; ++i) {
+        //     msgpack_pack_int32(&pk, i);
+        // }
+
+        // auto sz = sbuf.size;
+        // auto d = sbuf.data;
+
+            size_t size = sbuf.size;
+            auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
+
+            // Prevent sbuffer from double-freeing
+            sbuf.data = nullptr;
+            sbuf.size = 0;
+            sbuf.alloc = 0;
+
+            return MsgPackBuffer(std::move(owned), size);
+
+        // msgpack_sbuffer_destroy(&sbuf);
+
+        // ct += sz;
+
+        // return sz;
+    });
+
+    std::cout << "PURE SER TIME: " << pureSerTime << " FROM CT:" << ct << std::endl;
     
     std::cout << "Benchmark complete!" << std::endl;
     return 0;

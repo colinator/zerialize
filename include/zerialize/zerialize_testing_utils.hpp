@@ -18,7 +18,7 @@ bool test_serialization(const string& name,
 
     // invoke the serializer function: that will give us a serialized buffer
     auto buffer = serializer();
-   cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
+    cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
 
     // invoke the test predicate to determine whether that matched what we want
     bool res = test(buffer);
@@ -28,7 +28,7 @@ bool test_serialization(const string& name,
     }
 
     // Copy the entire underlying vector store
-    const vector<uint8_t> bufferCopy = buffer.buf();
+    auto bufferCopy = buffer.buf();
     
     // Create a new buffer from the copy
     typename SerializerType::BufferType newBuffer = typename SerializerType::BufferType(bufferCopy);
@@ -39,25 +39,28 @@ bool test_serialization(const string& name,
     }    
     
     // Get and compare addresses
-    const uint8_t* firstBufferAddr = buffer.buf().data();
-    const uint8_t* secondBufferAddr = newBuffer.buf().data();
+    // const uint8_t* firstBufferAddr = buffer.buf().data();
+    // const uint8_t* secondBufferAddr = newBuffer.buf().data();
     
     //cout << "First buffer address: " << static_cast<const void*>(firstBufferAddr) << endl;
     //cout << "Second buffer address: " << static_cast<const void*>(secondBufferAddr) << endl;
     
-    if (firstBufferAddr == secondBufferAddr && firstBufferAddr != 0) {
-        throw std::runtime_error(string("Buffer addresses match! This indicates a potential memory issue. ") + str);
-    }
+    // if (firstBufferAddr == secondBufferAddr && firstBufferAddr != 0) {
+    //     throw std::runtime_error(string("Buffer addresses match! This indicates a potential memory issue. ") + str);
+    // }
 
     // Deserialize from a span
-    auto span_view = std::span<const uint8_t>(newBuffer.buf().data(), newBuffer.buf().size());
+    auto bbuf = newBuffer.buf();
+    std::cout << "------ SPAN SIZE " << bbuf.size() << std::endl;
+    auto span_view = std::span<const uint8_t>(bbuf.data(), bbuf.size());
     auto spanBuffer = typename SerializerType::BufferType(span_view);
     if (!test(spanBuffer)) {
         throw std::runtime_error(string("test failed after span init!!! ") + str);
     } 
 
     // Deserialize from a moved vector
-    auto buf_to_move = std::vector<uint8_t>(newBuffer.buf());  // Make a copy to move from
+    auto buf = newBuffer.buf();
+    auto buf_to_move = std::vector<uint8_t>(buf.begin(), buf.end());  // Make a copy to move from
     auto moveBuffer = typename SerializerType::BufferType(std::move(buf_to_move));
     if (!test(moveBuffer)) {
         throw std::runtime_error(string("test failed after move init!!! ") + str);

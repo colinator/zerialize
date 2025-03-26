@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <span>
 #include <concepts>
@@ -17,7 +18,7 @@ constexpr bool DEBUG_TRACE_CALLS = false;
 
 namespace zerialize {
 
-using std::string, std::string_view, std::vector, std::map, std::set, std::pair, std::span;
+using std::string, std::string_view, std::vector, std::map, std::unordered_map, std::set, std::pair, std::span;
 using std::any, std::any_cast, std::initializer_list, std::function;
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t, std::declval;
 using std::runtime_error;
@@ -50,7 +51,7 @@ public:
 // Requires classes to implement deserialization into primitive
 // types, maps, and vectors. Blob constraints defined below.
 template<typename V>
-concept NonBlobDeserializable = requires(const V& v, const string& key, size_t index) {
+concept NonBlobDeserializable = requires(const V& v, const string_view key, size_t index) {
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
@@ -119,7 +120,7 @@ public:
         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
     }
     
-    virtual const vector<uint8_t>& buf() const = 0;
+    virtual span<const uint8_t> buf() const = 0;
     size_t size() const { return buf().size(); }
     virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
 
@@ -205,6 +206,7 @@ struct SerializingCallable {
 // Lame: _another_ concept to define serializeMap and Vector. These methods
 // take as arguments SerializingCallable objects: 'sub-serializers' that
 // are responsible for serializing key/value pairs or vector elements.
+// TODO: Unify these
 template <typename V>
 concept SerializingComposite = requires(V& v, const std::string& key) {
     typename V::Serializer;
@@ -238,11 +240,12 @@ public:
         static_assert(SerializingConcept<Derived>, "Derived must satisfy Serializing concept");
     }
 
-    void serializeFunction(function<void(Derived& s)> f) {
+    inline void serializeFunction(function<void(Derived& s)> f) noexcept {
         f(*static_cast<Derived*>(this));
     }
 
-    void serializeAny(const any& val) {
+    inline void serializeAny(const any& val) {
+
         // Get the hash code of the runtime type
         const std::size_t vt_hash = val.type().hash_code();
         
@@ -303,9 +306,9 @@ public:
     // Tested with array and vector
     template <typename Container>
     requires std::ranges::range<Container>
-    void serialize(const Container& v) {
+    inline void serialize(const Container& v) noexcept {
         Derived* d = static_cast<Derived*>(this);
-        d->serializeVector([&](SerializingConcept auto& s) {
+        d->serializeVector([&v](SerializingConcept auto& s) {
             for (auto&& val : v) {
                 s.serialize(val);
             }
@@ -320,7 +323,7 @@ public:
         { kv.first } -> std::convertible_to<std::string_view>;
         { kv.second };
     }
-    void serialize(const Map& m) {
+    inline void serialize(const Map& m) noexcept {
         Derived* d = static_cast<Derived*>(this);
         d->serializeMap([&m](SerializingConcept auto& s){
             for (const auto& [key, value] : m) {
@@ -359,7 +362,7 @@ struct SerializeCounter: public Serializer<SerializeCounter> {
     void serialize(const string&) { count += 1; }
     void serialize(const span<const uint8_t>&) { count += 1; }
     void serialize(const string&, const any&) { count += 1; }
-    void serialize(const map<string, any>&) { count += 1; }
+    void serialize(const unordered_map<string, any>&) { count += 1; }
     void serialize(const vector<any>&) { count += 1; }
 
     template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
@@ -556,7 +559,7 @@ typename SerializerType::BufferType serialize(initializer_list<pair<string, any>
     serializer.serializeMap([&l](SerializingConcept auto& s){
         for (const auto& [key, val] : l) {
             s.serialize(key, val);
-        }           
+        }
     });
     return rootSerializer.finish();
 }
@@ -603,6 +606,91 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
     });
     return rootSerializer.finish();
 }
+
+// Special...
+
+
+// template <typename T>
+// struct KeyValue {
+//     string_view key;
+//     T value;
+// };
+
+// template <typename T>
+// KeyValue<T> KV(string_view key, T&& val) {
+//     return KeyValue<T>{key, std::forward<T>(val)};
+// }
+
+// template <typename T>
+// struct KV {
+//     std::string_view key;
+//     T value;
+// };
+
+// template <typename T>
+// KV<std::decay_t<T>> kv(string_view key, T&& value) {
+//     return KV<std::decay_t<T>>{key, std::forward<T>(value)};
+// }
+
+// template <typename T>
+// struct is_kv : std::false_type {};
+
+// template <typename T>
+// struct is_kv<KV<T>> : std::true_type {};
+
+// template <typename T>
+// inline constexpr bool is_kv_v = is_kv<std::remove_cvref_t<T>>::value;
+
+// template <typename SerializerType, typename... KVTypes>
+// // requires (std::conjunction_v<std::is_same<std::remove_cvref_t<KVTypes>, KV<typename std::remove_cvref_t<KVTypes>::value_type>>...>)
+// requires (std::conjunction_v<std::bool_constant<is_kv_v<KVTypes>>...>)
+// typename SerializerType::BufferType serialize(KVTypes&&... kvs) {
+//     typename SerializerType::RootSerializer rootSerializer;
+//     typename SerializerType::Serializer serializer(rootSerializer);
+//     serializer.serializeMap([&](SerializingConcept auto& s) {
+//         (s.serializerForKey(kvs.key).serialize(std::forward<decltype(kvs.value)>(kvs.value)), ...);
+//     });
+//     return rootSerializer.finish();
+// }
+
+// Holds a reference to the value
+template <typename T>
+struct KVRef {
+    std::string_view key;
+    const T& value;
+};
+
+// Helper to create KVRef
+template <typename T>
+KVRef<T> kv(std::string_view key, const T& value) {
+    return KVRef<T>{key, value};
+}
+
+// Trait to recognize KVRef types
+template <typename T>
+struct is_kv : std::false_type {};
+
+template <typename T>
+struct is_kv<KVRef<T>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_kv_v = is_kv<std::remove_cvref_t<T>>::value;
+
+// Map-based serialize overload (no copies of values!)
+template <typename SerializerType, typename... KVTypes>
+requires (std::conjunction_v<std::bool_constant<is_kv_v<KVTypes>>...>)
+typename SerializerType::BufferType serialize(KVTypes&&... kvs) {
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
+
+    serializer.serializeMap([&](SerializingConcept auto& s) {
+        // No copies: we're serializing references
+        (s.serializerForKey(kvs.key).serialize(kvs.value), ...);
+    });
+
+    return rootSerializer.finish();
+}
+
 
 
 // --------------

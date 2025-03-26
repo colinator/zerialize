@@ -5,9 +5,6 @@
 
 namespace zerialize {
 
-// Buffer for MessagePack serialization
-using MsgPackStream = msgpack_sbuffer;
-
 // Helpers for reading big-endian numbers from a byte array.
 inline uint16_t read_be16(const uint8_t* data) {
     return (static_cast<uint16_t>(data[0]) << 8) | data[1];
@@ -165,37 +162,33 @@ inline size_t skip_element(span<const uint8_t> view) {
 }
 
 // A minimal MsgPackBuffer that parses MessagePack data dynamically.
-// The root buffer owns its vector and sets its view to cover it; non-root buffers
-// have an empty buf_ and a view over the appropriate subrange.
+// The root buffer owns its data and sets its view to cover it; non-root buffers
+// have only a view over the appropriate subrange.
 class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
 private:
-    vector<uint8_t> buf_;      // Only nonempty for root buffers.
-    span<const uint8_t> view_; // Always the view for this element.
+    std::unique_ptr<uint8_t[]> owned_;    // Optional owned memory
+    //std::vector<uint8_t> buf_;            // Optional owned buffer (legacy path)
+    span<const uint8_t> view_;            // Always used for access
 
 public:
     // Default constructor.
     MsgPackBuffer() : view_() {}
 
-    // Root constructor: takes ownership of a vector.
-    MsgPackBuffer(vector<uint8_t>&& buf)
-        : buf_(std::move(buf)), view_(buf_.data(), buf_.size()) {}
+    // Root constructor: takes ownership of raw memory
+    MsgPackBuffer(std::unique_ptr<uint8_t[]>&& owned, size_t size)
+        : owned_(std::move(owned)), view_(owned_.get(), size) {}
 
-    // Root constructor: copy.
-    MsgPackBuffer(const vector<uint8_t>& buf)
-        : buf_(buf), view_(buf_.data(), buf_.size()) {}
-
-    // Non-root constructor: takes a span.
+    // Non-root constructor: takes a span
     MsgPackBuffer(span<const uint8_t> sp)
         : view_(sp) {}
 
-    // Return the root buffer (empty for non-root).
-    const vector<uint8_t>& buf() const override {
-        return buf_;
+    span<const uint8_t> buf() const override {
+        return view_;
     }
 
     string to_string() const override {
         return "MsgPackBuffer " + std::to_string(buf().size()) +
-            " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
+            " bytes at: " + std::format("{}", static_cast<const void*>(buf().data())) +
             "\n" + debug_string(*this);
     }
 
@@ -543,7 +536,7 @@ public:
     }
 
     // Map indexing: returns the value corresponding to the given key.
-    MsgPackBuffer operator[](const string& key) const {
+    MsgPackBuffer operator[](const string_view& key) const {
         if (!isMap()) throw DeserializationError("MsgPackBuffer: not a map");
         size_t offset = 0;
         uint8_t marker = view_[0];
@@ -573,16 +566,18 @@ public:
             }
             offset += valSize;
         }
-        throw DeserializationError("MsgPackBuffer: key not found in map: " + key);
+        throw DeserializationError("MsgPackBuffer: key not found in map: " + string(key));
     }
 };
 
 class MsgPackRootSerializer {
 public:
-    MsgPackStream sbuf;
+    msgpack_sbuffer sbuf;
+    msgpack_packer packer;
 
     MsgPackRootSerializer() {
         msgpack_sbuffer_init(&sbuf);
+        msgpack_packer_init(&packer, &sbuf, msgpack_sbuffer_write);
     }
 
     ~MsgPackRootSerializer() {
@@ -591,79 +586,77 @@ public:
 
     MsgPackBuffer finish() {
         if (sbuf.size > 0) {
+
+            // Take ownership of sbuf.data
             size_t size = sbuf.size;
-            uint8_t* data = reinterpret_cast<uint8_t*>(sbuf.data);
-            
-            // Create a copy of the data since we're going to destroy the sbuffer
-            std::vector<uint8_t> vec(data, data + size);
-            
-            // Reset the sbuffer without freeing the data (we've copied it)
-            sbuf.size = 0;
+            auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
+
+            // Prevent sbuffer from double-freeing
             sbuf.data = nullptr;
+            sbuf.size = 0;
             sbuf.alloc = 0;
-            
-            return MsgPackBuffer(std::move(vec));
+
+            return MsgPackBuffer(std::move(owned), size);
         }
         return MsgPackBuffer();
     }
 };
 
+// NOTE! Marking the serialization functions as 'noexcept' speeds it up
+// by ~30% according to one measurement in benchmark_compare. But, do
+// we really want that?
+
 class MsgPackSerializer: public Serializer<MsgPackSerializer> {
 private:
-    msgpack_packer packer;
-    MsgPackStream* pack_stream;
+    msgpack_packer& packer;
 
 public:
     // Make the base class overloads visible in the derived class
     using Serializer<MsgPackSerializer>::serialize;
 
-    MsgPackSerializer(MsgPackRootSerializer& mb) {
-        pack_stream = &mb.sbuf;
-        msgpack_packer_init(&packer, pack_stream, msgpack_sbuffer_write);
-    }
+    MsgPackSerializer(MsgPackRootSerializer& mb) noexcept 
+        : packer(mb.packer)  {}
 
-    MsgPackSerializer(MsgPackStream* ps) {
-        pack_stream = ps;
-        msgpack_packer_init(&packer, pack_stream, msgpack_sbuffer_write);
-    }
+    MsgPackSerializer(msgpack_packer& ps) noexcept 
+        : packer(ps) {}
 
-    void serialize(std::nullptr_t) { 
+    inline void serialize(std::nullptr_t) noexcept { 
         msgpack_pack_nil(&packer); 
     }
 
-    void serialize(int8_t val) { 
+    inline void serialize(int8_t val) noexcept { 
         msgpack_pack_int8(&packer, val); 
     }
     
-    void serialize(int16_t val) { 
+    inline void serialize(int16_t val) noexcept { 
         msgpack_pack_int16(&packer, val); 
     }
     
-    void serialize(int32_t val) { 
+    inline void serialize(int32_t val) noexcept { 
         msgpack_pack_int32(&packer, val); 
     }
     
-    void serialize(int64_t val) { 
+    inline void serialize(int64_t val) noexcept { 
         msgpack_pack_int64(&packer, val); 
     }
 
-    void serialize(uint8_t val) { 
+    inline void serialize(uint8_t val) noexcept { 
         msgpack_pack_uint8(&packer, val); 
     }
     
-    void serialize(uint16_t val) { 
+    inline void serialize(uint16_t val) noexcept { 
         msgpack_pack_uint16(&packer, val); 
     }
     
-    void serialize(uint32_t val) { 
+    inline void serialize(uint32_t val) noexcept { 
         msgpack_pack_uint32(&packer, val); 
     }
     
-    void serialize(uint64_t val) { 
+    inline void serialize(uint64_t val) noexcept { 
         msgpack_pack_uint64(&packer, val); 
     }
 
-    void serialize(bool val) { 
+    inline void serialize(bool val) noexcept { 
         if (val) {
             msgpack_pack_true(&packer);
         } else {
@@ -671,53 +664,54 @@ public:
         }
     }
     
-    void serialize(double val) { 
+    inline void serialize(double val) noexcept { 
         msgpack_pack_double(&packer, val); 
     }
     
-    void serialize(const char* val) { 
-        size_t len = strlen(val);
-        msgpack_pack_str(&packer, len);
-        msgpack_pack_str_body(&packer, val, len);
-    }
-    
-    void serialize(const string& val) { 
-        // Optimize by storing the size in a local variable to avoid calculating it twice
-        const size_t size = val.size();
-        msgpack_pack_str(&packer, size);
-        msgpack_pack_str_body(&packer, val.data(), size);
+    inline void serialize(string_view val) noexcept {
+        msgpack_pack_str(&packer, val.size());
+        msgpack_pack_str_body(&packer, val.data(), val.size());
     }
 
-    void serialize(const span<const uint8_t>& val) { 
+    inline void serialize(const string& val) noexcept {
+        serialize(string_view(val));
+    }
+
+    inline void serialize(const char* val) noexcept {
+        serialize(string_view(val));
+    }
+
+    inline void serialize(const span<const uint8_t>& val) noexcept { 
         msgpack_pack_bin(&packer, val.size());
         msgpack_pack_bin_body(&packer, reinterpret_cast<const char*>(val.data()), val.size());
     }
 
     template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
-    void serialize(T&& val) {
-        string str(std::forward<T>(val));
-        msgpack_pack_str(&packer, str.size());
-        msgpack_pack_str_body(&packer, str.data(), str.size());
+    inline void serialize(T&& val) noexcept {
+        msgpack_pack_str(&packer, val.size());
+        msgpack_pack_str_body(&packer, val.data(), val.size());
     }
 
-    void serialize(const string& key, const any& value) {
-        serialize(key);
+    template <typename K, typename = std::enable_if_t<std::is_convertible_v<K, std::string_view>>>
+    inline void serialize(const K& key, const any& value) noexcept {
+        serialize(std::string_view(key));
         Serializer::serializeAny(value);
     }
 
-    MsgPackSerializer serializerForKey(const string_view& key) {
+    inline MsgPackSerializer serializerForKey(const string_view& key) noexcept {
         serialize(key);
-        return MsgPackSerializer(pack_stream);
+        return *this;
+        //return MsgPackSerializer(packer);
     }
 
-    void serialize(const map<string, any>& m) {
+    inline void serialize(const map<string, any>& m) noexcept {
         msgpack_pack_map(&packer, m.size());
         for (const auto& [key, value]: m) {
             serialize(key, value);
         }
     }
 
-    void serialize(const vector<any>& l) {
+    inline void serialize(const vector<any>& l) noexcept {
         msgpack_pack_array(&packer, l.size());
         for (const auto& value: l) {
             serializeAny(value);
@@ -726,13 +720,13 @@ public:
 
     template <typename F>
     requires InvocableSerializer<F, MsgPackSerializer&>
-    void serialize(F&& f) {
+    inline void serialize(F&& f) noexcept {
         std::forward<F>(f)(*this);
     }
 
     template <typename F>
     requires InvocableSerializer<F, MsgPackSerializer&>
-    void serializeMap(F&& f) {
+    inline void serializeMap(F&& f) noexcept {
         // for message pack map serialization, we need the size in advance
         SerializeCounter counter;
         std::forward<F>(f)(counter);
@@ -742,7 +736,7 @@ public:
 
     template <typename F>
     requires InvocableSerializer<F, MsgPackSerializer&>
-    void serializeVector(F&& f) {
+    inline void serializeVector(F&& f) noexcept {
         // for message pack array serialization, we need the size in advance
         SerializeCounter counter;
         std::forward<F>(f)(counter);
