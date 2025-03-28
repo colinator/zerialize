@@ -194,50 +194,50 @@ public:
     // Make the base class overloads visible in the derived class
     using Serializer<FlexSerializer>::serialize;
 
-    FlexSerializer(const FlexSerializer& o): Serializer<FlexSerializer>(), fbb(o.fbb) { }
+    FlexSerializer(const FlexSerializer& o) noexcept: Serializer<FlexSerializer>(), fbb(o.fbb) { }
 
-    FlexSerializer(FlexRootSerializer& fb): Serializer(), fbb(fb.fbb) {}
+    FlexSerializer(FlexRootSerializer& fb) noexcept: Serializer(), fbb(fb.fbb) {}
 
-    void serialize(std::nullptr_t) { fbb.Null(); }
+    void serialize(std::nullptr_t) noexcept { fbb.Null(); }
 
-    void serialize(int8_t val) { fbb.Int(val); }
-    void serialize(int16_t val) { fbb.Int(val); }
-    void serialize(int32_t val) { fbb.Int(val); }
-    void serialize(int64_t val) { fbb.Int(val); }
+    void serialize(int8_t val) noexcept { fbb.Int(val); }
+    void serialize(int16_t val) noexcept { fbb.Int(val); }
+    void serialize(int32_t val) noexcept { fbb.Int(val); }
+    void serialize(int64_t val) noexcept { fbb.Int(val); }
 
-    void serialize(uint8_t val) { fbb.UInt(val); }
-    void serialize(uint16_t val) { fbb.UInt(val); }
-    void serialize(uint32_t val) { fbb.UInt(val); }
-    void serialize(uint64_t val) { fbb.UInt(val); }
+    void serialize(uint8_t val) noexcept { fbb.UInt(val); }
+    void serialize(uint16_t val) noexcept { fbb.UInt(val); }
+    void serialize(uint32_t val) noexcept { fbb.UInt(val); }
+    void serialize(uint64_t val) noexcept { fbb.UInt(val); }
 
-    void serialize(bool val) { fbb.Bool(val); }
-    void serialize(double val) { fbb.Double(val); }
-    void serialize(const char* val) { fbb.String(val); }
-    void serialize(const string& val) { fbb.String(val); }
+    void serialize(bool val) noexcept { fbb.Bool(val); }
+    void serialize(double val) noexcept { fbb.Double(val); }
+    void serialize(const char* val) noexcept { fbb.String(val); }
+    void serialize(const string& val) noexcept { fbb.String(val); }
 
-    void serialize(const span<const uint8_t>& val) { 
+    void serialize(const span<const uint8_t>& val) noexcept { 
         fbb.Blob(val.data(), val.size()); 
     }
 
     template<typename T, typename = enable_if_t<is_convertible_v<T, string_view>>>
-    void serialize(T&& val) {
+    void serialize(T&& val) noexcept {
         // fbb.String(std::forward<T>(val));
         // LAME. must provide l-value.
         string a(std::forward<T>(val));
         fbb.String(a);
     }
 
-    void serialize(const string& key, const any& value) {
+    void serialize(const string& key, const any& value) noexcept {
         fbb.Key(key);
         Serializer::serializeAny(value);
     }
 
-    FlexSerializer serializerForKey(const string_view& key) {
+    FlexSerializer serializerForKey(const string_view& key) noexcept {
         fbb.Key(string(key));
         return *this;
     }
 
-    void serialize(const map<string, any>& m) {
+    void serialize(const map<string, any>& m) noexcept {
         fbb.Map([&]() {
             for (const auto& [key, value]: m) {
                 serialize(key, value);
@@ -255,13 +255,13 @@ public:
     
     template <typename F>
     requires InvocableSerializer<F, FlexSerializer&>
-    void serialize(F&& f) {
+    void serialize(F&& f) noexcept {
         std::forward<F>(f)(*this);
     }
 
     template <typename F>
     requires InvocableSerializer<F, FlexSerializer&>
-    void serializeMap(F&& f) {
+    void serializeMap(F&& f) noexcept {
         fbb.Map([&]() {
             std::forward<F>(f)(*this);
         });
@@ -269,7 +269,7 @@ public:
 
     template <typename F>
     requires InvocableSerializer<F, FlexSerializer&>
-    void serializeVector(F&& f) {
+    void serializeVector(F&& f) noexcept {
         fbb.Vector([&]() {
             std::forward<F>(f)(*this);
         });
