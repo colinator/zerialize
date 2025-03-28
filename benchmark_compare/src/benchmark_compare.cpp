@@ -129,10 +129,15 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                     // {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }}
                     // }
 
-                    kv( "int_value", 42 ),
-                    kv( "double_value", 3.14159 ),
-                    kv( "string_value", sharedStr ),
-                    kv( "array_value", sharedVec )
+                    // {"int_value", 42},
+                    // {"double_value", 3.14159},
+                    // {"string_value", sharedStr},
+                    // {"array_value", sharedVec}
+
+                    zkv("int_value", 42),
+                    zkv("double_value", 3.14159),
+                    zkv("string_value", sharedStr),
+                    zkv("array_value", sharedVec)
 
                     // kv( "int_value", 42 ),
                     // kv( "double_value", 3.14159 ),

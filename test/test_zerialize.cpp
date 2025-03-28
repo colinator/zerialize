@@ -200,8 +200,6 @@ void test_much_serialization() {
         },
         [&t](const auto& v) {
             auto a = xtensor::asXTensor<double, 2>(v["a"]);
-            //std::cout << " ---- a " << std::endl << a << std::endl;
-            //std::cout << " ---- t " << std::endl << t << std::endl;
             return
                 a == t &&
                 v["b"].asInt32() == 457835;
@@ -608,6 +606,48 @@ void test_much_serialization() {
             return 
                 v["empty_vector"].arraySize() == 0 &&
                 v["empty_map"].mapKeys().size() == 0; 
+        });
+
+    // kv
+    test_serialization<SerializerType>("kv",
+        [](){ 
+            return serialize<SerializerType>(
+                zkv("key1", 42), 
+                zkv("key2", 3.14159), 
+                zkv("key3", "string value")
+            ); 
+        },
+        [](const auto& v) {
+            return 
+                v["key1"].asInt32() == 42 &&
+                v["key2"].asDouble() == 3.14159 &&
+                v["key3"].asString() == "string value"; 
+        });
+
+    // nested kv
+    test_serialization<SerializerType>("Nested kv",
+        [](){ 
+            return serialize<SerializerType>(
+                zkv("key1", 42), 
+                zkv("key2", 3.14159), 
+                zkv("key3", "string value"),
+                zkv("key4", zmap(
+                    zkv("nk1", 1.23456),
+                    zkv("nk2", "yoyoyo!"),
+                    zkv("nk3", zvec(42, 3.14159, "hey man"))
+                ))
+            ); 
+        },
+        [](const auto& v) {
+            return 
+                v["key1"].asInt32() == 42 &&
+                v["key2"].asDouble() == 3.14159 &&
+                v["key3"].asString() == "string value" &&
+                v["key4"]["nk1"].asDouble() == 1.23456 &&
+                v["key4"]["nk2"].asString() == "yoyoyo!" &&
+                v["key4"]["nk3"][0].asInt32() == 42 &&
+                v["key4"]["nk3"][1].asDouble() == 3.14159 &&
+                v["key4"]["nk3"][2].asString() == "hey man"; 
         });
 /*
     // std::optional
