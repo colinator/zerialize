@@ -7,6 +7,7 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <unordered_set>
 #include <span>
 #include <concepts>
 #include <sstream>
@@ -18,7 +19,7 @@ constexpr bool DEBUG_TRACE_CALLS = false;
 
 namespace zerialize {
 
-using std::string, std::string_view, std::vector, std::map, std::unordered_map, std::set, std::pair, std::span;
+using std::string, std::string_view, std::vector, std::map, std::unordered_map, std::set, std::unordered_set, std::pair, std::span;
 using std::any, std::any_cast, std::initializer_list, std::function;
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t, std::declval;
 using std::runtime_error;
@@ -197,10 +198,13 @@ concept Serializing = requires(V& v,
 };
 
 
+template <typename T>
+using remove_volref_t = std::remove_volatile_t<std::remove_reference_t<T>>;
+
 struct SerializingCallable {
-    template <typename T>
-    requires Serializing<std::remove_cvref_t<T>>
-    void operator()(T&&) { }
+    template <typename SerializerType>
+    requires Serializing<remove_volref_t<SerializerType>> 
+    void operator()(SerializerType&&) noexcept { }
 };
 
 // Lame: _another_ concept to define serializeMap and Vector. These methods
@@ -504,167 +508,192 @@ inline std::string blob_to_string(std::span<const uint8_t> s) {
 
 
 // --------------
+
 // Define various serializer functions: the 7 canonical forms, so
 // we can pass nothing, an any, initializer lists for
 // vectors and maps, a perfect-forwarded value, and 
 // perfect-forwarded lists and maps.
+//
+// 1. serialize root via a serialization function (all other serializers use this)
+// 2. Three 'std::any' path serializers - any, initializer-list any, map of string: any
+// 3. Two perfectly-forwarded parameter pack serialization methods, taking a single
+//    value, a parameter pack of values, or a map of strings to values
+// 4. The zkv/zmap/zvec helper funtions, and single associated serialize map function.
+//    These helper functions just return lambdas that carry out the actual serialization.
+
+// --- Serialize, as root, via a serialization function ---
+
+template<typename SerializerType, typename F>
+typename SerializerType::BufferType serialize_root(F&& func) {
+    typename SerializerType::RootSerializer rootSerializer;
+    typename SerializerType::Serializer serializer(rootSerializer);
+    func(serializer);
+    return rootSerializer.finish();
+}
+
+
+// --- The std::any paths, which allow convenient brace-initializer expressions ---
 
 // Serialize anything, as an 'any' value.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(const any& value) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(any: " << value.type().name() << ")" << endl;
-    }
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-    serializer.serializeAny(value);
-    return rootSerializer.finish();
+typename SerializerType::BufferType serialize(const any& v) {
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(any: " << v.type().name() << ")" << endl; }
+    return serialize_root<SerializerType>([&v](auto& ser) {
+        ser.serializeAny(v);
+    });
 }
 
 // Serialize a vector from an initializer list of any.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(initializer_list<any> list) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(initializer list)" << endl;
-    }
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-    serializer.serializeVector([&list](SerializingConcept auto& s){
-        for (const any& val : list) {
-            s.serializeAny(val);
-        }           
+typename SerializerType::BufferType serialize(initializer_list<any> l) {
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list)" << endl; }
+    return serialize_root<SerializerType>([&l](auto& ser) {
+        ser.serializeVector([&l](SerializingConcept auto& s){
+            for (const any& val : l) {
+                s.serializeAny(val);
+            }           
+        });
     });
-    return rootSerializer.finish();
 }
 
 // Serialize a map from an initializer list of pair<string, any>.
 template <typename SerializerType>
 typename SerializerType::BufferType serialize(initializer_list<pair<string, any>> l) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(initializer list/map)" << endl;
-    }
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-    serializer.serializeMap([&l](SerializingConcept auto& s){
-        for (const auto& [key, val] : l) {
-            s.serialize(key, val);
-        }
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list/map)" << endl; }
+    return serialize_root<SerializerType>([&l](auto& ser) {
+        ser.serializeMap([&l](SerializingConcept auto& s){
+            for (const auto& [key, val] : l) {
+                s.serialize(key, val);
+            }
+        });
     });
-    return rootSerializer.finish();
 }
 
 
+// --- Perfectly-forwarded value serialization ---
+
 // Serialize a perfect-forwarded value.
 template<typename SerializerType, typename ValueType>
-void serialize_impl(SerializerType& serializer, ValueType&& value) {
-    serializer.serialize(std::forward<ValueType>(value));
+void serialize_impl(SerializerType& ser, ValueType&& value) {
+    ser.serialize(std::forward<ValueType>(value));
 }
 
 // Serialize a vector from a perfectly-forwarded parameter pack.
 template<typename SerializerType, typename... ValueTypes>
-void serialize_impl(SerializerType& serializer, ValueTypes&&... values) {
-    serializer.serializeVector([&](SerializingConcept auto& s){
+void serialize_impl(SerializerType& ser, ValueTypes&&... values) {
+    ser.serializeVector([&](SerializingConcept auto& s) constexpr noexcept -> void {
         (s.serialize(std::forward<ValueTypes>(values)), ...);      
     });
 }
 
+// serialize a single value or a pack of values...
 template<typename SerializerType, typename... ValueTypes>
 typename SerializerType::BufferType serialize(ValueTypes&&... values) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(&&values generic)" << endl;
-    }
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-    if constexpr (sizeof...(values) > 0) {
-        serialize_impl(serializer, std::forward<ValueTypes>(values)...);
-    }
-    return rootSerializer.finish();
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(&&values generic)" << endl; }
+    return serialize_root<SerializerType>([&values...](auto& ser) constexpr noexcept {
+        if constexpr (sizeof...(values) > 0) {
+            serialize_impl(ser, std::forward<ValueTypes>(values)...);
+        }
+    });
 }
-
 
 // Serialize a map from pairs of string keys and  perfectly-forwarded values.
 template<typename SerializerType, typename... ValueTypes>
 requires (sizeof...(ValueTypes) > 0)
 typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&... values) {
-    if constexpr (DEBUG_TRACE_CALLS) {
-        cout << "serialize(&& value pairs)" << endl;
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(&& value pairs)" << endl; }
+    return serialize_root<SerializerType>([&values...](auto& ser) {
+        ser.serializeMap([&values...](SerializingConcept auto& s) constexpr noexcept -> void {
+            ([&](auto&& pair) constexpr noexcept -> void {
+                SerializingConcept auto ks = s.serializerForKey(pair.first);
+                ks.serialize(std::forward<decltype(pair.second)>(pair.second));
+            } (std::forward<decltype(values)>(values)), ...);
+        });
+    });
+}
+
+
+// --- Special forms: zkv, zmap, zvec; the fastest way to serialize things. ---
+
+namespace zkvdetail {
+
+    // Holds a reference to the value
+    template <typename T>
+    struct KeyValueRef {
+        std::string_view key;
+        const T& value;
+    };
+
+    // Trait to recognize KVRef types
+    template <typename T>
+    struct is_kv : std::false_type {};
+
+    template <typename T>
+    struct is_kv<KeyValueRef<T>> : std::true_type {};
+
+    template <typename T>
+    inline constexpr bool is_kv_v = is_kv<std::remove_cvref_t<T>>::value;
+
+    template <typename... Ts>
+    constexpr bool all_are_kv = (is_kv_v<Ts> && ...);
+
+    template<std::size_t I = 0, typename Tuple, typename F>
+    constexpr void tuple_for_each(Tuple&& tuple, F&& f) {
+        if constexpr (I < std::tuple_size_v<std::remove_reference_t<Tuple>>) {
+            f(std::get<I>(std::forward<Tuple>(tuple)));
+            tuple_for_each<I + 1>(std::forward<Tuple>(tuple), std::forward<F>(f));
+        }
     }
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-    serializer.serializeMap([&](SerializingConcept auto& s){
-        ([&](auto&& pair) {
-            SerializingConcept auto ks = s.serializerForKey(pair.first);
-            ks.serialize(std::forward<decltype(pair.second)>(pair.second));
-        } (std::forward<decltype(values)>(values)), ...);
-    });
-    return rootSerializer.finish();
+} // namespace zkvdetail
+
+
+template <typename T>
+zkvdetail::KeyValueRef<T> zkv(std::string_view key, const T& value) {
+    return zkvdetail::KeyValueRef<T>{key, value};
 }
-
-// Special...
-
-// Holds a reference to the value
-template <typename T>
-struct KeyValueRef {
-    std::string_view key;
-    const T& value;
-};
-
-// Helper to create KVRef
-template <typename T>
-KeyValueRef<T> zkv(std::string_view key, const T& value) {
-    return KeyValueRef<T>{key, value};
-}
-
-// Trait to recognize KVRef types
-template <typename T>
-struct is_kv : std::false_type {};
-
-template <typename T>
-struct is_kv<KeyValueRef<T>> : std::true_type {};
-
-template <typename T>
-inline constexpr bool is_kv_v = is_kv<std::remove_cvref_t<T>>::value;
-
-template <typename... Ts>
-constexpr bool all_are_kv = (is_kv_v<Ts> && ...);
-
-// MapWrapper: wraps a parameter pack of key-value pairs (for nested maps)
-template <typename... KVTypes>
-struct MapWrapper {
-    std::tuple<KVTypes...> data;
-};
 
 template <typename... KVTypes>
-MapWrapper<KVTypes...> zmap(KVTypes&&... kvs) {
-    return MapWrapper<KVTypes...>{ std::forward_as_tuple(std::forward<KVTypes>(kvs)...) };
+requires zkvdetail::all_are_kv<KVTypes...>
+[[nodiscard]]
+constexpr auto zmap(KVTypes&&... kvs) noexcept {
+    return 
+        [data = std::forward_as_tuple(std::forward<KVTypes>(kvs)...)]
+        (SerializingConcept auto& ser) constexpr noexcept -> void
+    {
+        ser.serializeMap([&data](SerializingConcept auto& s) {
+            zkvdetail::tuple_for_each(data, [&s](const auto& kv_ref) {
+                s.serializerForKey(kv_ref.key).serialize(kv_ref.value);
+            });
+        });
+    };
 }
 
-// VectorWrapper: wraps a parameter pack of values (for nested vectors)
 template <typename... ValueTypes>
-struct VectorWrapper {
-    std::tuple<ValueTypes...> data;
-};
-
-template <typename... ValueTypes>
-VectorWrapper<ValueTypes...> zvec(ValueTypes&&... values) {
-    return VectorWrapper<ValueTypes...>{ std::forward_as_tuple(std::forward<ValueTypes>(values)...) };
+[[nodiscard]]
+constexpr auto zvec(ValueTypes&&... values) noexcept {
+    return 
+        [data = std::forward_as_tuple(std::forward<ValueTypes>(values)...)]
+        (SerializingConcept auto& ser) constexpr noexcept -> void
+    {
+        ser.serializeVector([&data](SerializingConcept auto& s) constexpr noexcept -> void {
+            zkvdetail::tuple_for_each(data, [&s](const auto& value) {
+                s.serialize(value);
+            });
+        });
+    };
 }
 
-// Map-based serialize overload (no copies of values!)
+// Map-based serialize overload for KeyValueRef list.
 template <typename SerializerType, typename... KVTypes>
-requires (std::conjunction_v<std::bool_constant<is_kv_v<KVTypes>>...>)
+requires (std::conjunction_v<std::bool_constant<zkvdetail::is_kv_v<KVTypes>>...>)
 typename SerializerType::BufferType serialize(KVTypes&&... kvs) {
-    typename SerializerType::RootSerializer rootSerializer;
-    typename SerializerType::Serializer serializer(rootSerializer);
-
-    serializer.serializeMap([&](SerializingConcept auto& s) {
-        // No copies: we're serializing references
-        (s.serializerForKey(kvs.key).serialize(kvs.value), ...);
+    if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(KVTypes&&...)" << endl; }
+    return serialize_root<SerializerType>([&kvs...](auto& ser) {
+        ser.serializeMap([&kvs...](SerializingConcept auto& s) {
+            (s.serializerForKey(kvs.key).serialize(kvs.value), ...);
+        });
     });
-
-    return rootSerializer.finish();
 }
-
 
 
 // --------------

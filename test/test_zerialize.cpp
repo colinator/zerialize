@@ -634,7 +634,15 @@ void test_much_serialization() {
                 zkv("key4", zmap(
                     zkv("nk1", 1.23456),
                     zkv("nk2", "yoyoyo!"),
-                    zkv("nk3", zvec(42, 3.14159, "hey man"))
+                    zkv("nk3", zvec(
+                        42, 
+                        3.14159, 
+                        "hey man",
+                        zmap(
+                            zkv("ik1", 2.71828),
+                            zkv("ik2", "euler")
+                        )
+                    ))
                 ))
             ); 
         },
@@ -647,9 +655,11 @@ void test_much_serialization() {
                 v["key4"]["nk2"].asString() == "yoyoyo!" &&
                 v["key4"]["nk3"][0].asInt32() == 42 &&
                 v["key4"]["nk3"][1].asDouble() == 3.14159 &&
-                v["key4"]["nk3"][2].asString() == "hey man"; 
+                v["key4"]["nk3"][2].asString() == "hey man" &&
+                v["key4"]["nk3"][3]["ik1"].asDouble() == 2.71828 &&
+                v["key4"]["nk3"][3]["ik2"].asString() == "euler"; 
         });
-/*
+ /*
     // std::optional
     test_serialization<SerializerType>("std::optional values",
         [](){ 
