@@ -11,6 +11,7 @@
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
+#include <zerialize/zerialize_yyjson.hpp>
 
 // Reflect-cpp includes
 #include <rfl/json.hpp>
@@ -422,10 +423,10 @@ int main() {
     
     // Run Zerialize benchmarks
 
-    // std::cout << "Zerialize JSON Serializer:" << std::endl;
-    // auto zerializeJsonResults = runZerializeBenchmarks<Json>();
-    // printResults(zerializeJsonResults);
-    // std::cout << std::endl;
+    std::cout << "Zerialize JSON Serializer:" << std::endl;
+    auto zerializeJsonResults = runZerializeBenchmarks<Json>();
+    printResults(zerializeJsonResults);
+    std::cout << std::endl;
 
     std::cout << "Zerialize Flex Serializer:" << std::endl;
     auto zerializeFlexResults = runZerializeBenchmarks<Flex>();
@@ -435,6 +436,11 @@ int main() {
     std::cout << "Zerialize MsgPack Serializer:" << std::endl;
     auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
     printResults(zerializeMsgPackResults);
+    std::cout << std::endl;
+
+    std::cout << "Zerialize YYJson Serializer:" << std::endl;
+    auto zerializeYYJsonPackResults = runZerializeBenchmarks<Yyjson>();
+    printResults(zerializeYYJsonPackResults);
     std::cout << std::endl;
     
     

@@ -3,6 +3,7 @@
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_json.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
+#include <zerialize/zerialize_yyjson.hpp>
 #include <zerialize/zerialize_testing_utils.hpp>
 #include <zerialize/zerialize_xtensor.hpp>
 #include <zerialize/zerialize_eigen.hpp>
@@ -842,12 +843,15 @@ int main() {
     test_much_serialization<Flex>();
     test_much_serialization<Json>();
     test_much_serialization<MsgPack>();
+    test_much_serialization<Yyjson>();
     test_conversion<Flex, Json>();
     test_conversion<Flex, MsgPack>();
     test_conversion<Json, Flex>();
     test_conversion<Json, MsgPack>();
     test_conversion<MsgPack, Json>();
     test_conversion<MsgPack, Flex>();
+    test_conversion<MsgPack, Yyjson>();
+    test_conversion<Yyjson, Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }

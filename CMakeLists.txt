@@ -20,6 +20,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# Fetch yyjson
+FetchContent_Declare(
+    yyjson
+    GIT_REPOSITORY https://github.com/ibireme/yyjson.git
+    GIT_TAG 0.10.0
+)
+FetchContent_MakeAvailable(yyjson)
+
 # Fetch msgpack-c (MessagePack for C/C++)
 FetchContent_Declare(
     msgpack
@@ -93,6 +101,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     ${flatbuffers_SOURCE_DIR}/include
     nlohmann_json::nlohmann_json
     ${msgpack_SOURCE_DIR}/include
+    ${yyjson_SOURCE_DIR}/src
     #$<INSTALL_INTERFACE:include/eigen3>
 )
 
@@ -106,4 +115,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     xtl
     eigen
     msgpack-c
+    yyjson
 )
