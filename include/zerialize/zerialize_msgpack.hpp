@@ -167,12 +167,12 @@ inline size_t skip_element(span<const uint8_t> view) {
 class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
 private:
     std::unique_ptr<uint8_t[]> owned_;    // Optional owned memory
-    //std::vector<uint8_t> buf_;            // Optional owned buffer (legacy path)
     span<const uint8_t> view_;            // Always used for access
 
 public:
     // Default constructor.
-    MsgPackBuffer() : view_() {}
+    MsgPackBuffer() 
+        : view_() {}
 
     // Root constructor: takes ownership of raw memory
     MsgPackBuffer(std::unique_ptr<uint8_t[]>&& owned, size_t size)
