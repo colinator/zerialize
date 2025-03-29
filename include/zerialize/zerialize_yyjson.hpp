@@ -146,7 +146,7 @@ public:
           current_val_(nullptr), // Set below
           owns_doc_(true)
     {
-         if (!doc_) {
+        if (!doc_) {
             throw std::invalid_argument("YyjsonBuffer: Null document provided for owning constructor.");
         }
         current_val_ = yyjson_doc_get_root(doc_);
@@ -159,7 +159,6 @@ public:
             throw DeserializationError("Failed to get root value from provided document");
         }
     }
-
 
     // Constructor from external data (span, copies data to parse)
     YyjsonBuffer(span<const uint8_t> data) {
@@ -425,37 +424,47 @@ public:
 
     // Finalize serialization and return an owning YyjsonBuffer
     YyjsonBuffer finish() {
+
         if (!doc) {
              throw SerializationError("Cannot finish serialization, document is invalid.");
         }
-        // Ensure root is set (might still be the initial null if nothing was serialized)
+
+        // Ensure root is set
         if (!root_val) {
-             root_val = yyjson_mut_null(doc); // Should not happen if constructor worked
+            root_val = yyjson_mut_null(doc);
         }
         yyjson_mut_doc_set_root(doc, root_val);
 
-        // Write mutable doc to string buffer
-        yyjson_write_flag flg = YYJSON_WRITE_NOFLAG;
-        size_t len = 0;
-        char* json_str_ptr = yyjson_mut_write(doc, flg, &len);
-        if (!json_str_ptr) {
-            throw SerializationError("Failed to write mutable JSON document");
+        // const char *json = yyjson_mut_write(doc, 0, NULL);
+        // size_t size = strlen(json);
+        // return YyjsonBuffer(std::move(json), size);
+
+        // --- Optimization Step 1: Create immutable doc directly ---
+        yyjson_doc* immutable_doc = yyjson_mut_doc_imut_copy(doc, nullptr); // Pass allocator if needed
+        if (!immutable_doc) {
+            // Maybe grab error code from mut_doc if available?
+            throw SerializationError("Failed to copy mutable doc to immutable (yyjson_mut_doc_imut_copy failed)");
         }
+
+        // --- Optimization Step 2: Write *once* to get the buffer ---
+        // We can write either the mutable or the immutable doc here.
+        // Writing the immutable might be slightly safer if the mutable doc gets modified later,
+        // but performance should be similar. Let's write the immutable one.
+        yyjson_write_flag flg = YYJSON_WRITE_NOFLAG; // No pretty print for final buffer
+        size_t len = 0;
+        char* json_str_ptr = yyjson_write(immutable_doc, flg, &len);
+        if (!json_str_ptr) {
+            yyjson_doc_free(immutable_doc); // Clean up immutable doc on error
+            throw SerializationError("Failed to write immutable JSON document (yyjson_write failed)");
+        }
+
         // Copy the result into our vector buffer
         vector<uint8_t> final_buf(json_str_ptr, json_str_ptr + len);
         free(json_str_ptr); // Free the string allocated by yyjson
 
-        // Create the immutable doc copy for the YyjsonBuffer to own
-        // This might seem redundant, but YyjsonBuffer needs an immutable doc
-        // for its read operations.
-        yyjson_doc* immutable_doc = yyjson_read(reinterpret_cast<const char*>(final_buf.data()), final_buf.size(), YYJSON_READ_NOFLAG);
-         if (!immutable_doc) {
-             // This really shouldn't happen if writing worked
-             throw SerializationError("Failed to re-parse written JSON into immutable doc");
-         }
-
-        // Create the buffer, transferring ownership of the buffer and the *immutable* doc
-        return YyjsonBuffer(std::move(final_buf), immutable_doc);
+        // --- Step 3: Return buffer owning the *already created* immutable doc ---
+        // No re-parsing needed!
+        return YyjsonBuffer(std::move(final_buf)); //, immutable_doc); // Pass ownership
     }
 };
 
