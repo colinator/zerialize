@@ -19,7 +19,8 @@ public:
 
     // Zero-copy view of existing data
     FlexBuffer(span<const uint8_t> data)
-        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference()), view_(data) { }
+        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference())
+        , view_(data) { }
 
     // Zero-copy move of vector ownership
     FlexBuffer(vector<uint8_t>&& buf)
