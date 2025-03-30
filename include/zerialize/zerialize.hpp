@@ -64,15 +64,11 @@ private:
             : ptr(data_to_own, std::move(deleter)), count(size) {}
 
         // Default constructor needed for variant default construction (if needed)
-            ManagedPtr() = default;
+        ManagedPtr() = default;
     };
 
     // --- Variant holding the active storage strategy ---
     std::variant<OwnedVector, ManagedPtr> storage_;
-
-    // --- Private: No span member ---
-    // std::span<const uint8_t> view_; // <-- Not adding this, see analysis above.
-
 
 public:
     // --- Constructors ---
