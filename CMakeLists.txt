@@ -47,28 +47,34 @@ endif()
 
 # Download and configure xtl
 FetchContent_Declare(xtl
-    URL https://github.com/xtensor-stack/xtl/archive/0.7.5.zip
-    URL_HASH SHA256=9e8e7dcc525500a4543226fe472a46a30636ee35274e4e30099071c5cbd4d05c
-    DOWNLOAD_NO_PROGRESS ON
-    DOWNLOAD_EXTRACT_TIMESTAMP 1
+    # URL https://github.com/xtensor-stack/xtl/archive/0.7.5.zip
+    # URL_HASH SHA256=9e8e7dcc525500a4543226fe472a46a30636ee35274e4e30099071c5cbd4d05c
+    URL https://github.com/xtensor-stack/xtl/archive/0.8.0.zip
+    #URL_HASH SHA256=9e8e7dcc525500a4543226fe472a46a30636ee35274e4e30099071c5cbd4d05c
+    #DOWNLOAD_NO_PROGRESS ON
+    #DOWNLOAD_EXTRACT_TIMESTAMP 1
 )
 FetchContent_MakeAvailable(xtl)
 
 # Download and configure xsimd
 FetchContent_Declare(xsimd
-    URL https://github.com/xtensor-stack/xsimd/archive/11.0.0.zip
-    URL_HASH SHA256=5d362ec26c6f2332d1a2858891d770f5c0077133a81f885658f48c910a03fc90
-    DOWNLOAD_NO_PROGRESS ON
-    DOWNLOAD_EXTRACT_TIMESTAMP 1
+    # URL https://github.com/xtensor-stack/xsimd/archive/11.0.0.zip
+    # URL_HASH SHA256=5d362ec26c6f2332d1a2858891d770f5c0077133a81f885658f48c910a03fc90
+    URL https://github.com/xtensor-stack/xsimd/archive/13.2.0.zip
+    #URL_HASH SHA256=5d362ec26c6f2332d1a2858891d770f5c0077133a81f885658f48c910a03fc90
+    #DOWNLOAD_NO_PROGRESS ON
+    #DOWNLOAD_EXTRACT_TIMESTAMP 1
 )
 FetchContent_MakeAvailable(xsimd)
 
 # Download and configure xtensor
 FetchContent_Declare(xtensor
-    URL https://github.com/xtensor-stack/xtensor/archive/0.24.6.zip
-    URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
-    DOWNLOAD_NO_PROGRESS ON
-    DOWNLOAD_EXTRACT_TIMESTAMP 1
+    # URL https://github.com/xtensor-stack/xtensor/archive/0.24.6.zip
+    # URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
+    URL https://github.com/xtensor-stack/xtensor/archive/0.26.0.zip
+    #URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
+    #DOWNLOAD_NO_PROGRESS ON
+    #DOWNLOAD_EXTRACT_TIMESTAMP 1
 )
 set(XTENSOR_USE_XSIMD 1)
 FetchContent_MakeAvailable(xtensor)
@@ -103,6 +109,8 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     ${msgpack_SOURCE_DIR}/include
     ${yyjson_SOURCE_DIR}/src
     #$<INSTALL_INTERFACE:include/eigen3>
+    #${xtensor_SOURCE_DIR}/include
+    ${xtensor_INCLUDE_DIRS}
 )
 
 # Doesn't really 'link' - just how to do transitive

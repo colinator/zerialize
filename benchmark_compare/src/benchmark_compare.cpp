@@ -9,7 +9,6 @@
 // Zerialize includes
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
-#include <zerialize/zerialize_json.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
 #include <zerialize/zerialize_yyjson.hpp>
 
@@ -41,11 +40,11 @@ TestData testData{
 
 // Simple benchmarking function that measures execution time
 template<typename Func>
-double benchmark(Func&& func, size_t iterations = 10000000) {
+double benchmark(Func&& func, size_t iterations = 1000000) {
     auto start = high_resolution_clock::now();
     
     for (size_t i = 0; i < iterations; i++) {
-        func();
+        auto r = func();
     }
     
     auto end = high_resolution_clock::now();
@@ -111,7 +110,7 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
         // Benchmark serialization
         double serTime = ZerializeAsVector ?
             benchmark([&]() {
-                std::cout << "YOYOYO" << std::endl;
+               
                 auto serialized = serialize<SerializerType>({
                     42,
                     3.14159,
@@ -121,7 +120,6 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 return serialized;
             }) :
             benchmark([&]() {
-
                 auto serialized = serialize<SerializerType>(
                     // {
                     // {"int_value", 42},
@@ -164,10 +162,24 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
             //     auto serialized = serialize<SerializerType>(m);
             //     return serialized;
             // });
-
        
+        // // Create serialized data once for deserialization tests
+        // auto serialized = ZerializeAsVector ?
+        //    serialize<SerializerType>({
+        //         42,
+        //         3.14159,
+        //         "hello world",
+        //         std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+        //     }) :
+        //     serialize<SerializerType>({
+        //         {"int_value", 42},
+        //         {"double_value", 3.14159},
+        //         {"string_value", "hello world"},
+        //         {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
+        //     });
         // Create serialized data once for deserialization tests
-        auto serialized = ZerializeAsVector ?
+
+        auto buffer = ZerializeAsVector ?
            serialize<SerializerType>({
                 42,
                 3.14159,
@@ -179,15 +191,21 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 {"double_value", 3.14159},
                 {"string_value", "hello world"},
                 {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
-            });   
+            });
 
-        std::vector<uint8_t> bufferCopy(serialized.buf().begin(), serialized.buf().end());
-        span<const uint8_t> newBuf(bufferCopy);
+
+        //std::vector<uint8_t> bufferCopy(serialized.buf().begin(), serialized.buf().end());
+        auto bufCopy = buffer.to_vector_copy();
+        span<const uint8_t> newBuf(bufCopy.begin(), bufCopy.end());
+
+        // for (int i=0; i<bufCopy.size(); i++) {
+        //     std::cout << "" << (char)bufCopy[i];
+        // }
 
         // Measure deserialization time (instantiating Buffer from copy)
         double deserTime = benchmark([&]() {
-            typename SerializerType::BufferType buffer(newBuf);
-            return buffer;
+            typename SerializerType::BufferType deserialized(newBuf);
+            return deserialized;
 
             // int i = buffer["int_value"].template as<int>();
             // double d = buffer["double_value"].template as<double>();
@@ -214,6 +232,9 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
         });
         
         // Measure read time
+
+        auto serialized = typename SerializerType::BufferType(buffer.to_vector_copy());
+
         double readTime = ZerializeAsVector ?
             // Just to use the values
             benchmark([&]() {
@@ -416,57 +437,9 @@ std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
     return results;
 }
 
-int main() {
-    std::cout << "Benchmarking Zerialize vs Reflect-cpp" << std::endl;
-    std::cout << "====================================" << std::endl << std::endl;
-    
-    
-    // Run Zerialize benchmarks
+double get_pure_serialization_time_msgpack(const std::array<int, 10>& sharedVec) {
 
-    std::cout << "Zerialize JSON Serializer:" << std::endl;
-    auto zerializeJsonResults = runZerializeBenchmarks<Json>();
-    printResults(zerializeJsonResults);
-    std::cout << std::endl;
-
-    std::cout << "Zerialize Flex Serializer:" << std::endl;
-    auto zerializeFlexResults = runZerializeBenchmarks<Flex>();
-    printResults(zerializeFlexResults);
-    std::cout << std::endl;
-    
-    std::cout << "Zerialize MsgPack Serializer:" << std::endl;
-    auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
-    printResults(zerializeMsgPackResults);
-    std::cout << std::endl;
-
-    std::cout << "Zerialize YYJson Serializer:" << std::endl;
-    auto zerializeYYJsonPackResults = runZerializeBenchmarks<Yyjson>();
-    printResults(zerializeYYJsonPackResults);
-    std::cout << std::endl;
-    
-    
-    // Run Reflect-cpp benchmarks
-
-    std::cout << "Reflect-cpp JSON:" << std::endl;
-    auto reflectCppJsonResults = runReflectCppJsonBenchmarks();
-    printResults(reflectCppJsonResults);
-    std::cout << std::endl;
-    
-    std::cout << "Reflect-cpp FlexBuffers:" << std::endl;
-    auto reflectCppFlexBuffersResults = runReflectCppFlexBuffersBenchmarks();
-    printResults(reflectCppFlexBuffersResults);
-    std::cout << std::endl;
-    
-    std::cout << "Reflect-cpp MessagePack:" << std::endl;
-    auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
-    printResults(reflectCppMsgPackResults);
-    std::cout << std::endl;
-
-
-    unsigned long long ct = 0;
-
-    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
-
-    double pureSerTime = benchmark([&]() {
+    return benchmark([&]() {
         msgpack_sbuffer sbuf;
         msgpack_packer pk;
 
@@ -501,31 +474,183 @@ int main() {
         for (auto & k: sharedVec) {
             msgpack_pack_int32(&pk, k);
         }
-        // for (int i = 1; i <= 10; ++i) {
-        //     msgpack_pack_int32(&pk, i);
-        // }
 
-        // auto sz = sbuf.size;
-        // auto d = sbuf.data;
+        size_t size = sbuf.size;
+        char* data = sbuf.data;
+        //auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
 
-            size_t size = sbuf.size;
-            auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
+        // Prevent sbuffer from double-freeing
+        sbuf.data = nullptr;
+        sbuf.size = 0;
+        sbuf.alloc = 0;
 
-            // Prevent sbuffer from double-freeing
-            sbuf.data = nullptr;
-            sbuf.size = 0;
-            sbuf.alloc = 0;
-
-            return MsgPackBuffer(std::move(owned), size);
-
-        // msgpack_sbuffer_destroy(&sbuf);
-
-        // ct += sz;
-
-        // return sz;
+        //return MsgPackBuffer(std::move(owned), size);
+        return ZBuffer(data, size, ZBuffer::Deleters::Free);
     });
+}
 
-    std::cout << "PURE SER TIME: " << pureSerTime << " FROM CT:" << ct << std::endl;
+double get_pure_serialization_time_yyjson(const std::array<int, 10>& sharedVec) {
+
+    // Pre-define keys outside the lambda to avoid repeated construction
+    // if the benchmark runs the lambda multiple times.
+    const std::string k1 = "int_value";
+    const std::string k2 = "double_value";
+    const std::string k3 = "string_value";
+    const std::string k4 = "array_value";
+    const std::string v_str = "string_value"; // Renamed 'v' for clarity
+
+    return benchmark([&]() { // Capture strings by reference
+
+        // 1. Initialize yyjson mutable document
+        yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr); // Use default allocator
+        if (!doc) {
+            // In a real benchmark, might abort or return specific error code
+            // instead of throwing, as throwing can add overhead.
+            throw std::runtime_error("yyjson_mut_doc_new failed");
+        }
+
+        // 2. Create the root object
+        yyjson_mut_val *root_obj = yyjson_mut_obj(doc);
+        if (!root_obj) {
+            yyjson_mut_doc_free(doc); // Clean up doc
+            throw std::runtime_error("yyjson_mut_obj failed");
+        }
+
+        // --- Use a try-catch block to ensure doc is freed on error ---
+        std::vector<uint8_t> result_buffer; // Declare outside try for return
+        char* json_str = nullptr;           // Pointer for allocated string
+
+        try {
+            // 3. Add key-value pairs directly
+            // Note: yyjson_mut_obj_add takes ownership of key and val pointers
+            // after successful addition. No need to free them separately.
+
+            // Pair 1: int_value: 42
+            yyjson_mut_val* key1 = yyjson_mut_strncpy(doc, k1.data(), k1.size());
+            yyjson_mut_val* val1 = yyjson_mut_sint(doc, 42);
+            if (!key1 || !val1 || !yyjson_mut_obj_add(root_obj, key1, val1)) {
+                throw std::runtime_error("Failed to add int_value");
+            }
+
+            // Pair 2: double_value: 3.14159
+            yyjson_mut_val* key2 = yyjson_mut_strncpy(doc, k2.data(), k2.size());
+            yyjson_mut_val* val2 = yyjson_mut_real(doc, 3.14159);
+            if (!key2 || !val2 || !yyjson_mut_obj_add(root_obj, key2, val2)) {
+                throw std::runtime_error("Failed to add double_value");
+            }
+
+            // Pair 3: string_value: "string_value"
+            yyjson_mut_val* key3 = yyjson_mut_strncpy(doc, k3.data(), k3.size());
+            yyjson_mut_val* val3 = yyjson_mut_strncpy(doc, v_str.data(), v_str.size());
+            if (!key3 || !val3 || !yyjson_mut_obj_add(root_obj, key3, val3)) {
+                throw std::runtime_error("Failed to add string_value");
+            }
+
+            // Pair 4: array_value: [...]
+            yyjson_mut_val* key4 = yyjson_mut_strncpy(doc, k4.data(), k4.size());
+            yyjson_mut_val* arr = yyjson_mut_arr(doc);
+            if (!key4 || !arr) {
+                throw std::runtime_error("Failed to create key or array for array_value");
+            }
+            // Add elements to the array
+            for (int item : sharedVec) {
+                yyjson_mut_val* arr_item = yyjson_mut_sint(doc, item);
+                // yyjson_mut_arr_append takes ownership of arr_item on success
+                if (!arr_item || !yyjson_mut_arr_append(arr, arr_item)) {
+                    throw std::runtime_error("Failed to append item to array");
+                }
+            }
+            // Add the completed array to the root object
+            if (!yyjson_mut_obj_add(root_obj, key4, arr)) {
+                 throw std::runtime_error("Failed to add array_value");
+            }
+
+            // 4. Set the root of the document
+            yyjson_mut_doc_set_root(doc, root_obj);
+
+            // 5. Serialize the document to a string
+            size_t len = 0;
+            // Use YYJSON_WRITE_NOFLAG for potentially fastest output (no pretty print)
+            json_str = yyjson_mut_write(doc, YYJSON_WRITE_NOFLAG, &len);
+            if (!json_str) {
+                throw std::runtime_error("yyjson_mut_write failed");
+            }
+
+            // 6. Copy the result into the desired buffer format (vector<uint8_t>)
+            //    Do this *before* freeing the doc, as json_str points into doc memory?
+            //    Correction: yyjson_mut_write allocates separately, safe to copy then free doc.
+            result_buffer.assign(json_str, json_str + len);
+
+        } catch (...) {
+             // Clean up resources on exception
+             if(json_str) free(json_str); // Free allocated string if write succeeded partially
+             if(doc) yyjson_mut_doc_free(doc); // Free the document structure
+             throw; // Re-throw
+        }
+
+        // 7. Clean up yyjson resources (on success path)
+        free(json_str); // Free yyjson's allocated string
+        yyjson_mut_doc_free(doc); // Free the document structure and its pooled memory
+
+        // 8. Return the result buffer from the lambda (for benchmark wrapper)
+        return result_buffer;
+
+    }); // End benchmark lambda
+}
+
+int main() {
+    std::cout << "Benchmarking Zerialize vs Reflect-cpp" << std::endl;
+    std::cout << "====================================" << std::endl << std::endl;
+    
+    
+    // Run Zerialize benchmarks
+
+    // std::cout << "Zerialize JSON Serializer:" << std::endl;
+    // auto zerializeJsonResults = runZerializeBenchmarks<Json>();
+    // printResults(zerializeJsonResults);
+    // std::cout << std::endl;
+
+    std::cout << "Zerialize ---" << std::endl << std::endl;
+
+    std::cout << "YYJson Serializer:" << std::endl;
+    auto zerializeYYJsonPackResults = runZerializeBenchmarks<Yyjson>();
+    printResults(zerializeYYJsonPackResults);
+    std::cout << std::endl;
+
+    std::cout << "Flex Serializer:" << std::endl;
+    auto zerializeFlexResults = runZerializeBenchmarks<Flex>();
+    printResults(zerializeFlexResults);
+    std::cout << std::endl;
+    
+    std::cout << "MsgPack Serializer:" << std::endl;
+    auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
+    printResults(zerializeMsgPackResults);
+    std::cout << std::endl;
+
+    
+    // Run Reflect-cpp benchmarks
+
+    std::cout << "Reflect-cpp ---" << std::endl << std::endl;
+
+    std::cout << "JSON:" << std::endl;
+    auto reflectCppJsonResults = runReflectCppJsonBenchmarks();
+    printResults(reflectCppJsonResults);
+    std::cout << std::endl;
+    
+    std::cout << "FlexBuffers:" << std::endl;
+    auto reflectCppFlexBuffersResults = runReflectCppFlexBuffersBenchmarks();
+    printResults(reflectCppFlexBuffersResults);
+    std::cout << std::endl;
+    
+    std::cout << "MessagePack:" << std::endl;
+    auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
+    printResults(reflectCppMsgPackResults);
+    std::cout << std::endl;
+
+
+    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
+    std::cout << "Pure serialization time, msgpack: " << get_pure_serialization_time_msgpack(sharedVec) << "µs" << std::endl;
+    std::cout << "Pure serialization time, yyjson:  " << get_pure_serialization_time_yyjson(sharedVec)  << "µs"<< std::endl;
     
     std::cout << "Benchmark complete!" << std::endl;
     return 0;

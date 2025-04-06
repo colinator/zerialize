@@ -5,38 +5,34 @@
 
 namespace zerialize {
 
-class FlexBuffer : public DataBuffer<FlexBuffer> {
+class FlexBuffer : public Deserializer<FlexBuffer> {
 private:
-    vector<uint8_t> buf_;
     flexbuffers::Reference ref_;
-    span<const uint8_t> view_;
 
 public:
 
-    FlexBuffer() {}
+    FlexBuffer()
+        : Deserializer<FlexBuffer>() {}
 
-    FlexBuffer(flexbuffers::Reference ref): ref_(ref) {}
+    FlexBuffer(flexbuffers::Reference ref)
+        : Deserializer<FlexBuffer>(), ref_(ref) {}
 
     // Zero-copy view of existing data
     FlexBuffer(span<const uint8_t> data)
-        : ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference())
-        , view_(data) { }
+        : Deserializer<FlexBuffer>(data),
+          ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference())
+    {}
 
     // Zero-copy move of vector ownership
     FlexBuffer(vector<uint8_t>&& buf)
-        : buf_(std::move(buf))
-        , ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
-        , view_(buf_) { }
+        : Deserializer<FlexBuffer>(std::move(buf)),
+          ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
+    {}
 
-    // Must copy for const reference
     FlexBuffer(const vector<uint8_t>& buf)
-        : buf_(buf)
-        , ref_(buf.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference()) 
-        , view_(buf_) { }
-
-    span<const uint8_t> buf() const override {
-        return view_;
-    }
+        : Deserializer<FlexBuffer>(buf),
+          ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
+    {}
 
     string to_string() const override {
         return "FlexBuffer " + std::to_string(buf().size()) +
@@ -167,7 +163,7 @@ class FlexRootSerializer {
 public:
     flexbuffers::Builder fbb;
 
-    FlexBuffer finish() {
+    ZBuffer finish() {
         if (fbb.StartVector() > 0) {
             fbb.Finish(); 
 
@@ -180,9 +176,9 @@ public:
             std::vector<uint8_t>& nonConstOrig = const_cast<std::vector<uint8_t>&>(orig);
 
             // ...but we'll be fine...
-            return FlexBuffer(std::move(nonConstOrig));
+            return ZBuffer(std::move(nonConstOrig));
         }
-        return FlexBuffer();
+        return ZBuffer();
     }
 };
 

@@ -9,8 +9,11 @@ using std::cout, std::endl;
 namespace zerialize {
 
 template <typename SerializerType>
+// bool test_serialization(const string& name,
+//     const function<typename SerializerType::BufferType()>& serializer,
+//     const function<bool(const typename SerializerType::BufferType&)>& test)
 bool test_serialization(const string& name,
-    const function<typename SerializerType::BufferType()>& serializer,
+    const function<ZBuffer()>& serializer,
     const function<bool(const typename SerializerType::BufferType&)>& test)
 {
     string str = string("TEST <") + SerializerType::Name + "> --- " + name + " ---";
@@ -20,8 +23,12 @@ bool test_serialization(const string& name,
     auto buffer = serializer();
     cout << "serialized buffer: \"" << buffer.to_string() << "\" size: " << buffer.buf().size() << endl;
 
+    // create a deserializer
+    auto deserializer = typename SerializerType::BufferType(buffer.buf());
+
     // invoke the test predicate to determine whether that matched what we want
-    bool res = test(buffer);
+    //bool res = test(buffer);
+    bool res = test(deserializer);
     cout << (res ? "   OK " : " FAIL ") << str << endl << endl;
     if (!res) {
         throw std::runtime_error(string("test failed!!!") + str);

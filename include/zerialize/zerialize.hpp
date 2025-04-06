@@ -15,6 +15,7 @@
 #include <functional>
 #include <algorithm>
 #include "zerialize_any.hpp"
+#include "zerialize_zbuffer.hpp"
 
 constexpr bool DEBUG_TRACE_CALLS = false;
 
@@ -25,163 +26,6 @@ using std::any, std::any_cast, std::initializer_list, std::function, std::varian
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t, std::declval;
 using std::runtime_error;
 using std::cout, std::endl, std::stringstream;
-
-
-class ZBuffer {
-public:
-
-    // --- Deleter Helpers ---
-    // Provides convenient access to common deleters
-    struct Deleters {
-        // Deleter for memory allocated with `malloc`, `calloc`, `realloc`
-        // Takes void* to match std::free signature
-        static constexpr auto Free = [](void* ptr) { std::free(ptr); };
-
-        // Deleter for memory allocated with `new uint8_t[...]`
-        static constexpr auto DeleteArray = [](std::uint8_t* ptr) { delete[] ptr; };
-
-        // No-op deleter for data that shouldn't be freed by ZBuffer (e.g., stack, static)
-        // Use with caution! Ensure the data outlives the ZBuffer.
-        static constexpr auto NoOp = [](std::uint8_t* /*ptr*/) { /* Do nothing */ };
-    };
-    
-
-private:
-    // --- Storage Strategies ---
-
-    // 1. Data owned by a std::vector
-    using OwnedVector = vector<uint8_t>;
-
-    // 2. Data owned by a raw pointer with a custom deleter
-    // We use unique_ptr with a type-erased deleter (std::function)
-    struct ManagedPtr {
-        // unique_ptr stores the pointer and the deleter.
-        // The deleter lambda captures any necessary context (like original type).
-        std::unique_ptr<uint8_t, std::function<void(uint8_t*)>> ptr;
-        size_t count = 0;
-
-        ManagedPtr(uint8_t* data_to_own, size_t size, std::function<void(uint8_t*)> deleter)
-            : ptr(data_to_own, std::move(deleter)), count(size) {}
-
-        // Default constructor needed for variant default construction (if needed)
-        ManagedPtr() = default;
-    };
-
-    // --- Variant holding the active storage strategy ---
-    std::variant<OwnedVector, ManagedPtr> storage_;
-
-public:
-    // --- Constructors ---
-
-    // Default constructor: Creates an empty buffer
-    ZBuffer() noexcept 
-        : storage_(std::in_place_type<OwnedVector>) {}
-
-    // Constructor from a moved std::vector
-    // Takes ownership of the vector's data.
-    ZBuffer(std::vector<uint8_t>&& vec) noexcept
-        : storage_(std::in_place_type<OwnedVector>, std::move(vec)) {}
-
-    // Constructor taking ownership of a raw uint8_t* pointer with a custom deleter.
-    // The deleter MUST correctly free the provided pointer.
-    ZBuffer(uint8_t* data_to_own, size_t size, std::function<void(uint8_t*)> deleter)
-        : storage_(std::in_place_type<ManagedPtr>, data_to_own, size, std::move(deleter))
-    {
-        if (size > 0 && data_to_own == nullptr) {
-            throw std::invalid_argument("ZBuffer: Non-zero size requires a non-null pointer");
-        }
-        if (!std::get<ManagedPtr>(storage_).ptr.get_deleter()) { // Check if deleter is valid (!= nullptr)
-            throw std::invalid_argument("ZBuffer: A valid deleter function must be provided");
-        }
-    }
-
-    // Constructor taking ownership of a raw char* pointer with a custom deleter.
-    // The provided deleter should expect a char*.
-    ZBuffer(char* data_to_own, size_t size, std::function<void(char*)> char_deleter)
-        // Delegate to the uint8_t* constructor, wrapping the deleter
-        : ZBuffer(reinterpret_cast<uint8_t*>(data_to_own), size,
-            // Create a lambda that captures the original char* deleter
-            // and performs the cast back before calling it.
-            [cd = std::move(char_deleter)](uint8_t* ptr_to_delete) {
-                if (ptr_to_delete) { // Avoid casting/deleting null
-                    cd(reinterpret_cast<char*>(ptr_to_delete));
-                }
-            }) // End of arguments to delegating constructor
-    {
-            // Parameter validation already happened in the delegated constructor
-            // We might want to check the original char_deleter wasn't null before moving it.
-            // However, the check inside the uint8_t* constructor effectively covers this.
-    }
-
-    // Constructor taking ownership of a raw void* pointer with a custom *void* deleter
-    // Useful for C APIs returning void* (like from malloc).
-    ZBuffer(void* data_to_own, size_t size, std::function<void(void*)> void_deleter)
-        : ZBuffer(static_cast<uint8_t*>(data_to_own), size,
-            [vd = std::move(void_deleter)](uint8_t* ptr_to_delete) {
-                if (ptr_to_delete) {
-                    vd(static_cast<void*>(ptr_to_delete)); // Cast back to void* for deleter
-                }
-            })
-    {}
-
-
-    // Delete copy constructor and assignment - ZBuffer manages unique ownership
-    ZBuffer(const ZBuffer&) = delete;
-    ZBuffer& operator=(const ZBuffer&) = delete;
-
-    // Default move constructor and assignment are okay (variant handles it)
-    ZBuffer(ZBuffer&&) noexcept = default;
-    ZBuffer& operator=(ZBuffer&&) noexcept = default;
-
-    // --- Destructor ---
-    // The variant's destructor will automatically call the destructor
-    // of the active member (OwnedVector or ManagedPtr).
-    // ManagedPtr's unique_ptr will call the stored custom deleter.
-    ~ZBuffer() = default;
-
-
-    // --- Accessors ---
-
-    // Get the size of the buffer in bytes
-    [[nodiscard]] size_t size() const noexcept {
-        return std::visit([](const auto& storage_impl) -> size_t {
-            using T = std::decay_t<decltype(storage_impl)>;
-            if constexpr (std::is_same_v<T, OwnedVector>) {
-                return storage_impl.size();
-            } else if constexpr (std::is_same_v<T, ManagedPtr>) {
-                return storage_impl.count;
-            } else {
-                    // Should be unreachable if variant holds only these types
-                    return 0;
-            }
-        }, storage_);
-    }
-
-    // Get a pointer to the beginning of the data (const access)
-    [[nodiscard]] const uint8_t* data() const noexcept {
-            return std::visit([](const auto& storage_impl) -> const uint8_t* {
-            using T = std::decay_t<decltype(storage_impl)>;
-            if constexpr (std::is_same_v<T, OwnedVector>) {
-                return storage_impl.data(); // vector::data() is fine in C++20
-            } else if constexpr (std::is_same_v<T, ManagedPtr>) {
-                return storage_impl.ptr.get(); // unique_ptr::get()
-            } else {
-                    return nullptr; // Should be unreachable
-            }
-        }, storage_);
-    }
-
-    // Check if the buffer is empty
-    [[nodiscard]] bool empty() const noexcept {
-        return size() == 0;
-    }
-
-    // Provide a C++20 span view (const access)
-    // Creates the span on-demand - this is cheap and safe.
-    [[nodiscard]] span<const uint8_t> buf() const noexcept {
-        return span<const uint8_t>(data(), size());
-    }
-};
     
 
 // --------------
@@ -266,22 +110,59 @@ concept Deserializable = BlobDeserializable<T> && NonBlobDeserializable<T>;
 
 
 // --------------
-// The DataBuffer class exists to:
+// The Deserializer class exists to:
 // 1. enforce a common compile-time concept interface for derived types: they
 //    must conform to Deserializable.
-// 2. enforce a common interface for root-node buffers (that are themselves
-//    derived types, but also manage the actual byte buffer).
+// 2. be a source of data for the concrete child classes
 
 template <typename Derived>
-class DataBuffer {
+class Deserializer {
+protected:
+    vector<uint8_t> buf_;
+    span<const uint8_t> view_;
+
 public:
-    DataBuffer() {
+
+    // --- Constructors ---
+
+    Deserializer() noexcept {}
+
+    // Constructor 1: Takes ownership by moving a vector. Safe lifetime.
+    explicit Deserializer(vector<uint8_t>&& vec) noexcept
+        : buf_(std::move(vec)),
+          view_(buf_.begin(), buf_.end())
+    {
         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
     }
+
+    // Constructor 2: Copies from an existing vector via a const reference.
+    explicit Deserializer(const vector<uint8_t>& vec) noexcept
+        : buf_(vec),
+          view_(buf_.begin(), buf_.end())
+    {
+        static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
+    }
+
+    // Constructor 3: Borrows via an existing span.
+    // WARNING: Caller MUST ensure the lifetime of the data viewed by 'view'
+    // exceeds this Deserializer.
+    explicit Deserializer(std::span<const uint8_t> view) noexcept
+        : view_(view)
+    {
+        static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
+    }
+
+    span<const uint8_t> buf() const { 
+        return view_; 
+    }
     
-    virtual span<const uint8_t> buf() const = 0;
-    size_t size() const { return buf().size(); }
-    virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
+    size_t size() const { 
+        return view_.size(); 
+    }
+
+    virtual string to_string() const { 
+        return "<Deserializer size: " + std::to_string(size()) + ">"; 
+    }
 
     template<typename T>
     T as() const {
@@ -318,6 +199,52 @@ public:
     }
 };
 
+// template <typename Derived>
+// class DataBuffer {
+// public:
+//     DataBuffer() {
+//         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
+//     }
+    
+//     virtual span<const uint8_t> buf() const = 0;
+//     size_t size() const { return buf().size(); }
+//     virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
+
+//     template<typename T>
+//     T as() const {
+//         const Derived* d = static_cast<const Derived*>(this);
+//         if constexpr (std::is_same_v<T, int8_t>) {
+//             return d->asInt8();
+//         } else if constexpr (std::is_same_v<T, int16_t>) {
+//             return d->asInt16();
+//         } else if constexpr (std::is_same_v<T, int32_t>) {
+//             return d->asInt32();
+//         } else if constexpr (std::is_same_v<T, int64_t>) {
+//             return d->asInt64();
+//         } else if constexpr (std::is_same_v<T, uint8_t>) {
+//             return d->asUInt8();
+//         } else if constexpr (std::is_same_v<T, uint16_t>) {
+//             return d->asUInt16();
+//         } else if constexpr (std::is_same_v<T, uint32_t>) {
+//             return d->asUInt32();
+//         } else if constexpr (std::is_same_v<T, uint64_t>) {
+//             return d->asUInt64();
+//         } else if constexpr (std::is_same_v<T, float>) {
+//             return d->asFloat();
+//         } else if constexpr (std::is_same_v<T, double>) {
+//             return d->asDouble();
+//         } else if constexpr (std::is_same_v<T, bool>) {
+//             return d->asBool();
+//         } else if constexpr (std::is_same_v<T, string>) {
+//             return d->asString();
+//         } else if constexpr (std::is_same_v<T, string_view>) {
+//             return d->asStringView();
+//         } else {
+//             static_assert(false, "Unsupported type in as<T>()");
+//         }
+//     }
+// };
+
 
 // --------------
 // The Serializing concept defines a compile-time interface
@@ -350,8 +277,6 @@ concept Serializing = requires(V& v,
     { v.serialize(h) } -> std::same_as<void>;
     { v.serialize(i) } -> std::same_as<void>;
     { v.serialize(j) } -> std::same_as<void>;
-
-    // Must support v.serialize(key, any)
     { v.serialize(key, a) } -> std::same_as<void>;
 };
 
@@ -682,7 +607,7 @@ inline std::string blob_to_string(std::span<const uint8_t> s) {
 // --- Serialize, as root, via a serialization function ---
 
 template<typename SerializerType, typename F>
-typename SerializerType::BufferType serialize_root(F&& func) {
+ZBuffer serialize_root(F&& func) {
     typename SerializerType::RootSerializer rootSerializer;
     typename SerializerType::Serializer serializer(rootSerializer);
     func(serializer);
@@ -694,7 +619,7 @@ typename SerializerType::BufferType serialize_root(F&& func) {
 
 // Serialize anything, as an 'any' value.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(const any& v) {
+ZBuffer serialize(const any& v) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(any: " << v.type().name() << ")" << endl; }
     return serialize_root<SerializerType>([&v](auto& ser) {
         ser.serializeAny(v);
@@ -703,7 +628,7 @@ typename SerializerType::BufferType serialize(const any& v) {
 
 // Serialize a vector from an initializer list of any.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(initializer_list<any> l) {
+ZBuffer serialize(initializer_list<any> l) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list)" << endl; }
     return serialize_root<SerializerType>([&l](auto& ser) {
         ser.serializeVector([&l](SerializingConcept auto& s){
@@ -716,7 +641,7 @@ typename SerializerType::BufferType serialize(initializer_list<any> l) {
 
 // Serialize a map from an initializer list of pair<string, any>.
 template <typename SerializerType>
-typename SerializerType::BufferType serialize(initializer_list<pair<string, any>> l) {
+ZBuffer serialize(initializer_list<pair<string, any>> l) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list/map)" << endl; }
     return serialize_root<SerializerType>([&l](auto& ser) {
         ser.serializeMap([&l](SerializingConcept auto& s){
@@ -746,7 +671,7 @@ void serialize_impl(SerializerType& ser, ValueTypes&&... values) {
 
 // serialize a single value or a pack of values...
 template<typename SerializerType, typename... ValueTypes>
-typename SerializerType::BufferType serialize(ValueTypes&&... values) {
+ZBuffer serialize(ValueTypes&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(&&values generic)" << endl; }
     return serialize_root<SerializerType>([&values...](auto& ser) constexpr noexcept {
         if constexpr (sizeof...(values) > 0) {
@@ -758,7 +683,7 @@ typename SerializerType::BufferType serialize(ValueTypes&&... values) {
 // Serialize a map from pairs of string keys and  perfectly-forwarded values.
 template<typename SerializerType, typename... ValueTypes>
 requires (sizeof...(ValueTypes) > 0)
-typename SerializerType::BufferType serialize(pair<const char*, ValueTypes>&&... values) {
+ZBuffer serialize(pair<const char*, ValueTypes>&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(&& value pairs)" << endl; }
     return serialize_root<SerializerType>([&values...](auto& ser) {
         ser.serializeMap([&values...](SerializingConcept auto& s) constexpr noexcept -> void {
@@ -844,7 +769,7 @@ constexpr auto zvec(ValueTypes&&... values) noexcept {
 // Map-based serialize overload for KeyValueRef list.
 template <typename SerializerType, typename... KVTypes>
 requires (std::conjunction_v<std::bool_constant<zkvdetail::is_kv_v<KVTypes>>...>)
-typename SerializerType::BufferType serialize(KVTypes&&... kvs) {
+ZBuffer serialize(KVTypes&&... kvs) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(KVTypes&&...)" << endl; }
     return serialize_root<SerializerType>([&kvs...](auto& ser) {
         ser.serializeMap([&kvs...](SerializingConcept auto& s) {
@@ -859,14 +784,15 @@ typename SerializerType::BufferType serialize(KVTypes&&... kvs) {
 // to convert from one serialization format to another.
 
 template<typename SrcSerializerType, typename DstSerializerType>
-typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& src) {
+typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& srcSerializer) {
     if constexpr (DEBUG_TRACE_CALLS) {
         cout << "convert(" << SrcSerializerType::Name << ") to: " << DstSerializerType::Name << endl;
     }
     typename DstSerializerType::RootSerializer rootSerializer;
     typename DstSerializerType::Serializer serializer(rootSerializer);
-    serializer.Serializer::serialize(src);
-    return rootSerializer.finish();
+    serializer.Serializer::serialize(srcSerializer);
+    ZBuffer buf(rootSerializer.finish());
+    return typename DstSerializerType::BufferType(buf.to_vector_copy());
 }
 
 }

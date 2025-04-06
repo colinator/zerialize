@@ -164,27 +164,23 @@ inline size_t skip_element(span<const uint8_t> view) {
 // A minimal MsgPackBuffer that parses MessagePack data dynamically.
 // The root buffer owns its data and sets its view to cover it; non-root buffers
 // have only a view over the appropriate subrange.
-class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
-private:
-    std::unique_ptr<uint8_t[]> owned_;    // Optional owned memory
-    span<const uint8_t> view_;            // Always used for access
-
+// class MsgPackBuffer : public DataBuffer<MsgPackBuffer> {
+class MsgPackBuffer : public Deserializer<MsgPackBuffer> {
 public:
-    // Default constructor.
     MsgPackBuffer() 
-        : view_() {}
+        : Deserializer<MsgPackBuffer>() {}
 
-    // Root constructor: takes ownership of raw memory
-    MsgPackBuffer(std::unique_ptr<uint8_t[]>&& owned, size_t size)
-        : owned_(std::move(owned)), view_(owned_.get(), size) {}
+    MsgPackBuffer(span<const uint8_t> data)
+        : Deserializer<MsgPackBuffer>(data)
+    {}
 
-    // Non-root constructor: takes a span
-    MsgPackBuffer(span<const uint8_t> sp)
-        : view_(sp) {}
+    MsgPackBuffer(vector<uint8_t>&& buf)
+        : Deserializer<MsgPackBuffer>(std::move(buf))
+    {}
 
-    span<const uint8_t> buf() const override {
-        return view_;
-    }
+    MsgPackBuffer(const vector<uint8_t>& buf)
+        : Deserializer<MsgPackBuffer>(std::move(buf))
+    {}
 
     string to_string() const override {
         return "MsgPackBuffer " + std::to_string(buf().size()) +
@@ -584,21 +580,21 @@ public:
         msgpack_sbuffer_destroy(&sbuf);
     }
 
-    MsgPackBuffer finish() {
+    ZBuffer finish() {
         if (sbuf.size > 0) {
 
             // Take ownership of sbuf.data
             size_t size = sbuf.size;
-            auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
+            char* data = sbuf.data;
 
             // Prevent sbuffer from double-freeing
             sbuf.data = nullptr;
             sbuf.size = 0;
             sbuf.alloc = 0;
 
-            return MsgPackBuffer(std::move(owned), size);
+            return ZBuffer(data, size, ZBuffer::Deleters::Free);
         }
-        return MsgPackBuffer();
+        return ZBuffer();
     }
 };
 

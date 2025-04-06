@@ -1,11 +1,11 @@
 #pragma once
 
 #include "zerialize.hpp"
-#include <xtensor/xtensor.hpp>
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xarray.hpp>
-#include <xtensor/xio.hpp>
-#include <xtensor/xexpression.hpp>
+#include <xtensor/containers/xtensor.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/containers/xarray.hpp>
+#include <xtensor/io/xio.hpp>
+#include <xtensor/core/xexpression.hpp>
 #include "zerialize_tensor_utils.h"
 
 namespace zerialize {

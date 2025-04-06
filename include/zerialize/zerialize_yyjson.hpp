@@ -6,13 +6,13 @@
 #include <string>
 #include <string_view>
 #include <set>
-#include <stdexcept> // For runtime_error if needed
-#include <cstring>   // For strlen
+#include <stdexcept> 
+#include <cstring>
 
 namespace zerialize {
 
-// --- Base64 Utilities (Copied from zerialize_json.hpp) ---
-inline string base64Encode2(span<const uint8_t> data) {
+// --- Base64 Utilities ---
+inline string base64Encode(span<const uint8_t> data) {
     static constexpr char base64_chars[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
@@ -47,7 +47,7 @@ inline string base64Encode2(span<const uint8_t> data) {
     return encoded;
 }
 
-inline vector<uint8_t> base64Decode2(string_view encoded) {
+inline vector<uint8_t> base64Decode(string_view encoded) {
     static constexpr uint8_t lookup[256] = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
@@ -95,10 +95,8 @@ inline vector<uint8_t> base64Decode2(string_view encoded) {
 
 
 // --- YyjsonBuffer (Deserialization Wrapper) ---
-class YyjsonBuffer : public DataBuffer<YyjsonBuffer> {
+class YyjsonBuffer : public Deserializer<YyjsonBuffer> {
 private:
-    // Holds the original buffer data ONLY if constructed from external data
-    vector<uint8_t> owned_buf_;
     // Holds the yyjson document structure
     yyjson_doc* doc_ = nullptr;
     // Points to the current value node within the doc_
@@ -123,7 +121,9 @@ private:
 
 public:
     // Default constructor: represents an empty JSON object {}
-    YyjsonBuffer() {
+    YyjsonBuffer()
+        : Deserializer<YyjsonBuffer>()
+    {
         parse_data("{}", 2);
     }
 
@@ -138,65 +138,26 @@ public:
         }
     }
 
-    // Constructor taking ownership of an existing doc (e.g., from serializer finish)
-    // Assumes buf content matches the doc structure.
-    YyjsonBuffer(vector<uint8_t>&& buf, yyjson_doc* doc_to_own)
-        : owned_buf_(std::move(buf)),
-          doc_(doc_to_own),
-          current_val_(nullptr), // Set below
-          owns_doc_(true)
-    {
-        if (!doc_) {
-            throw std::invalid_argument("YyjsonBuffer: Null document provided for owning constructor.");
-        }
-        current_val_ = yyjson_doc_get_root(doc_);
-        if (!current_val_) {
-            // Allow empty doc? Let's create a null root for consistency.
-            // Though yyjson_mut_doc_imut_copy should ideally produce a valid root.
-            // Maybe throw?
-            yyjson_doc_free(doc_);
-            doc_ = nullptr;
-            throw DeserializationError("Failed to get root value from provided document");
-        }
-    }
-
     // Constructor from external data (span, copies data to parse)
-    YyjsonBuffer(span<const uint8_t> data) {
-        // Need to copy data because yyjson_read needs null termination potentially,
-        // and the span might not have it or might disappear.
+    YyjsonBuffer(span<const uint8_t> data)
+        : Deserializer<YyjsonBuffer>(data)
+    {
         string json_str(reinterpret_cast<const char*>(data.data()), data.size());
         parse_data(json_str.c_str(), json_str.size());
-        // Store the original data if needed for buf() consistency?
-        owned_buf_.assign(data.begin(), data.end());
     }
 
     // Constructor from external data (vector move)
-    YyjsonBuffer(vector<uint8_t>&& buf) : owned_buf_(std::move(buf)) {
-        // Use the moved buffer's data. Ensure null termination for safety.
-        // Note: yyjson_read doesn't strictly require null termination if len is correct,
-        // but it's safer practice if parsing C strings.
-        if (!owned_buf_.empty() && owned_buf_.back() != '\0') {
-            owned_buf_.push_back('\0');
-            parse_data(reinterpret_cast<const char*>(owned_buf_.data()), owned_buf_.size() - 1);
-            owned_buf_.pop_back(); // Remove temporarily added null
-        } else if (!owned_buf_.empty()) {
-            parse_data(reinterpret_cast<const char*>(owned_buf_.data()), owned_buf_.size());
-        } else {
-            parse_data("null", 4); // Parse null if buffer is empty? Or throw? Or {}? Let's choose null.
-        }
+    YyjsonBuffer(vector<uint8_t>&& buf) 
+        : Deserializer<YyjsonBuffer>(std::move(buf))
+    {
+        parse_data(reinterpret_cast<const char*>(buf_.data()), buf_.size());
     }
 
     // Constructor from external data (vector copy)
-    YyjsonBuffer(const vector<uint8_t>& buf) : owned_buf_(buf) {
-        if (!owned_buf_.empty() && owned_buf_.back() != '\0') {
-            owned_buf_.push_back('\0');
-            parse_data(reinterpret_cast<const char*>(owned_buf_.data()), owned_buf_.size() - 1);
-            owned_buf_.pop_back();
-        } else if (!owned_buf_.empty()) {
-            parse_data(reinterpret_cast<const char*>(owned_buf_.data()), owned_buf_.size());
-        } else {
-             parse_data("null", 4);
-        }
+    YyjsonBuffer(const vector<uint8_t>& buf) 
+        : Deserializer<YyjsonBuffer>(buf)
+    {
+        parse_data(reinterpret_cast<const char*>(buf_.data()), buf_.size());
     }
 
     // Destructor
@@ -212,19 +173,54 @@ public:
     YyjsonBuffer& operator=(const YyjsonBuffer&) = delete;
 
     // Move constructor
+    // YyjsonBuffer(YyjsonBuffer&& other) noexcept
+    //     : owned_buf_(std::move(other.owned_buf_)),
+    //       doc_(other.doc_),
+    //       current_val_(other.current_val_),
+    //       owns_doc_(other.owns_doc_) {
+    //     // Nullify the moved-from object's pointers to prevent double-free
+    //     other.doc_ = nullptr;
+    //     other.current_val_ = nullptr;
+    //     other.owns_doc_ = false; // It no longer owns anything
+    // }
+
+    // // Move assignment
+    // YyjsonBuffer& operator=(YyjsonBuffer&& other) noexcept {
+    //     if (this != &other) {
+    //         // Free existing owned resources
+    //         if (owns_doc_ && doc_) {
+    //             yyjson_doc_free(doc_);
+    //         }
+
+    //         // Transfer resources from 'other'
+    //         owned_buf_ = std::move(other.owned_buf_);
+    //         doc_ = other.doc_;
+    //         current_val_ = other.current_val_;
+    //         owns_doc_ = other.owns_doc_;
+
+    //         // Nullify 'other'
+    //         other.doc_ = nullptr;
+    //         other.current_val_ = nullptr;
+    //         other.owns_doc_ = false;
+    //     }
+    //     return *this;
+    // }
+
     YyjsonBuffer(YyjsonBuffer&& other) noexcept
-        : owned_buf_(std::move(other.owned_buf_)),
+        : Deserializer<YyjsonBuffer>(),
           doc_(other.doc_),
           current_val_(other.current_val_),
-          owns_doc_(other.owns_doc_) {
-        // Nullify the moved-from object's pointers to prevent double-free
+          owns_doc_(other.owns_doc_) 
+    {
+        buf_ = std::move(other.buf_);
         other.doc_ = nullptr;
         other.current_val_ = nullptr;
         other.owns_doc_ = false; // It no longer owns anything
     }
 
     // Move assignment
-    YyjsonBuffer& operator=(YyjsonBuffer&& other) noexcept {
+    YyjsonBuffer& operator=(YyjsonBuffer&& other) noexcept 
+    {
         if (this != &other) {
             // Free existing owned resources
             if (owns_doc_ && doc_) {
@@ -232,7 +228,7 @@ public:
             }
 
             // Transfer resources from 'other'
-            owned_buf_ = std::move(other.owned_buf_);
+            buf_ = std::move(other.buf_);
             doc_ = other.doc_;
             current_val_ = other.current_val_;
             owns_doc_ = other.owns_doc_;
@@ -243,31 +239,6 @@ public:
             other.owns_doc_ = false;
         }
         return *this;
-    }
-
-    // --- DataBuffer Interface ---
-    span<const uint8_t> buf() const override {
-         // Returns the owned buffer if it exists, otherwise empty span?
-         // The concept requires a buffer, but for views, there might not be one stored here.
-         // The original intent seems to store the serialized form. Let's try to provide it.
-         // This is inefficient for views if called often.
-         if (!owned_buf_.empty()) {
-             return span<const uint8_t>(owned_buf_);
-         } else if (doc_ && current_val_) {
-             // Try to serialize the current view to get *a* buffer representation
-             // This is potentially slow and allocates memory.
-             yyjson_write_flag flg = YYJSON_WRITE_NOFLAG;
-             size_t len = 0;
-             char* json_str = yyjson_val_write(current_val_, flg, &len);
-             if (json_str) {
-                 // Need a place to store this temporary buffer... this design is tricky for views.
-                 // Maybe return an empty span for views? Or store the root buffer always?
-                 // For now, let's return empty for views.
-                 free(json_str); // Free the temporary string
-             }
-             return span<const uint8_t>(); // Indicate no owned buffer for views
-         }
-         return span<const uint8_t>();
     }
 
     string to_string() const override {
@@ -283,8 +254,8 @@ public:
         }
 
         string buf_info = "(no owned buffer)";
-        if (!owned_buf_.empty()) {
-             buf_info = std::to_string(owned_buf_.size()) + " bytes at: " + std::format("{}", static_cast<const void*>(owned_buf_.data()));
+        if (!buf_.empty()) {
+             buf_info = std::to_string(buf_.size()) + " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data()));
         }
 
         return "YyjsonBuffer " + buf_info + " : " + json_dump + "\n" + debug_string(*this);
@@ -422,8 +393,7 @@ public:
     YyjsonRootSerializer(const YyjsonRootSerializer&) = delete;
     YyjsonRootSerializer& operator=(const YyjsonRootSerializer&) = delete;
 
-    // Finalize serialization and return an owning YyjsonBuffer
-    YyjsonBuffer finish() {
+    ZBuffer finish() {
 
         if (!doc) {
              throw SerializationError("Cannot finish serialization, document is invalid.");
@@ -464,7 +434,7 @@ public:
 
         // --- Step 3: Return buffer owning the *already created* immutable doc ---
         // No re-parsing needed!
-        return YyjsonBuffer(std::move(final_buf)); //, immutable_doc); // Pass ownership
+        return ZBuffer(std::move(final_buf)); //, immutable_doc); // Pass ownership
     }
 };
 
@@ -553,7 +523,7 @@ public:
 
     void serialize(const span<const uint8_t>& val) {
         // Encode blob as Base64 string
-        std::string s = base64Encode2(val);
+        std::string s = base64Encode(val);
         set_value(yyjson_mut_strncpy(doc_, s.data(), s.size()));
     }
 

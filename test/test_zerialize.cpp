@@ -1,7 +1,6 @@
 #include <iostream>
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
-#include <zerialize/zerialize_json.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
 #include <zerialize/zerialize_yyjson.hpp>
 #include <zerialize/zerialize_testing_utils.hpp>
@@ -824,7 +823,8 @@ template<typename SrcSerializerType, typename DestSerializerType>
 void test_conversion() {
     std::cout << "Testing conversion from " << SrcSerializerType::Name << " to " << DestSerializerType::Name << std::endl;
     auto m = xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
-    auto v1 = serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}, {"m", xtensor::serializer<SrcSerializerType>(m)}}}}});
+    ZBuffer buf = serialize<SrcSerializerType>({{"a", 3}, {"b", 5.2}, {"k", 1028}, {"c", "asdf"}, {"d", std::vector<std::any>{7, 8.2, std::map<std::string, std::any>{{"pi", 3.14159}, {"e", 2.613}, {"m", xtensor::serializer<SrcSerializerType>(m)}}}}});
+    auto v1 = typename SrcSerializerType::BufferType(buf.buf());
     auto v2 = convert<SrcSerializerType, DestSerializerType>(v1);
     auto v3 = convert<DestSerializerType, SrcSerializerType>(v2);
     auto v4 = convert<SrcSerializerType, DestSerializerType>(v3);
@@ -841,14 +841,14 @@ void test_conversion() {
 
 int main() {
     test_much_serialization<Flex>();
-    test_much_serialization<Json>();
+    //test_much_serialization<Json>();
     test_much_serialization<MsgPack>();
     test_much_serialization<Yyjson>();
-    test_conversion<Flex, Json>();
+    //test_conversion<Flex, Json>();
     test_conversion<Flex, MsgPack>();
-    test_conversion<Json, Flex>();
-    test_conversion<Json, MsgPack>();
-    test_conversion<MsgPack, Json>();
+    //test_conversion<Json, Flex>();
+    //test_conversion<Json, MsgPack>();
+    //test_conversion<MsgPack, Json>();
     test_conversion<MsgPack, Flex>();
     test_conversion<MsgPack, Yyjson>();
     test_conversion<Yyjson, Flex>();
