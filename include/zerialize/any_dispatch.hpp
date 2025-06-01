@@ -8,6 +8,8 @@
 #include <vector>
 #include <map>
 #include <span>
+#include "concepts.hpp"
+#include "errors.hpp"
 
 /*
  * This file implements a compile-time type map for efficient serialization of std::any values.

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zerialize.hpp"
+#include <zerialize/zerialize.hpp>
 #include <Eigen/Dense>
-#include "zerialize_tensor_utils.h"
+#include <zerialize/tensor/utils.hpp>
 
 namespace zerialize {
 namespace eigen {
@@ -10,16 +10,16 @@ namespace eigen {
 // Serialize an eigen matrix
 template <typename S, typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
 S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
-    return [&m](SerializingConcept auto& s) {
+    return [&m](Serializable auto& s) {
         if constexpr (TensorIsMap) {
-            s.serializeMap([&m](SerializingConcept auto& ser) {
+            s.serializeMap([&m](Serializable auto& ser) {
                 std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
                 ser.serialize(ShapeKey, shape);
                 ser.serialize(DTypeKey, tensor_dtype_index<T>);
                 ser.serialize(DataKey, span_from_data_of(m));
             });
         } else {
-            s.serializeVector([&m](SerializingConcept auto& ser) {
+            s.serializeVector([&m](Serializable auto& ser) {
                 std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
                 ser.serialize(tensor_dtype_index<T>);
                 ser.serialize(shape);

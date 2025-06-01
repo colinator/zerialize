@@ -82,7 +82,7 @@ FetchContent_MakeAvailable(xtensor)
 # Download and configure eigen
 FetchContent_Declare(eigen_download
     URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-    URL_HASH SHA256=1ccaabbfe870f60af3d6a519c53e09f3dcf630207321dffa553564a8e75c4fc8
+    URL_HASH SHA256=eba3f3d414d2f8cba2919c78ec6daab08fc71ba2ba4ae502b7e5d4d99fc02cda
     GIT_TAG        origin/master
 )
 # FetchContent_MakeAvailable(eigen)
@@ -103,7 +103,7 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
 
 # Include directories
 target_include_directories(${PROJECT_NAME} INTERFACE
-    ${PROJECT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     ${flatbuffers_SOURCE_DIR}/include
     nlohmann_json::nlohmann_json
     ${msgpack_SOURCE_DIR}/include

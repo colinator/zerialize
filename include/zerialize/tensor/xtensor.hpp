@@ -1,12 +1,12 @@
 #pragma once
 
-#include "zerialize.hpp"
+#include <zerialize/zerialize.hpp>
 #include <xtensor/containers/xtensor.hpp>
 #include <xtensor/containers/xadapt.hpp>
 #include <xtensor/containers/xarray.hpp>
 #include <xtensor/io/xio.hpp>
 #include <xtensor/core/xexpression.hpp>
-#include "zerialize_tensor_utils.h"
+#include <zerialize/tensor/utils.hpp>
 
 namespace zerialize {
 namespace xtensor {
@@ -17,19 +17,19 @@ namespace xtensor {
 // requires xt::is_xexpression<X>::value
 template <typename S, HasDataAndSize X, bool TensorIsMap=false>
 S::SerializingFunction serializer(const X& t) {
-//SerializingConcept auto& serializer(const X& t) {
+//Serializable auto& serializer(const X& t) {
 //auto serializer(const X& t) {
     // std::cout << "___________ HERE" << std::endl;
     // exit(0);
-    return [&t](SerializingConcept auto& s) {
+    return [&t](Serializable auto& s) {
         if constexpr (TensorIsMap) {
-            s.serializeMap([&t](SerializingConcept auto& ser) {
+            s.serializeMap([&t](Serializable auto& ser) {
                 ser.serialize(ShapeKey, shape_of_any(t.shape()));
                 ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
                 ser.serialize(DataKey, span_from_data_of(t));
             });
         } else {
-            s.serializeVector([&t](SerializingConcept auto& ser) {
+            s.serializeVector([&t](Serializable auto& ser) {
                 ser.serialize(tensor_dtype_index<typename X::value_type>);
                 ser.serialize(shape_of_any(t.shape()));
                 ser.serialize(span_from_data_of(t));
@@ -64,15 +64,15 @@ S::SerializingFunction serializer(const X& t) {
 // template <typename S, typename X, bool TensorIsMap=false>
 // requires xt::is_xexpression<X>::value && (!HasDataAndSize<X>)
 // S::SerializingFunction serializer(const X& t) {
-//     return [&t](SerializingConcept auto& s) {
+//     return [&t](Serializable auto& s) {
 //         if constexpr (TensorIsMap) {
-//             s.serializeMap([&t](SerializingConcept auto& ser) {
+//             s.serializeMap([&t](Serializable auto& ser) {
 //                 ser.serialize(ShapeKey, shape_of_any(t.shape()));
 //                 ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
 //                 //ser.serialize(DataKey, span_from_data_of(t));
 //             });
 //         } else {
-//             s.serializeVector([&t](SerializingConcept auto& ser) {
+//             s.serializeVector([&t](Serializable auto& ser) {
 //                 ser.serialize(tensor_dtype_index<typename X::value_type>);
 //                 ser.serialize(shape_of_any(t.shape()));
 //                 //ser.serialize(span_from_data_of(t));

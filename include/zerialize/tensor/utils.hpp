@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zerialize.hpp"
+#include <zerialize/zerialize.hpp>
 #include <complex>
 
 // boooo... xtensor dependency...

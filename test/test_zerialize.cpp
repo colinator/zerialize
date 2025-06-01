@@ -1,11 +1,11 @@
 #include <iostream>
 #include <zerialize/zerialize.hpp>
-#include <zerialize/zerialize_flex.hpp>
-#include <zerialize/zerialize_msgpack.hpp>
-#include <zerialize/zerialize_json.hpp>
-#include <zerialize/zerialize_testing_utils.hpp>
-#include <zerialize/zerialize_xtensor.hpp>
-#include <zerialize/zerialize_eigen.hpp>
+#include <zerialize/protocols/flex.hpp>
+#include <zerialize/protocols/msgpack.hpp>
+#include <zerialize/protocols/json.hpp>
+#include <zerialize/testing_utils.hpp>
+#include <zerialize/tensor/xtensor.hpp>
+#include <zerialize/tensor/eigen.hpp>
 
 using std::string, std::function;
 using std::cout, std::endl;
@@ -352,8 +352,8 @@ void test_much_serialization() {
     auto iv = std::vector<int>{1, 2, 3, 4, 5};
     test_serialization<SerializerType>("Vector of int: [1, 2, 3, 4, 5]",
         [&iv](){ 
-            return serialize<SerializerType>([&iv](SerializingConcept auto& s){
-                s.serializeVector([&iv](SerializingConcept auto& ser) {
+            return serialize<SerializerType>([&iv](Serializable auto& s){
+                s.serializeVector([&iv](Serializable auto& ser) {
                     for (auto z: iv) {
                         ser.serialize(z);
                     }

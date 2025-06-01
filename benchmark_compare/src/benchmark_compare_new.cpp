@@ -4,10 +4,10 @@
 #include <chrono>
 
 #include <zerialize/zerialize.hpp>
-#include <zerialize/zerialize_flex.hpp>
-#include <zerialize/zerialize_msgpack.hpp>
-#include <zerialize/zerialize_json.hpp>
-#include <zerialize/zerialize_xtensor.hpp>
+#include <zerialize/protocols/flex.hpp>
+#include <zerialize/protocols/msgpack.hpp>
+#include <zerialize/protocols/json.hpp>
+#include <zerialize/tensor/xtensor.hpp>
 
 #include <xtensor/core/xmath.hpp>
 
