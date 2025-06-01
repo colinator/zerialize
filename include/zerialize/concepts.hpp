@@ -92,7 +92,7 @@ concept Deserializable = requires(const V& v, const string_view key, size_t inde
 // a 'Serializer'.
 
 template<typename V>
-concept Serializing = requires(V& v, 
+concept SerializingValue = requires(V& v, 
     const any& a, 
     int64_t b, 
     uint64_t c, 
@@ -124,7 +124,7 @@ using remove_volref_t = std::remove_volatile_t<std::remove_reference_t<T>>;
 
 struct SerializingCallable {
     template <typename SerializerType>
-    requires Serializing<remove_volref_t<SerializerType>> 
+    requires SerializingValue<remove_volref_t<SerializerType>> 
     void operator()(SerializerType&&) noexcept { }
 };
 
@@ -142,7 +142,7 @@ concept SerializingComposite = requires(V& v, const std::string& key) {
 
 // Finally, the concept we really want: just the union of the above.
 template <typename T>
-concept Serializable = Serializing<T> && SerializingComposite<T>;
+concept Serializable = SerializingValue<T> && SerializingComposite<T>;
 
 // Defines the concept type of a function taking some arg.
 // NOTE: Why can't we add && Serializable<Arg> ?
