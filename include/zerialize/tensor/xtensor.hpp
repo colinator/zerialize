@@ -13,14 +13,8 @@ namespace xtensor {
 
 
 // Serialize an xtensor or xarray - anything that conforms to is_xexpression
-// template <typename S, typename X, bool TensorIsMap=false>
-// requires xt::is_xexpression<X>::value
 template <typename S, HasDataAndSize X, bool TensorIsMap=false>
 S::SerializingFunction serializer(const X& t) {
-//Serializable auto& serializer(const X& t) {
-//auto serializer(const X& t) {
-    // std::cout << "___________ HERE" << std::endl;
-    // exit(0);
     return [&t](Serializable auto& s) {
         if constexpr (TensorIsMap) {
             s.serializeMap([&t](Serializable auto& ser) {
@@ -36,21 +30,6 @@ S::SerializingFunction serializer(const X& t) {
             });
         }
     };
-    // return [&t](auto& s) {
-    //     if constexpr (TensorIsMap) {
-    //         s.serializeMap([&t](auto& ser) {
-    //             ser.serialize(ShapeKey, shape_of_any(t.shape()));
-    //             ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
-    //             ser.serialize(DataKey, span_from_data_of(t));
-    //         });
-    //     } else {
-    //         s.serializeVector([&t](auto& ser) {
-    //             ser.serialize(tensor_dtype_index<typename X::value_type>);
-    //             ser.serialize(shape_of_any(t.shape()));
-    //             ser.serialize(span_from_data_of(t));
-    //         });
-    //     }
-    // };
 }
 
 // We can match raw xexpression, but we need a way to

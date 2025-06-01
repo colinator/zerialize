@@ -25,6 +25,8 @@ This is a header-only library, and contains nothing to build. The `test/`, `benc
 
 This example demonstrates serializing and deserializing a map containing an `xtensor` using `zkv` for optimized serialization.
 
+There are many more examples in test/test_zerialize.cpp.
+
 ```cpp
 #include <iostream>
 #include "zerialize/zerialize.hpp"
@@ -32,23 +34,32 @@ This example demonstrates serializing and deserializing a map containing an `xte
 #include "zerialize/tensor/xtensor.hpp" // For xtensor support
 
 int main() {
-    // Define an xtensor
+    // xtensor and eigen are zero-copy where possible.
     auto my_tensor = xt::xtensor<double, 2>{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
 
     // --- Serialization ---
-    // Replace JsonSerializer with your desired serializer (e.g., FlexSerializer, MsgpackSerializer)
-    auto buffer = zerialize::serialize<zerialize::JsonSerializer>(
-        zerialize::zmap( // zmap for efficient map serialization
-            zerialize::zkv("id", 12345),
-            zerialize::zkv("label", std::string("data_point_alpha")),
-            zerialize::zkv("tensor_data", zerialize::xtensor::serializer<zerialize::JsonSerializer>(my_tensor))
-        )
+    // There are many more forms, including std::any-based forms (for ergonomics) of 
+    // serialization. See test/test_zerialize.cpp for more. Below is the fastest.
+    auto buffer = zerialize::serialize<zerialize::JsonSerializer>( // or flex or msgpack etc
+        zerialize::zkv("id", 12345),
+        zerialize::zkv("label", std::string("data_point_alpha")),
+        zerialize::zkv("tensor_data", zerialize::xtensor::serializer<zerialize::JsonSerializer>(my_tensor))
     );
 
-    // 'buffer' (a zerialize::ZBuffer) contains the serialized data.
+    // 'buffer' (a zerialize::ZBuffer) contains the serialized data. 
+    // For this example contains json:
+    // {
+    //      "id", 12345,
+    //      "label", "data_point_alpha",
+    //      "tensor_data": [
+    //          [ 2, 3 ],
+    //          11,
+    //          "base64 encoded rep of the binary tensor data"
+    //      ]
+    // }
+
 
     // --- Deserialization ---
-    // Construct the specific deserializer (e.g., JsonDeserializer) from the ZBuffer's underlying data.
     zerialize::JsonDeserializer deserialized_data(buffer.buf()); 
 
     // Accessing values:
