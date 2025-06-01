@@ -12,9 +12,14 @@ using std::string;
 // on Deserializable.
 
 enum ValueType {
-    Bool, Int, UInt, Float,
-    String, Blob,
-    Map, Array
+    Bool, 
+    Int, 
+    UInt, 
+    Float,
+    String, 
+    Blob,
+    Map, 
+    Array
 };
 
 template <Deserializable T>

@@ -133,7 +133,7 @@ public:
     }
 
     [[nodiscard]] const uint8_t* data() const noexcept {
-            return std::visit([](const auto& storage_impl) -> const uint8_t* {
+        return std::visit([](const auto& storage_impl) -> const uint8_t* {
             using T = std::decay_t<decltype(storage_impl)>;
             if constexpr (std::is_same_v<T, OwnedVector>) {
                 return storage_impl.data(); // vector::data() is fine in C++20

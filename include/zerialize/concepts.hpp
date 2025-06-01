@@ -132,6 +132,9 @@ struct SerializingCallable {
 // take as arguments SerializingCallable objects: 'sub-serializers' that
 // are responsible for serializing key/value pairs or vector elements.
 // TODO: Unify these
+// TBH: it would be better for SerializingCallable could require Serializer
+// instead of SerializingValue. But there's no recursion between concepts
+// like that, without forward-declaration anyway...
 template <typename V>
 concept SerializingComposite = requires(V& v, const std::string& key) {
     typename V::Serializer;
