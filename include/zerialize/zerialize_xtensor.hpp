@@ -13,9 +13,14 @@ namespace xtensor {
 
 
 // Serialize an xtensor or xarray - anything that conforms to is_xexpression
-template <typename S, typename X>
-requires xt::is_xexpression<X>::value
+// template <typename S, typename X, bool TensorIsMap=false>
+// requires xt::is_xexpression<X>::value
+template <typename S, HasDataAndSize X, bool TensorIsMap=false>
 S::SerializingFunction serializer(const X& t) {
+//SerializingConcept auto& serializer(const X& t) {
+//auto serializer(const X& t) {
+    // std::cout << "___________ HERE" << std::endl;
+    // exit(0);
     return [&t](SerializingConcept auto& s) {
         if constexpr (TensorIsMap) {
             s.serializeMap([&t](SerializingConcept auto& ser) {
@@ -31,7 +36,50 @@ S::SerializingFunction serializer(const X& t) {
             });
         }
     };
+    // return [&t](auto& s) {
+    //     if constexpr (TensorIsMap) {
+    //         s.serializeMap([&t](auto& ser) {
+    //             ser.serialize(ShapeKey, shape_of_any(t.shape()));
+    //             ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
+    //             ser.serialize(DataKey, span_from_data_of(t));
+    //         });
+    //     } else {
+    //         s.serializeVector([&t](auto& ser) {
+    //             ser.serialize(tensor_dtype_index<typename X::value_type>);
+    //             ser.serialize(shape_of_any(t.shape()));
+    //             ser.serialize(span_from_data_of(t));
+    //         });
+    //     }
+    // };
 }
+
+// We can match raw xexpression, but we need a way to
+// 1. insert a 'blob grower' object
+// 2. evaluate the xexpression directly into that data area
+// builder is non‑const
+// auto& raw_buf = const_cast<std::vector<uint8_t>&>(builder.GetBuffer());
+// now you can grow (or shrink) its size:
+// raw_buf.resize( new_size );
+
+// template <typename S, typename X, bool TensorIsMap=false>
+// requires xt::is_xexpression<X>::value && (!HasDataAndSize<X>)
+// S::SerializingFunction serializer(const X& t) {
+//     return [&t](SerializingConcept auto& s) {
+//         if constexpr (TensorIsMap) {
+//             s.serializeMap([&t](SerializingConcept auto& ser) {
+//                 ser.serialize(ShapeKey, shape_of_any(t.shape()));
+//                 ser.serialize(DTypeKey, tensor_dtype_index<typename X::value_type>);
+//                 //ser.serialize(DataKey, span_from_data_of(t));
+//             });
+//         } else {
+//             s.serializeVector([&t](SerializingConcept auto& ser) {
+//                 ser.serialize(tensor_dtype_index<typename X::value_type>);
+//                 ser.serialize(shape_of_any(t.shape()));
+//                 //ser.serialize(span_from_data_of(t));
+//             });
+//         }
+//     };
+// }
 
 
 // The actual type that the call to xt::adapt returns is this.
@@ -50,7 +98,7 @@ using flextensor_adaptor = const xt::xarray_adaptor<
 >;
 
 // Deserialize an xtensor/x-adapter
-template <typename T, int D=-1>
+template <typename T, int D=-1, bool TensorIsMap=false>
 auto asXTensor(const Deserializable auto& buf) {
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }
 

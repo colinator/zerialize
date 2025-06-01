@@ -10,7 +10,7 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
-#include <zerialize/zerialize_yyjson.hpp>
+#include <zerialize/zerialize_json.hpp>
 
 // Reflect-cpp includes
 #include <rfl/json.hpp>
@@ -110,7 +110,6 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
         // Benchmark serialization
         double serTime = ZerializeAsVector ?
             benchmark([&]() {
-               
                 auto serialized = serialize<SerializerType>({
                     42,
                     3.14159,
@@ -271,6 +270,23 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                     sum += arr[i].asInt32();
                 }
 
+                std::vector<int> v;
+                v.reserve(arr.arraySize());
+                for (size_t i = 0; i < arr.arraySize(); i++) {
+                    v.emplace_back(arr[i].asInt32());
+                }            
+
+                TestData testData{
+                    i,
+                    d,
+                    s,
+                    v //{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+                };
+                // for (size_t i = 0; i < arr.arraySize(); i++) {
+                //     testData.array_value.push_back(arr[i].asInt32());
+                // }
+                
+
                 // std::vector<int> vec;
                 // vec.reserve(arr.arraySize());
                 // for (size_t i = 0; i < arr.arraySize(); i++) {
@@ -282,7 +298,9 @@ std::vector<BenchmarkResult> runZerializeBenchmarks() {
                 //     .string_value = s,
                 //     .array_value = vec
                 // };
-                return i + d + s.size() + sum;
+                return testData;
+                //return testData.int_value + testData.double_value + testData.string_value.size() + testData.array_value.size();
+                //return i + d + s.size() + sum;
             });
 
         results.push_back({

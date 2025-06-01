@@ -5,37 +5,37 @@
 
 namespace zerialize {
 
-class FlexBuffer : public Deserializer<FlexBuffer> {
+class FlexDeserializer : public Deserializer<FlexDeserializer> {
 private:
     flexbuffers::Reference ref_;
 
 public:
 
-    FlexBuffer()
-        : Deserializer<FlexBuffer>() {}
+    FlexDeserializer()
+        : Deserializer<FlexDeserializer>() {}
 
-    FlexBuffer(flexbuffers::Reference ref)
-        : Deserializer<FlexBuffer>(), ref_(ref) {}
+    FlexDeserializer(flexbuffers::Reference ref)
+        : Deserializer<FlexDeserializer>(), ref_(ref) {}
 
     // Zero-copy view of existing data
-    FlexBuffer(span<const uint8_t> data)
-        : Deserializer<FlexBuffer>(data),
+    FlexDeserializer(span<const uint8_t> data)
+        : Deserializer<FlexDeserializer>(data),
           ref_(data.size() > 0 ? flexbuffers::GetRoot(data.data(), data.size()) : flexbuffers::Reference())
     {}
 
     // Zero-copy move of vector ownership
-    FlexBuffer(vector<uint8_t>&& buf)
-        : Deserializer<FlexBuffer>(std::move(buf)),
+    FlexDeserializer(vector<uint8_t>&& buf)
+        : Deserializer<FlexDeserializer>(std::move(buf)),
           ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
     {}
 
-    FlexBuffer(const vector<uint8_t>& buf)
-        : Deserializer<FlexBuffer>(buf),
+    FlexDeserializer(const vector<uint8_t>& buf)
+        : Deserializer<FlexDeserializer>(buf),
           ref_(buf_.size() > 0 ? flexbuffers::GetRoot(buf_) : flexbuffers::Reference())
     {}
 
     string to_string() const override {
-        return "FlexBuffer " + std::to_string(buf().size()) +
+        return "FlexDeserializer " + std::to_string(buf().size()) +
             " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data())) +
             "\n" + debug_string(*this);
     }
@@ -135,10 +135,10 @@ public:
         return keys;
     }
 
-    FlexBuffer operator[] (const string_view key) const {
+    FlexDeserializer operator[] (const string_view key) const {
         //if (!isMap()) { throw DeserializationError("not a map"); }
         string s(key);
-        return FlexBuffer(ref_.AsMap()[s]);
+        return FlexDeserializer(ref_.AsMap()[s]);
     }
 
     size_t arraySize() const {
@@ -146,16 +146,16 @@ public:
         return ref_.AsVector().size();
     }
 
-    FlexBuffer operator[] (size_t index) const {
+    FlexDeserializer operator[] (size_t index) const {
         // if (!isArray()) {
         //     throw DeserializationError("not an array");
         // }
         auto vec = ref_.AsVector();
         auto val = vec[index];
-        auto ret = FlexBuffer(val);
+        auto ret = FlexDeserializer(val);
         return ret;
         // if (!isArray()) { throw DeserializationError("not an array"); }
-        //return FlexBuffer(ref_.AsVector()[index]);
+        //return FlexDeserializer(ref_.AsVector()[index]);
     }
 };
 
@@ -250,22 +250,19 @@ public:
         });
     }
     
-    template <typename F>
-    requires InvocableSerializer<F, FlexSerializer&>
+    template <typename F> requires InvocableSerializer<F, FlexSerializer&>
     void serialize(F&& f) noexcept {
         std::forward<F>(f)(*this);
     }
 
-    template <typename F>
-    requires InvocableSerializer<F, FlexSerializer&>
+    template <typename F> requires InvocableSerializer<F, FlexSerializer&>
     void serializeMap(F&& f) noexcept {
         fbb.Map([&]() {
             std::forward<F>(f)(*this);
         });
     }
 
-    template <typename F>
-    requires InvocableSerializer<F, FlexSerializer&>
+    template <typename F> requires InvocableSerializer<F, FlexSerializer&>
     void serializeVector(F&& f) noexcept {
         fbb.Vector([&]() {
             std::forward<F>(f)(*this);
@@ -275,12 +272,15 @@ public:
 
 class Flex {
 public:
-    using BufferType = FlexBuffer;
+    // TODO change to 'DeserializerType', or just Deserializer
+    using BufferType = FlexDeserializer;
     using Serializer = FlexSerializer;
     using RootSerializer = FlexRootSerializer;
+
+    // TODO do we need? They're all the same, no?
     using SerializingFunction = FlexSerializer::SerializingFunction;
 
-    static inline constexpr const char* Name = "FLEX";
+    static inline constexpr const char* Name = "Flex";
 };
 
 } // namespace zerialize

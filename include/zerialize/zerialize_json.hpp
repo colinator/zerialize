@@ -93,9 +93,7 @@ inline vector<uint8_t> base64Decode(string_view encoded) {
     return decoded;
 }
 
-
-// --- YyjsonBuffer (Deserialization Wrapper) ---
-class YyjsonBuffer : public Deserializer<YyjsonBuffer> {
+class JsonDeserializer : public Deserializer<JsonDeserializer> {
 private:
     // Holds the yyjson document structure
     yyjson_doc* doc_ = nullptr;
@@ -121,47 +119,47 @@ private:
 
 public:
     // Default constructor: represents an empty JSON object {}
-    YyjsonBuffer()
-        : Deserializer<YyjsonBuffer>()
+    JsonDeserializer()
+        : Deserializer<JsonDeserializer>()
     {
         parse_data("{}", 2);
     }
 
     // Constructor from an existing value (view, doesn't own the doc)
-    YyjsonBuffer(yyjson_val* val, yyjson_doc* doc_context)
+    JsonDeserializer(yyjson_val* val, yyjson_doc* doc_context)
         : doc_(doc_context), // Shares the document context
           current_val_(val),
           owns_doc_(false) // Does not own the shared document
     {
         if (!doc_ || !current_val_) {
-            throw std::invalid_argument("YyjsonBuffer: Null value or document context provided for view constructor.");
+            throw std::invalid_argument("JsonDeserializer: Null value or document context provided for view constructor.");
         }
     }
 
     // Constructor from external data (span, copies data to parse)
-    YyjsonBuffer(span<const uint8_t> data)
-        : Deserializer<YyjsonBuffer>(data)
+    JsonDeserializer(span<const uint8_t> data)
+        : Deserializer<JsonDeserializer>(data)
     {
         string json_str(reinterpret_cast<const char*>(data.data()), data.size());
         parse_data(json_str.c_str(), json_str.size());
     }
 
     // Constructor from external data (vector move)
-    YyjsonBuffer(vector<uint8_t>&& buf) 
-        : Deserializer<YyjsonBuffer>(std::move(buf))
+    JsonDeserializer(vector<uint8_t>&& buf) 
+        : Deserializer<JsonDeserializer>(std::move(buf))
     {
         parse_data(reinterpret_cast<const char*>(buf_.data()), buf_.size());
     }
 
     // Constructor from external data (vector copy)
-    YyjsonBuffer(const vector<uint8_t>& buf) 
-        : Deserializer<YyjsonBuffer>(buf)
+    JsonDeserializer(const vector<uint8_t>& buf) 
+        : Deserializer<JsonDeserializer>(buf)
     {
         parse_data(reinterpret_cast<const char*>(buf_.data()), buf_.size());
     }
 
     // Destructor
-    ~YyjsonBuffer() {
+    ~JsonDeserializer() {
         if (owns_doc_ && doc_) {
             yyjson_doc_free(doc_);
         }
@@ -169,11 +167,11 @@ public:
 
     // --- Rule of 5/6 ---
     // Delete copy constructor and assignment
-    YyjsonBuffer(const YyjsonBuffer&) = delete;
-    YyjsonBuffer& operator=(const YyjsonBuffer&) = delete;
+    JsonDeserializer(const JsonDeserializer&) = delete;
+    JsonDeserializer& operator=(const JsonDeserializer&) = delete;
 
     // Move constructor
-    // YyjsonBuffer(YyjsonBuffer&& other) noexcept
+    // JsonDeserializer(JsonDeserializer&& other) noexcept
     //     : owned_buf_(std::move(other.owned_buf_)),
     //       doc_(other.doc_),
     //       current_val_(other.current_val_),
@@ -185,7 +183,7 @@ public:
     // }
 
     // // Move assignment
-    // YyjsonBuffer& operator=(YyjsonBuffer&& other) noexcept {
+    // JsonDeserializer& operator=(JsonDeserializer&& other) noexcept {
     //     if (this != &other) {
     //         // Free existing owned resources
     //         if (owns_doc_ && doc_) {
@@ -206,8 +204,8 @@ public:
     //     return *this;
     // }
 
-    YyjsonBuffer(YyjsonBuffer&& other) noexcept
-        : Deserializer<YyjsonBuffer>(),
+    JsonDeserializer(JsonDeserializer&& other) noexcept
+        : Deserializer<JsonDeserializer>(),
           doc_(other.doc_),
           current_val_(other.current_val_),
           owns_doc_(other.owns_doc_) 
@@ -219,7 +217,7 @@ public:
     }
 
     // Move assignment
-    YyjsonBuffer& operator=(YyjsonBuffer&& other) noexcept 
+    JsonDeserializer& operator=(JsonDeserializer&& other) noexcept 
     {
         if (this != &other) {
             // Free existing owned resources
@@ -243,7 +241,7 @@ public:
 
     string to_string() const override {
         if (!doc_ || !current_val_) {
-            return "YyjsonBuffer (invalid state)";
+            return "JsonDeserializer (invalid state)";
         }
         yyjson_write_flag flg = YYJSON_WRITE_PRETTY; // Use pretty print for debug
         size_t len = 0;
@@ -258,7 +256,7 @@ public:
              buf_info = std::to_string(buf_.size()) + " bytes at: " + std::format("{}", static_cast<const void*>(buf_.data()));
         }
 
-        return "YyjsonBuffer " + buf_info + " : " + json_dump + "\n" + debug_string(*this);
+        return "JsonDeserializer " + buf_info + " : " + json_dump + "\n" + debug_string(*this);
     }
 
     // --- Deserializable Concept Implementation ---
@@ -334,8 +332,8 @@ public:
     }
 
     // operator[] for map access
-    YyjsonBuffer operator[] (const string_view key) const {
-        check_type<YyjsonBuffer>(yyjson_is_obj, "map/object");
+    JsonDeserializer operator[] (const string_view key) const {
+        check_type<JsonDeserializer>(yyjson_is_obj, "map/object");
         // yyjson_obj_get requires null-terminated key
         string key_str(key);
         yyjson_val* val = yyjson_obj_get(current_val_, key_str.c_str());
@@ -347,7 +345,7 @@ public:
             throw DeserializationError("Key not found in JSON object: " + string(key));
         }
         // Return a *view* into the same document
-        return YyjsonBuffer(val, doc_);
+        return JsonDeserializer(val, doc_);
     }
 
     size_t arraySize() const {
@@ -356,26 +354,26 @@ public:
     }
 
     // operator[] for array access
-    YyjsonBuffer operator[] (size_t index) const {
-        check_type<YyjsonBuffer>(yyjson_is_arr, "array");
+    JsonDeserializer operator[] (size_t index) const {
+        check_type<JsonDeserializer>(yyjson_is_arr, "array");
         yyjson_val* val = yyjson_arr_get(current_val_, index);
         if (!val) {
              // Index out of bounds
              throw DeserializationError("Array index out of bounds: " + std::to_string(index));
         }
          // Return a *view* into the same document
-        return YyjsonBuffer(val, doc_);
+        return JsonDeserializer(val, doc_);
     }
 };
 
 
-// --- YyjsonRootSerializer (Serialization Setup) ---
-class YyjsonRootSerializer {
+// --- JsonRootSerializer (Serialization Setup) ---
+class JsonRootSerializer {
 public:
     yyjson_mut_doc* doc;
     yyjson_mut_val* root_val; // The single root value being built
 
-    YyjsonRootSerializer() : doc(yyjson_mut_doc_new(nullptr)), root_val(nullptr) {
+    JsonRootSerializer() : doc(yyjson_mut_doc_new(nullptr)), root_val(nullptr) {
         if (!doc) {
             throw SerializationError("Failed to create yyjson mutable document");
         }
@@ -383,15 +381,15 @@ public:
         root_val = yyjson_mut_null(doc);
     }
 
-    ~YyjsonRootSerializer() {
+    ~JsonRootSerializer() {
         if (doc) {
             yyjson_mut_doc_free(doc);
         }
     }
 
     // No copying/moving needed for this temporary builder
-    YyjsonRootSerializer(const YyjsonRootSerializer&) = delete;
-    YyjsonRootSerializer& operator=(const YyjsonRootSerializer&) = delete;
+    JsonRootSerializer(const JsonRootSerializer&) = delete;
+    JsonRootSerializer& operator=(const JsonRootSerializer&) = delete;
 
     ZBuffer finish() {
 
@@ -407,7 +405,7 @@ public:
 
         // const char *json = yyjson_mut_write(doc, 0, NULL);
         // size_t size = strlen(json);
-        // return YyjsonBuffer(std::move(json), size);
+        // return JsonDeserializer(std::move(json), size);
 
         // --- Optimization Step 1: Create immutable doc directly ---
         yyjson_doc* immutable_doc = yyjson_mut_doc_imut_copy(doc, nullptr); // Pass allocator if needed
@@ -439,14 +437,13 @@ public:
 };
 
 
-// --- YyjsonSerializer (Serialization Logic) ---
-class YyjsonSerializer: public Serializer<YyjsonSerializer> {
+class JsonSerializer: public Serializer<JsonSerializer> {
 private:
     yyjson_mut_doc* doc_;           // The document context
     yyjson_mut_val* parent_obj_;    // Pointer to parent if current context is an object's value
     yyjson_mut_val* parent_arr_;    // Pointer to parent if current context is an array element
     yyjson_mut_val* key_for_obj_;   // Pointer to the key if adding to an object (owned by parent's add call)
-    YyjsonRootSerializer* root_ctx_; // Pointer to root if this is the top-level serializer
+    JsonRootSerializer* root_ctx_;  // Pointer to root if this is the top-level serializer
 
     // Internal helper to add the final value based on context
     void set_value(yyjson_mut_val* val_to_set) {
@@ -464,16 +461,16 @@ private:
             root_ctx_->root_val = val_to_set;
         } else {
             // Should not happen - indicates an invalid serializer state
-            throw SerializationError("YyjsonSerializer: Invalid context for setting value.");
+            throw SerializationError("JsonSerializer: Invalid context for setting value.");
         }
     }
 
 public:
-    using Serializer<YyjsonSerializer>::serialize; // Make base overloads visible
+    using Serializer<JsonSerializer>::serialize; // Make base overloads visible
 
     // Constructor for the root serializer
-    YyjsonSerializer(YyjsonRootSerializer& rs)
-        : Serializer<YyjsonSerializer>(),
+    JsonSerializer(JsonRootSerializer& rs)
+        : Serializer<JsonSerializer>(),
           doc_(rs.doc),
           parent_obj_(nullptr),
           parent_arr_(nullptr),
@@ -481,8 +478,8 @@ public:
           root_ctx_(&rs) {}
 
     // Internal constructor for nested serializers
-    YyjsonSerializer(yyjson_mut_doc* doc, yyjson_mut_val* parent_obj, yyjson_mut_val* parent_arr, yyjson_mut_val* key_for_obj)
-        : Serializer<YyjsonSerializer>(),
+    JsonSerializer(yyjson_mut_doc* doc, yyjson_mut_val* parent_obj, yyjson_mut_val* parent_arr, yyjson_mut_val* key_for_obj)
+        : Serializer<JsonSerializer>(),
           doc_(doc),
           parent_obj_(parent_obj),
           parent_arr_(parent_arr),
@@ -536,7 +533,7 @@ public:
          // Create the key value (yyjson requires keys to be added first)
          yyjson_mut_val* key_val = yyjson_mut_strncpy(doc_, key.data(), key.size());
          // Create a placeholder serializer for the value
-         YyjsonSerializer value_serializer(doc_, parent_obj_, nullptr, key_val);
+         JsonSerializer value_serializer(doc_, parent_obj_, nullptr, key_val);
          // Serialize the std::any value using the placeholder serializer
          // This will eventually call set_value(actual_value) inside value_serializer,
          // which will add the key_val and the actual_value to parent_obj_.
@@ -546,22 +543,22 @@ public:
     // --- Composite Serialization ---
 
     // Returns a serializer configured to add its result to the current object context with the given key.
-    YyjsonSerializer serializerForKey(const string_view& key) {
+    JsonSerializer serializerForKey(const string_view& key) {
         if (parent_arr_ || root_ctx_) { // Cannot add key to root or array
             throw SerializationError("serializerForKey can only be used within serializeMap context.");
         }
         if (!parent_obj_) { // Should be inside serializeMap
-             throw SerializationError("YyjsonSerializer: Invalid context for serializerForKey.");
+             throw SerializationError("JsonSerializer: Invalid context for serializerForKey.");
         }
          // Create the key value - yyjson owns this memory now
          yyjson_mut_val* key_val = yyjson_mut_strncpy(doc_, key.data(), key.size());
          // Return a new serializer instance configured to add using this key to our parent object
-         return YyjsonSerializer(doc_, parent_obj_, nullptr, key_val);
+         return JsonSerializer(doc_, parent_obj_, nullptr, key_val);
     }
 
     // Handles functions returned by zmap/zvec etc.
     template <typename F>
-    requires InvocableSerializer<F, YyjsonSerializer&>
+    requires InvocableSerializer<F, JsonSerializer&>
     void serialize(F&& f) {
         // The function f is expected to call serializeMap or serializeVector
         // on the serializer passed to it (*this*).
@@ -570,28 +567,28 @@ public:
 
     // Serialize a map structure
     template <typename F>
-    requires InvocableSerializer<F, YyjsonSerializer&>
+    requires InvocableSerializer<F, JsonSerializer&>
     void serializeMap(F&& f) {
         // Create the mutable object node
         yyjson_mut_val* obj = yyjson_mut_obj(doc_);
         // Add this new object to the parent context (root, parent obj, or parent arr)
         set_value(obj);
         // Create a serializer whose context *is* this new object
-        YyjsonSerializer map_content_serializer(doc_, obj, nullptr, nullptr);
+        JsonSerializer map_content_serializer(doc_, obj, nullptr, nullptr);
         // Call the user's function to populate the object
         std::forward<F>(f)(map_content_serializer);
     }
 
     // Serialize a vector structure
     template <typename F>
-    requires InvocableSerializer<F, YyjsonSerializer&>
+    requires InvocableSerializer<F, JsonSerializer&>
     void serializeVector(F&& f) {
         // Create the mutable array node
         yyjson_mut_val* arr = yyjson_mut_arr(doc_);
         // Add this new array to the parent context
         set_value(arr);
         // Create a serializer whose context *is* this new array
-        YyjsonSerializer vector_content_serializer(doc_, nullptr, arr, nullptr);
+        JsonSerializer vector_content_serializer(doc_, nullptr, arr, nullptr);
         // Call the user's function to populate the array
         // The function f will call serialize(...) on vector_content_serializer,
         // which will append elements to the 'arr' via set_value().
@@ -600,7 +597,7 @@ public:
 
     // Override for std::map<string, any> (less efficient than serializeMap)
     void serialize(const map<string, any>& m) {
-        serializeMap([&m](YyjsonSerializer& s) {
+        serializeMap([&m](JsonSerializer& s) {
             for (const auto& [key, value] : m) {
                 // Use serializerForKey to get the context, then serializeAny
                 s.serializerForKey(key).serializeAny(value);
@@ -610,7 +607,7 @@ public:
 
     // Override for std::vector<any> (less efficient than serializeVector)
     void serialize(const vector<any>& l) {
-         serializeVector([&l](YyjsonSerializer& s) {
+         serializeVector([&l](JsonSerializer& s) {
             for (const auto& v : l) {
                 // Directly serialize elements using the vector context serializer
                 s.serializeAny(v);
@@ -621,16 +618,16 @@ public:
 };
 
 
-// --- Yyjson Class (Ties everything together) ---
-class Yyjson {
+// --- Json Class (Ties everything together) ---
+class Json {
 public:
-    using BufferType = YyjsonBuffer;
-    using Serializer = YyjsonSerializer;
-    using RootSerializer = YyjsonRootSerializer;
+    using BufferType = JsonDeserializer;
+    using Serializer = JsonSerializer;
+    using RootSerializer = JsonRootSerializer;
     // Provide the expected SerializingFunction type definition
     using SerializingFunction = std::function<void(Serializer&)>;
 
-    static inline constexpr const char* Name = "YYJSON";
+    static inline constexpr const char* Name = "Json";
 };
 
 } // namespace zerialize

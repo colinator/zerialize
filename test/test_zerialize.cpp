@@ -2,7 +2,7 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/zerialize_flex.hpp>
 #include <zerialize/zerialize_msgpack.hpp>
-#include <zerialize/zerialize_yyjson.hpp>
+#include <zerialize/zerialize_json.hpp>
 #include <zerialize/zerialize_testing_utils.hpp>
 #include <zerialize/zerialize_xtensor.hpp>
 #include <zerialize/zerialize_eigen.hpp>
@@ -204,6 +204,42 @@ void test_much_serialization() {
                 a == t &&
                 v["b"].asInt32() == 457835;
         });
+
+    // Using an initializer list for a map with a large nested xtensor:
+    xt::xtensor<uint8_t, 3> tl = xt::ones<xt::xarray<uint8_t>>({3, 640, 480});
+    test_serialization<SerializerType>("Initializer list: {\"a\": xtensor::serializer<SerializerType>(<very large tensor>), \"b\": 457835 }",
+        [&tl](){ 
+            return serialize<SerializerType>(
+                { 
+                  { "a", xtensor::serializer<SerializerType>(tl) }, 
+                  { "b", 457835 } 
+                }
+            ); 
+        },
+        [&tl](const auto& v) {
+            auto a = xtensor::asXTensor<uint8_t, 3>(v["a"]);
+            return
+                a == tl &&
+                v["b"].asInt32() == 457835;
+        });
+
+    // // Using an initializer list for a map with a large nested xtensor:
+    // auto tla = xt::ones<xt::xarray<uint8_t>>({3, 640, 480});
+    // test_serialization<SerializerType>("Initializer list: {\"a\": xtensor::serializer<SerializerType>(<very large tensor>), \"b\": 457835 }",
+    //     [&tla](){ 
+    //         return serialize<SerializerType>(
+    //             { 
+    //               { "a", xtensor::serializer<SerializerType>(tla) }, 
+    //               { "b", 457835 } 
+    //             }
+    //         ); 
+    //     },
+    //     [&tla](const auto& v) {
+    //         auto a = xtensor::asXTensor<uint8_t, 3>(v["a"]);
+    //         return
+    //             a == tla &&
+    //             v["b"].asInt32() == 457835;
+    //     });
 
     // Using an initializer list for a map with a nested xarray:
     //     {"a": xt::xarray<double>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}}, "b": 457835 }
@@ -659,6 +695,25 @@ void test_much_serialization() {
                 v["key4"]["nk3"][3]["ik1"].asDouble() == 2.71828 &&
                 v["key4"]["nk3"][3]["ik2"].asString() == "euler"; 
         });
+
+        // Working on this one!
+    // kv wit xtensor
+    auto tens = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
+    test_serialization<SerializerType>("kv with tensor",
+        [&tens](){ 
+            return serialize<SerializerType>(
+                zkv("key1", 42), 
+                zkv("key2", 3.14159),
+                zkv("key3", xtensor::serializer<SerializerType>(tens))
+            ); 
+        },
+        [&tens](const auto& v) {
+            auto a = xtensor::asXTensor<double>(v["key3"]);
+            return 
+                v["key1"].asInt32() == 42 &&
+                v["key2"].asDouble() == 3.14159 &&
+                a == tens; 
+        });
  /*
     // std::optional
     test_serialization<SerializerType>("std::optional values",
@@ -841,17 +896,14 @@ void test_conversion() {
 
 int main() {
     test_much_serialization<Flex>();
-    //test_much_serialization<Json>();
+    test_much_serialization<Json>();
     test_much_serialization<MsgPack>();
-    test_much_serialization<Yyjson>();
-    //test_conversion<Flex, Json>();
+    test_conversion<Flex, Json>();
     test_conversion<Flex, MsgPack>();
-    //test_conversion<Json, Flex>();
-    //test_conversion<Json, MsgPack>();
-    //test_conversion<MsgPack, Json>();
+    test_conversion<Json, Flex>();
+    test_conversion<Json, MsgPack>();
+    test_conversion<MsgPack, Json>();
     test_conversion<MsgPack, Flex>();
-    test_conversion<MsgPack, Yyjson>();
-    test_conversion<Yyjson, Flex>();
     std::cout << "test zerialize done, ALL SUCCEEDED" << std::endl;
     return 0;
 }

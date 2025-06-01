@@ -52,9 +52,16 @@ public:
 // It's just the union of BlobDeserialiable and NonBlobDeserialiable.
 
 // Requires classes to implement deserialization into primitive
-// types, maps, and vectors. Blob constraints defined below.
+// types, maps, vectors, and blobs.
+
+template <typename C>
+concept Blobby = requires(const C& c) {
+    { c.data() } -> std::convertible_to<const uint8_t*>; 
+    { c.size() } -> std::convertible_to<std::size_t>;
+};
+
 template<typename V>
-concept NonBlobDeserializable = requires(const V& v, const string_view key, size_t index) {
+concept Deserializable = requires(const V& v, const string_view key, size_t index) {
 
     // Type checking: everything that conforms to this concept needs
     // to be able to check it's type.
@@ -93,27 +100,17 @@ concept NonBlobDeserializable = requires(const V& v, const string_view key, size
     // ... or as an array
     { v.arraySize() } -> convertible_to<size_t>;
     { v[index] } -> same_as<V>;
+
+    // ... or as a blob
+    { v.asBlob() } -> Blobby;
 };
-
-// Requires classes to implement a valid asBlob method
-// that can return owning or non-owning array types.
-template <typename T>
-concept BlobDeserializable = requires(T t) {
-    { t.asBlob() };
-} && (convertible_to<decltype(declval<T>().asBlob()), vector<uint8_t>> ||
-      same_as<decltype(declval<T>().asBlob()), span<const uint8_t>>);
-
-// We just use the union because of c++20 constraints - we cannot
-// define the asBlob as returning either span or vector otherwise.
-template <typename T>
-concept Deserializable = BlobDeserializable<T> && NonBlobDeserializable<T>;
 
 
 // --------------
 // The Deserializer class exists to:
 // 1. enforce a common compile-time concept interface for derived types: they
 //    must conform to Deserializable.
-// 2. be a source of data for the concrete child classes
+// 2. own a source of data for the concrete child classes: either a vector or a span.
 
 template <typename Derived>
 class Deserializer {
@@ -199,52 +196,6 @@ public:
     }
 };
 
-// template <typename Derived>
-// class DataBuffer {
-// public:
-//     DataBuffer() {
-//         static_assert(Deserializable<Derived>, "Derived must satisfy Deserializable concept");
-//     }
-    
-//     virtual span<const uint8_t> buf() const = 0;
-//     size_t size() const { return buf().size(); }
-//     virtual string to_string() const { return "<DataBuffer size: " + std::to_string(size()) + ">"; }
-
-//     template<typename T>
-//     T as() const {
-//         const Derived* d = static_cast<const Derived*>(this);
-//         if constexpr (std::is_same_v<T, int8_t>) {
-//             return d->asInt8();
-//         } else if constexpr (std::is_same_v<T, int16_t>) {
-//             return d->asInt16();
-//         } else if constexpr (std::is_same_v<T, int32_t>) {
-//             return d->asInt32();
-//         } else if constexpr (std::is_same_v<T, int64_t>) {
-//             return d->asInt64();
-//         } else if constexpr (std::is_same_v<T, uint8_t>) {
-//             return d->asUInt8();
-//         } else if constexpr (std::is_same_v<T, uint16_t>) {
-//             return d->asUInt16();
-//         } else if constexpr (std::is_same_v<T, uint32_t>) {
-//             return d->asUInt32();
-//         } else if constexpr (std::is_same_v<T, uint64_t>) {
-//             return d->asUInt64();
-//         } else if constexpr (std::is_same_v<T, float>) {
-//             return d->asFloat();
-//         } else if constexpr (std::is_same_v<T, double>) {
-//             return d->asDouble();
-//         } else if constexpr (std::is_same_v<T, bool>) {
-//             return d->asBool();
-//         } else if constexpr (std::is_same_v<T, string>) {
-//             return d->asString();
-//         } else if constexpr (std::is_same_v<T, string_view>) {
-//             return d->asStringView();
-//         } else {
-//             static_assert(false, "Unsupported type in as<T>()");
-//         }
-//     }
-// };
-
 
 // --------------
 // The Serializing concept defines a compile-time interface
@@ -265,7 +216,6 @@ concept Serializing = requires(V& v,
     std::nullptr_t j,
     const string& key
 ) {
-
     //{ v.serialize(a) } -> std::same_as<void>;
     { v.serialize(b) } -> std::same_as<void>;
     { v.serialize(c) } -> std::same_as<void>;
@@ -389,6 +339,12 @@ public:
         }
     }
 
+    //SerializingFunction
+    // inline void serialize(const SerializingFunction& v) noexcept {
+    //     Derived* d = static_cast<Derived*>(this);
+    //     v(*d);
+    // }
+
     // Serialize any vector-like container that we can iterate over.
     // Tested with array and vector
     template <typename Container>
@@ -463,6 +419,20 @@ struct SerializeCounter: public Serializer<SerializeCounter> {
 
     template <typename F> requires InvocableSerializer<F, SerializeCounter&>
     void serializeVector(F&&) { count += 1; }
+
+    // template <typename F>
+    // void serialize(const std::function<void(F&)>&) { count += 1; }
+
+    // Handle any std::function type during counting - just execute it to count properly
+    template <typename F>
+    void serialize(const std::function<void(F&)>& func) { 
+        // Create a temporary instance of F to execute the function for counting
+        if constexpr (std::is_same_v<F, SerializeCounter>) {
+            func(*this);  // Execute with this counter
+        } else {
+            count += 1;   // Fallback - just count as 1 element
+        }
+    }
 
     SerializeCounter serializerForKey(const string_view&) { count += 1; return *this; }
 };
@@ -601,7 +571,7 @@ inline std::string blob_to_string(std::span<const uint8_t> s) {
 // 2. Three 'std::any' path serializers - any, initializer-list any, map of string: any
 // 3. Two perfectly-forwarded parameter pack serialization methods, taking a single
 //    value, a parameter pack of values, or a map of strings to values
-// 4. The zkv/zmap/zvec helper funtions, and single associated serialize map function.
+// 4. The zkv/zmap/zvec helper functions, and single associated serialize map function.
 //    These helper functions just return lambdas that carry out the actual serialization.
 
 // --- Serialize, as root, via a serialization function ---

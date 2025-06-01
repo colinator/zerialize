@@ -73,8 +73,6 @@ constexpr char DataKey[] = "data";
 using TensorShapeElement = uint32_t;
 using TensorShape = vector<TensorShapeElement>;
 
-constexpr bool TensorIsMap = false;
-
 inline vector<any> shape_of_any(const auto& tshape) {
     // get a vector of the shape as a vector of any.
     // we really should do something about that...
@@ -113,11 +111,11 @@ std::span<const std::uint8_t> span_from_data_of(const C& container) {
     return std::span<const std::uint8_t>(byte_data, num_bytes);
 }
 
-template <typename C>
-concept Blobby = requires(const C& c) {
-    { c.data() } -> std::convertible_to<const uint8_t*>; 
-    { c.size() } -> std::convertible_to<std::size_t>;
-};
+// template <typename C>
+// concept Blobby = requires(const C& c) {
+//     { c.data() } -> std::convertible_to<const uint8_t*>; 
+//     { c.size() } -> std::convertible_to<std::size_t>;
+// };
 
 template <typename T>
 T* data_from_blobby(const Blobby auto& blob) {
@@ -127,7 +125,7 @@ T* data_from_blobby(const Blobby auto& blob) {
     return data_typed;
 }
 
-template <typename T>
+template <typename T, bool TensorIsMap=false>
 bool isTensor(const Deserializable auto& buf) {
     if constexpr (TensorIsMap) {
         if (!buf.isMap()) return false;
@@ -137,7 +135,7 @@ bool isTensor(const Deserializable auto& buf) {
             keys.contains(DTypeKey) && buf[DTypeKey].isInt() && buf[DTypeKey].asInt8() == tensor_dtype_index<T> &&
             keys.contains(DataKey) && buf[DataKey].isBlob();
     } else {
-       if (!buf.isArray()) return false;
+        if (!buf.isArray()) return false;
         if (buf.arraySize() < 3) return false;
         return 
             buf[0].isInt() && buf[0].asInt8() == tensor_dtype_index<T> &&

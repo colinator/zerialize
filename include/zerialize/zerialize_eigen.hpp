@@ -8,7 +8,7 @@ namespace zerialize {
 namespace eigen {
 
 // Serialize an eigen matrix
-template <typename S, typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
+template <typename S, typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
 S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
     return [&m](SerializingConcept auto& s) {
         if constexpr (TensorIsMap) {
@@ -30,9 +30,8 @@ S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>&
 }
 
 // Deserialize an eigen matrix/map
-template <typename T, int NRows, int NCols, int Options=Eigen::ColMajor>
+template <typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
 auto asEigenMatrix(const Deserializable auto& buf) {
-
     using MatrixType = Eigen::Matrix<T, NRows, NCols, Options>; // | Eigen::DontAlign>;
 
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }

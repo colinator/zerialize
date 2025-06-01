@@ -12,7 +12,7 @@ find_package(reflectcpp CONFIG REQUIRED)
 add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
 
 add_executable(${PROJECT_NAME} 
-    src/benchmark_compare.cpp
+    src/benchmark_compare_new.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE 
