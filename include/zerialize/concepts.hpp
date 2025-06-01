@@ -11,9 +11,14 @@
 
 namespace zerialize {
 
-using std::string, std::string_view, std::set, std::span;
+//
+// Defines the two main concepts:
+//  Deserializable, which defines typechecking and conversion requirements.
+//  Serialiable, which defines serialize function requirements.
+//
+
+using std::string, std::string_view, std::set, std::span, std::any;
 using std::convertible_to, std::same_as, std::is_convertible_v, std::enable_if_t;
-using std::any;
 
 // --------------
 // Deserializable Concept
@@ -27,6 +32,8 @@ using std::any;
 // Requires classes to implement deserialization into primitive
 // types, maps, vectors, and blobs.
 
+
+// A helper for 'blob-like' things...
 template <typename C>
 concept Blobby = requires(const C& c) {
     { c.data() } -> std::convertible_to<const uint8_t*>; 
@@ -77,6 +84,7 @@ concept Deserializable = requires(const V& v, const string_view key, size_t inde
     // ... or as a blob
     { v.asBlob() } -> Blobby;
 };
+
 
 // --------------
 // The Serializing concept defines a compile-time interface
