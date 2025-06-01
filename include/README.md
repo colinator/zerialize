@@ -2,7 +2,7 @@
 
 ```mermaid
 
-graph TD
+graph TB
     %% Main entry point
     Z[zerialize.hpp] --> E[errors.hpp]
     Z --> C[concepts.hpp]

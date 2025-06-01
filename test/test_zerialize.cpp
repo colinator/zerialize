@@ -696,8 +696,7 @@ void test_much_serialization() {
                 v["key4"]["nk3"][3]["ik2"].asString() == "euler"; 
         });
 
-        // Working on this one!
-    // kv wit xtensor
+    // kv with xtensor
     auto tens = xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}, {5.0, 6.0}};
     test_serialization<SerializerType>("kv with tensor",
         [&tens](){ 

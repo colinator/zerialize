@@ -46,6 +46,7 @@ ZBuffer serialize_root(F&& func) {
 // --- The std::any paths, which allow convenient brace-initializer expressions ---
 
 // Serialize anything, as an 'any' value.
+// Example → auto buf = serialize<MySerializer>(std::any{123});
 template <typename SerializerType>
 ZBuffer serialize(const any& v) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(any: " << v.type().name() << ")" << endl; }
@@ -55,6 +56,7 @@ ZBuffer serialize(const any& v) {
 }
 
 // Serialize a vector from an initializer list of any.
+// Example → auto buf = serialize<MySerializer>({3.14, "pi"});
 template <typename SerializerType>
 ZBuffer serialize(initializer_list<any> l) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list)" << endl; }
@@ -68,6 +70,7 @@ ZBuffer serialize(initializer_list<any> l) {
 }
 
 // Serialize a map from an initializer list of pair<string, any>.
+// Example → auto buf = serialize<MySerializer>({{"x", 1}, {"y", 2}});
 template <typename SerializerType>
 ZBuffer serialize(initializer_list<pair<string, any>> l) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(initializer list/map)" << endl; }
@@ -98,6 +101,7 @@ void serialize_impl(SerializerType& ser, ValueTypes&&... values) {
 }
 
 // serialize a single value or a pack of values...
+// Example → auto buf = serialize<MySerializer>(42, 3.14, true);
 template<typename SerializerType, typename... ValueTypes>
 ZBuffer serialize(ValueTypes&&... values) {
     if constexpr (DEBUG_TRACE_CALLS) { cout << "serialize(&&values generic)" << endl; }
@@ -109,6 +113,7 @@ ZBuffer serialize(ValueTypes&&... values) {
 }
 
 // Serialize a map from pairs of string keys and  perfectly-forwarded values.
+// Example → auto buf = serialize<MySerializer>({"x", 1}, {"y", 2});
 template<typename SerializerType, typename... ValueTypes>
 requires (sizeof...(ValueTypes) > 0)
 ZBuffer serialize(pair<const char*, ValueTypes>&&... values) {
@@ -195,6 +200,7 @@ constexpr auto zvec(ValueTypes&&... values) noexcept {
 }
 
 // Map-based serialize overload for KeyValueRef list.
+// Example → auto buf = serialize<MySerializer>(zkv("x", 1), zkv("y", 2));
 template <typename SerializerType, typename... KVTypes>
 requires (std::conjunction_v<std::bool_constant<zkvdetail::is_kv_v<KVTypes>>...>)
 ZBuffer serialize(KVTypes&&... kvs) {
@@ -210,7 +216,7 @@ ZBuffer serialize(KVTypes&&... kvs) {
 // --------------
 // ...and a special handle-it-all generic conversion function,
 // to convert from one serialization format to another.
-
+// Example → auto mpBuf = convert<JsonSerializer, MsgpackSerializer>(jsonBuf);
 template<typename SrcSerializerType, typename DstSerializerType>
 typename DstSerializerType::BufferType convert(const typename SrcSerializerType::BufferType& srcSerializer) {
     if constexpr (DEBUG_TRACE_CALLS) {
