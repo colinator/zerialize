@@ -1,37 +1,36 @@
 #pragma once
 
+#include <array>
 #include <zerialize/zerialize.hpp>
 #include <Eigen/Dense>
+#include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/utils.hpp>
+#include <zerialize/zbuilders.hpp>
+
+namespace Eigen {
+
+template <typename T, int R, int C, int Options, zerialize::Writer W>
+void serialize(const Eigen::Matrix<T, R, C, Options>& m, W& w) {
+    const std::array<std::size_t, 2> shape{
+        static_cast<std::size_t>(m.rows()),
+        static_cast<std::size_t>(m.cols())
+    };
+
+    zerialize::zvec(
+        zerialize::tensor_dtype_index<T>,
+        shape,
+        zerialize::span_from_data_of(m)
+    )(w);
+}
+
+} // namespace Eigen
 
 namespace zerialize {
 namespace eigen {
 
-// Serialize an eigen matrix
-template <typename S, typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
-S::SerializingFunction serializer(const Eigen::Matrix<T, NRows, NCols, Options>& m) {
-    return [&m](Serializable auto& s) {
-        if constexpr (TensorIsMap) {
-            s.serializeMap([&m](Serializable auto& ser) {
-                std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
-                ser.serialize(ShapeKey, shape);
-                ser.serialize(DTypeKey, tensor_dtype_index<T>);
-                ser.serialize(DataKey, span_from_data_of(m));
-            });
-        } else {
-            s.serializeVector([&m](Serializable auto& ser) {
-                std::vector<any> shape = { any((TensorShapeElement)m.rows()), any((TensorShapeElement)m.cols()) };
-                ser.serialize(tensor_dtype_index<T>);
-                ser.serialize(shape);
-                ser.serialize(span_from_data_of(m));
-            });   
-        }
-    };
-}
-
 // Deserialize an eigen matrix/map
 template <typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
-auto asEigenMatrix(const Deserializable auto& buf) {
+auto asEigenMatrix(const Reader auto& buf) {
     using MatrixType = Eigen::Matrix<T, NRows, NCols, Options>; // | Eigen::DontAlign>;
 
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }
@@ -40,8 +39,8 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     auto dtype_ref = TensorIsMap ? buf[DTypeKey] : buf[0];
     auto dtype = dtype_ref.asInt32();
     if (dtype != tensor_dtype_index<T>) {
-        throw DeserializationError(string("asEigenMatrix asked to deserialize a matrix of type ") + 
-            string(tensor_dtype_name<T>) + " but found a matrix of type " + string(type_name_from_code(dtype)));
+        throw DeserializationError(std::string("asEigenMatrix asked to deserialize a matrix of type ") + 
+        std::string(tensor_dtype_name<T>) + " but found a matrix of type " + std::string(type_name_from_code(dtype)));
     }
 
     // get the shape
@@ -72,7 +71,7 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     // read actual data
     auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
     auto blob = data_ref.asBlob();
-    T* data_typed = data_from_blobby<T>(blob);
+    T* data_typed = data_from_blobview<T>(blob);
 
     // Create a Map object. If all is well, then this
     // should perform no copies - it should basically
@@ -88,7 +87,7 @@ auto asEigenMatrix(const Deserializable auto& buf) {
     // Depending on the blob type (is it owned or not), we might
     // have to instantiate (copy) the matrix. This will happen for 
     // serializable types that do not support 0-copy blobs (such as Json).
-    if constexpr (std::is_same_v<decltype(blob), vector<uint8_t>>) {
+    if constexpr (std::is_same_v<decltype(blob), std::vector<std::byte>>) {
         // We've gotta copy it...
         return MatrixType(in_place_matrix);
     } else { //if constexpr (std::is_same_v<decltype(blob), span<const uint8_t>>) {

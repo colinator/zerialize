@@ -3,18 +3,19 @@
 #include <stdexcept>
 #include <string>
 
+// Serialization and Deserialization exception types. 
+// These really require no further explanation.
+
 namespace zerialize {
 
-using std::runtime_error, std::string;
-
-class SerializationError : public runtime_error {
+class SerializationError : public std::runtime_error {
 public:
-    SerializationError(const string& msg) : runtime_error(msg) { }
+    SerializationError(const std::string& msg) : std::runtime_error(msg) { }
 };
 
-class DeserializationError : public runtime_error {
+class DeserializationError : public std::runtime_error {
 public:
-    DeserializationError(const string& msg) : runtime_error(msg) { }
+    DeserializationError(const std::string& msg) : std::runtime_error(msg) { }
 };
 
 } // namespace zerialize

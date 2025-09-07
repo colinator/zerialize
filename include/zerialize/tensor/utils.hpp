@@ -27,27 +27,27 @@ template<> inline constexpr int tensor_dtype_index<complex<double>> = 13;
 template<> inline constexpr int tensor_dtype_index<xtl::half_float> = 14;
 
 template<typename T>
-inline constexpr string_view tensor_dtype_name = "";
-template<> inline constexpr string_view tensor_dtype_name<int8_t>   = "int8";
-template<> inline constexpr string_view tensor_dtype_name<int16_t>  = "int16";
-template<> inline constexpr string_view tensor_dtype_name<int32_t>  = "int32";
-template<> inline constexpr string_view tensor_dtype_name<int64_t>  = "int64";
-template<> inline constexpr string_view tensor_dtype_name<uint8_t>  = "uint8";
-template<> inline constexpr string_view tensor_dtype_name<uint16_t> = "uint16";
-template<> inline constexpr string_view tensor_dtype_name<uint32_t> = "uint32";
-template<> inline constexpr string_view tensor_dtype_name<uint64_t> = "uint64";
-template<> inline constexpr string_view tensor_dtype_name<float> = "float";
-template<> inline constexpr string_view tensor_dtype_name<double> = "double";
-template<> inline constexpr string_view tensor_dtype_name<complex<float>> = "complex<float>";
-template<> inline constexpr string_view tensor_dtype_name<complex<double>> = "complex<double>";
-template<> inline constexpr string_view tensor_dtype_name<xtl::half_float> = "xtl::half_float";
+inline constexpr std::string_view tensor_dtype_name = "";
+template<> inline constexpr std::string_view tensor_dtype_name<int8_t>   = "int8";
+template<> inline constexpr std::string_view tensor_dtype_name<int16_t>  = "int16";
+template<> inline constexpr std::string_view tensor_dtype_name<int32_t>  = "int32";
+template<> inline constexpr std::string_view tensor_dtype_name<int64_t>  = "int64";
+template<> inline constexpr std::string_view tensor_dtype_name<uint8_t>  = "uint8";
+template<> inline constexpr std::string_view tensor_dtype_name<uint16_t> = "uint16";
+template<> inline constexpr std::string_view tensor_dtype_name<uint32_t> = "uint32";
+template<> inline constexpr std::string_view tensor_dtype_name<uint64_t> = "uint64";
+template<> inline constexpr std::string_view tensor_dtype_name<float> = "float";
+template<> inline constexpr std::string_view tensor_dtype_name<double> = "double";
+template<> inline constexpr std::string_view tensor_dtype_name<complex<float>> = "complex<float>";
+template<> inline constexpr std::string_view tensor_dtype_name<complex<double>> = "complex<double>";
+template<> inline constexpr std::string_view tensor_dtype_name<xtl::half_float> = "xtl::half_float";
 
 // Unsupported...
 //template<> inline constexpr int tensor_dtype_index<intptr_t> = 8;
 //template<> inline constexpr int tensor_dtype_index<uintptr_t> = 9;
 
 
-inline string_view type_name_from_code(int type_code) {
+inline std::string_view type_name_from_code(int type_code) {
     switch (type_code) {
         case tensor_dtype_index<int8_t>: return tensor_dtype_name<int8_t>;
         case tensor_dtype_index<int16_t>: return tensor_dtype_name<int16_t>;
@@ -71,20 +71,18 @@ constexpr char DTypeKey[] = "dtype";
 constexpr char DataKey[] = "data";
 
 using TensorShapeElement = uint32_t;
-using TensorShape = vector<TensorShapeElement>;
+using TensorShape = std::vector<TensorShapeElement>;
 
-inline vector<any> shape_of_any(const auto& tshape) {
-    // get a vector of the shape as a vector of any.
-    // we really should do something about that...
+inline std::vector<std::size_t> shape_of_sizet(const auto& tshape) {
     // We should be able to pass vector<T> to serialize...
-    vector<any> shape;
+    std::vector<std::size_t> shape;
     shape.reserve(tshape.size());
     std::transform(tshape.begin(), tshape.end(), std::back_inserter(shape),
-        [](TensorShapeElement x) { return any(x); });
+        [](TensorShapeElement x) { return x; });
     return shape;
 }
 
-TensorShape tensor_shape(const Deserializable auto& d) {
+TensorShape tensor_shape(const Reader auto& d) {
     if (!d.isArray()) {
         return {};
     }
@@ -103,33 +101,27 @@ concept HasDataAndSize = requires(const C& c) {
 };
 
 template <HasDataAndSize C>
-std::span<const std::uint8_t> span_from_data_of(const C& container) {
+std::span<const std::byte> span_from_data_of(const C& container) {
     using T = typename C::value_type; 
     const T* actual_data = container.data();
-    const std::uint8_t* byte_data = reinterpret_cast<const std::uint8_t*>(actual_data);
+    const std::byte* byte_data = reinterpret_cast<const std::byte*>(actual_data);
     std::size_t num_bytes = container.size() * sizeof(T);
-    return std::span<const std::uint8_t>(byte_data, num_bytes);
+    return std::span<const std::byte>(byte_data, num_bytes);
 }
 
-// template <typename C>
-// concept Blobby = requires(const C& c) {
-//     { c.data() } -> std::convertible_to<const uint8_t*>; 
-//     { c.size() } -> std::convertible_to<std::size_t>;
-// };
-
 template <typename T>
-T* data_from_blobby(const Blobby auto& blob) {
-    const uint8_t * data_bytes = blob.data();
+T* data_from_blobview(const BlobView auto& blob) {
+    const std::byte * data_bytes = blob.data();
     const T * data_typed_const = (const T*)data_bytes;
     T* data_typed = const_cast<T*>(data_typed_const);
     return data_typed;
 }
 
 template <typename T, bool TensorIsMap=false>
-bool isTensor(const Deserializable auto& buf) {
+bool isTensor(const Reader auto& buf) {
     if constexpr (TensorIsMap) {
         if (!buf.isMap()) return false;
-        set<string_view> keys = buf.mapKeys();
+        std::set<std::string_view> keys = buf.mapKeys();
         return 
             keys.contains(ShapeKey) && buf[ShapeKey].isArray() && 
             keys.contains(DTypeKey) && buf[DTypeKey].isInt() && buf[DTypeKey].asInt8() == tensor_dtype_index<T> &&

@@ -2,9 +2,9 @@
     "name": "benchmark-compare",
     "version-string": "0.0.1",
     "dependencies": [
-      {
-        "name": "reflectcpp",
-        "features": [ "flexbuffers", "msgpack" ]
-      }
+        {
+            "name": "reflectcpp",
+            "features": [ "flexbuffers", "msgpack" ]
+        }
     ]
-  }
+}

@@ -3,17 +3,56 @@
 #include <string>
 #include <vector>
 #include <span>
+#include <variant>
+#include <functional>
 
 namespace zerialize {
 
-using std::vector, std::span, std::string;
-
-
-// --------------
-// A buffer type (basically an array of bytes) that
-// can get it's data from different sources: moving in
-// a std::vector, or taking ownership of a raw pointer.
-// Re-exposes data as a span<uint8_t>.
+/*
+ * ZBuffer
+ * --------
+ * A flexible, RAII-managed byte buffer abstraction used throughout zerialize.
+ * When you call `serialize`, this is what you get back.
+ *
+ * Key points:
+ *   • Encapsulates a contiguous block of bytes with unique ownership semantics.
+ *   • Can be constructed from:
+ *       - A moved `std::vector<uint8_t>` (takes ownership of its storage).
+ *       - A raw pointer (`uint8_t*`, `char*`, or `void*`) + size + custom deleter.
+ *         Useful for integrating with C APIs, malloc/new allocations, or foreign libraries.
+ *   • Internally stores either:
+ *       - An owned `std::vector<uint8_t>`.
+ *       - A managed pointer (`unique_ptr<uint8_t, function<void(uint8_t*)>>`) + length.
+ *   • Always provides a uniform view via:
+ *       - `.data()`   → raw pointer
+ *       - `.size()`   → length in bytes
+ *       - `.buf()`    → `std::span<const uint8_t>` (preferred)
+ *
+ * Intended usage:
+ *   ZBuffer acts as the "glue" between serializers and deserializers,
+ *   making it easy to hand off raw protocol bytes while abstracting away
+ *   ownership rules. 
+ *
+ * Example:
+ *   // From a std::vector
+ *   std::vector<uint8_t> bytes = {...};
+ *   zerialize::ZBuffer buf(std::move(bytes));
+ *
+ *   // From a malloc’d buffer
+ *   void* raw = malloc(1024);
+ *   zerialize::ZBuffer buf(raw, 1024, zerialize::ZBuffer::Deleters::Free);
+ *
+ *   // As a span
+ *   auto view = buf.buf();
+ *
+ *   // Copy out
+ *   std::vector<uint8_t> copy = buf.to_vector_copy();
+ *
+ * Notes:
+ *   • Copy construction is disabled (unique ownership).
+ *   • Move construction/assignment is supported.
+ *   • Provides helper methods for debugging (`to_string`, `to_debug_string`).
+ */
 
 class ZBuffer {
 public:
@@ -38,7 +77,7 @@ private:
     // --- Storage Strategies ---
 
     // 1. Data owned by a std::vector
-    using OwnedVector = vector<uint8_t>;
+    using Ownedvector = std::vector<uint8_t>;
 
     // 2. Data owned by a raw pointer with a custom deleter
     // We use unique_ptr with a type-erased deleter (std::function)
@@ -56,19 +95,19 @@ private:
     };
 
     // --- Variant holding the active storage strategy ---
-    std::variant<OwnedVector, ManagedPtr> storage_;
+    std::variant<Ownedvector, ManagedPtr> storage_;
 
 public:
     // --- Constructors ---
 
     // Default constructor: Creates an empty buffer
     ZBuffer() noexcept 
-        : storage_(std::in_place_type<OwnedVector>) {}
+        : storage_(std::in_place_type<Ownedvector>) {}
 
-    // Constructor from a moved std::vector
-    // Takes ownership of the vector's data.
+    // Constructor from a moved std::std::vector
+    // Takes ownership of the std::vector's data.
     ZBuffer(std::vector<uint8_t>&& vec) noexcept
-        : storage_(std::in_place_type<OwnedVector>, std::move(vec)) {}
+        : storage_(std::in_place_type<Ownedvector>, std::move(vec)) {}
 
     // Constructor taking ownership of a raw uint8_t* pointer with a custom deleter.
     // The deleter MUST correctly free the provided pointer.
@@ -122,7 +161,7 @@ public:
     [[nodiscard]] size_t size() const noexcept {
         return std::visit([](const auto& storage_impl) -> size_t {
             using T = std::decay_t<decltype(storage_impl)>;
-            if constexpr (std::is_same_v<T, OwnedVector>) {
+            if constexpr (std::is_same_v<T, Ownedvector>) {
                 return storage_impl.size();
             } else if constexpr (std::is_same_v<T, ManagedPtr>) {
                 return storage_impl.count;
@@ -132,11 +171,15 @@ public:
         }, storage_);
     }
 
+    [[nodiscard]] bool owned() const noexcept {
+        return std::holds_alternative<Ownedvector>(storage_);
+    }
+
     [[nodiscard]] const uint8_t* data() const noexcept {
         return std::visit([](const auto& storage_impl) -> const uint8_t* {
             using T = std::decay_t<decltype(storage_impl)>;
-            if constexpr (std::is_same_v<T, OwnedVector>) {
-                return storage_impl.data(); // vector::data() is fine in C++20
+            if constexpr (std::is_same_v<T, Ownedvector>) {
+                return storage_impl.data(); // std::vector::data() is fine in C++20
             } else if constexpr (std::is_same_v<T, ManagedPtr>) {
                 return storage_impl.ptr.get(); // unique_ptr::get()
             } else {
@@ -149,24 +192,42 @@ public:
         return size() == 0;
     }
 
-    [[nodiscard]] span<const uint8_t> buf() const noexcept {
-        return span<const uint8_t>(data(), size());
+    [[nodiscard]] std::span<const uint8_t> buf() const noexcept {
+        return std::span<const uint8_t>(data(), size());
     }
 
     std::string to_string() const {
-        return string("<ZBuffer, size=") + std::to_string(size()) + ">";
+        return std::string("<ZBuffer ") + std::to_string(size()) + " bytes, owned=" + (owned() ? "true" : "false") + ">";
     }
 
-    // Creates a new vector containing a copy of the buffer's data.
-    vector<uint8_t> to_vector_copy() const {
+    // Returns the buffer data as a string for debugging purposes.
+    // For text-based formats like JSON, this will be human-readable.
+    // For binary formats, this may contain non-printable characters.
+    std::string to_debug_string() const {
+        const uint8_t* ptr = data();
+        const size_t count = size();
+        if (ptr && count > 0) {
+            // Convert the raw bytes to a string
+            // for (size_t i=0; i<count; i++) {
+            //     std::cout << ptr[i];
+            // }
+            return std::string(reinterpret_cast<const char*>(ptr), count);
+        } else {
+            // Return an empty string if the buffer is empty or invalid
+            return std::string();
+        }
+    }
+
+    // Creates a new std::std::vector containing a copy of the buffer's data.
+    std::vector<uint8_t> to_vector_copy() const {
         const uint8_t* ptr = data();
         const size_t count = size();
         if (ptr && count > 0) {
             // Use the iterator range constructor to copy the data
-            return vector<uint8_t>(ptr, ptr + count);
+            return std::vector<uint8_t>(ptr, ptr + count);
         } else {
-            // Return an empty vector if the buffer is empty or invalid
-            return vector<uint8_t>();
+            // Return an empty std::vector if the buffer is empty or invalid
+            return std::vector<uint8_t>();
         }
     }
 };

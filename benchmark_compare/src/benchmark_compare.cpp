@@ -1,16 +1,15 @@
 #include <iostream>
-#include <chrono>
-#include <vector>
 #include <string>
-#include <map>
-#include <functional>
 #include <iomanip>
+#include <chrono>
 
-// Zerialize includes
 #include <zerialize/zerialize.hpp>
-#include <zerialize/zerialize_flex.hpp>
-#include <zerialize/zerialize_msgpack.hpp>
-#include <zerialize/zerialize_json.hpp>
+#include <zerialize/protocols/flex.hpp>
+#include <zerialize/protocols/msgpack.hpp>
+#include <zerialize/protocols/json.hpp>
+#include <zerialize/tensor/xtensor.hpp>
+
+#include <xtensor/core/xmath.hpp>
 
 // Reflect-cpp includes
 #include <rfl/json.hpp>
@@ -21,22 +20,9 @@
 using namespace zerialize;
 using namespace std::chrono;
 
-// Define a struct for reflect-cpp that matches our test data
-struct TestData {
-    int int_value;
-    double double_value;
-    std::string string_value;
-    std::vector<int> array_value;
-};
+using std::cout, std::endl, std::string;
+using std::setw, std::setprecision, std::right, std::left, std::fixed;
 
-    
-// Create test data
-TestData testData{
-    42,
-    3.14159,
-    "hello world",
-    {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-};
 
 // Simple benchmarking function that measures execution time
 template<typename Func>
@@ -53,623 +39,638 @@ double benchmark(Func&& func, size_t iterations = 1000000) {
     return static_cast<double>(duration) / iterations;
 }
 
-// Benchmark results structure
+
+// -------------------------
+// Reflect-cpp support for xtensor
+
+// -------------------------
+
+
+// -------------------------
+// Test variation combinations
+
+// Test across these serialization types
+enum class SerializationType {
+    Flex,
+    MsgPack,
+    Json
+};
+
+// Test across these data variations
+enum class DataType {
+    SmallStruct,
+    SmallStructAsVector,
+    SmallTensorStruct,
+    SmallTensorStructAsVector,
+    LargeTensorStruct
+};
+
+// Test across these competitors
+enum class CompetitorType {
+    Zerialize,
+    ReflectCpp
+};
+
+
+// -------------------------
+// the message types we are testing
+
+struct SmallStruct {
+    int int_value;
+    double double_value;
+    std::string string_value;
+    std::vector<int> array_value;
+};
+
+struct TensorWrapper {
+    std::vector<size_t> shape;
+    int dtype;
+    //std::vector<std::uint8_t> data;
+    rfl::Bytestring data;
+};
+
+struct SmallTensorStruct {
+    int int_value;
+    double double_value;
+    std::string string_value;
+    TensorWrapper tensor_value; // Small 4x4 tensor
+};
+
+struct LargeTensorStruct {
+    int int_value;
+    double double_value;
+    std::string string_value;
+    //rfl::Bytestring tensor_value;
+    TensorWrapper tensor_value; // Large 3x1024x768 tensor
+};
+
+
+// -------------------------
+// to string utility methods
+
+template <SerializationType ST>
+constexpr string st_to_string() {
+    if constexpr (ST == SerializationType::Flex) { return "Flex"; } 
+    else if constexpr (ST == SerializationType::MsgPack) { return "MsgPack"; } 
+    else { return "Json"; }
+}
+
+template <DataType DT>
+constexpr string dt_to_string() {
+    if constexpr (DT == DataType::SmallStruct) { return "SmallStruct"; } 
+    else if constexpr (DT == DataType::SmallStructAsVector) { return "SmallStructAsVector"; } 
+    else if constexpr (DT == DataType::SmallTensorStruct) { return "SmallTensorStruct";} 
+    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return "SmallTensorStructAsVector"; } 
+    else if constexpr (DT == DataType::LargeTensorStruct) { return "LargeTensorStruct"; } 
+    else { return "unknown"; }
+}
+
+template <CompetitorType CT>
+constexpr string ct_to_string() {
+    if constexpr (CT == CompetitorType::Zerialize) { return "Zerialize"; } 
+    else { return "ReflectCpp"; }
+}
+
+
+// -------------------------
+// How we collect data.
+
 struct BenchmarkResult {
-    std::string name;
     double serializationTime;
     double deserializationTime;
     double readTime;
+    double deserializeAndReadTime;
+    double deserializeAndInstantiateTime;
     size_t dataSize;
-    int iterations;
+    size_t iterations;
 };
 
-// Print benchmark results in a table
-void printResults(const std::vector<BenchmarkResult>& results) {
-    std::cout << std::left << std::setw(35) << "Test Name" 
-              << std::right << std::setw(18) << "Serialize (µs)" 
-              << std::setw(18) << "Deserialize (µs)" 
-              << std::setw(18) << "Read (µs)" 
-              << std::setw(18) << "Data Size (bytes)"
-              << std::setw(14) << "(samples)" << std::endl;
-    
-    std::cout << std::string(118, '-') << std::endl;
-    
-    for (const auto& result : results) {
-        std::cout << std::left << std::setw(35) << result.name 
-                  << std::right << std::setw(17) << std::fixed << std::setprecision(3) << result.serializationTime 
-                  << std::setw(17) << std::fixed << std::setprecision(3) << result.deserializationTime 
-                  << std::setw(17) << std::fixed << std::setprecision(3) << result.readTime 
-                  << std::setw(17) << result.dataSize
-                  << std::setw(15) << result.iterations << std::endl;
+
+// -------------------------
+// Serialization methods
+
+std::array<int, 10> smallArray = {1,2,3,4,5,6,7,8,9,10};
+xt::xtensor<double, 2> smallXtensor{{1.0, 2.0, 3.0, 4.0}, {4.0, 5.0, 6.0, 7.0}, {8.0, 9.0, 10.0, 11.0}, {12.0, 13.0, 14.0, 15.0}};
+//auto largeXTensor = xt::full<uint8_t>({3, 1024, 768}, 3);
+xt::xtensor<uint8_t, 3> largeXTensor({3, 1024, 768});
+
+
+// -------------------------
+// Zerialize serialization methods (DSL: serialize/zmap/zvec)
+
+template <typename P>
+ZBuffer get_zerialized_smallstruct() {
+    return serialize<P>(
+        zmap<"int_value","double_value","string_value","array_value">(
+            42,
+            3.14159,
+            "hello world",
+            smallArray
+        )
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_smallstructasvector() {
+    return serialize<P>(
+        zvec(42, 3.14159, "hello world", smallArray)
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_smalltensorstruct() {
+    return serialize<P>(
+        zmap<"int_value","double_value","string_value","tensor_value">(
+            42,
+            3.14159,
+            "hello world",
+            smallXtensor
+        )
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_smalltensorstructasvector() {
+    return serialize<P>(
+        zvec(42, 3.14159, "hello world", smallXtensor)
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_largetensorstruct() {
+    // relies on ADL overload: serialize(const xt::xtensor<uint8_t,3>&, W&)
+    return serialize<P>(
+        zmap<"int_value","double_value","string_value","tensor_value">(
+            42,
+            3.14159,
+            "hello world",
+            largeXTensor
+        )
+    );
+}
+
+template <typename P, DataType DT>
+ZBuffer get_zerialized_data() {
+    if constexpr (DT == DataType::SmallStruct) {
+        return get_zerialized_smallstruct<P>();
+    } else if constexpr (DT == DataType::SmallStructAsVector) {
+        return get_zerialized_smallstructasvector<P>();
+    } else if constexpr (DT == DataType::SmallTensorStruct) {
+        return get_zerialized_smalltensorstruct<P>();
+    } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
+        return get_zerialized_smalltensorstructasvector<P>();
+    } else {
+        return get_zerialized_largetensorstruct<P>();
     }
 }
 
-constexpr bool ZerializeAsVector = false;
+template <SerializationType ST, DataType DT>
+ZBuffer get_zerialized() {
+    if constexpr (ST == SerializationType::Flex) {
+        return get_zerialized_data<zerialize::Flex, DT>();
+    } else if constexpr (ST == SerializationType::MsgPack) {
+        return get_zerialized_data<zerialize::MsgPack, DT>();
+    } else {
+        return get_zerialized_data<zerialize::JSON, DT>();
+    }
+}
 
-// Run Zerialize benchmarks for a specific serializer type
-template<typename SerializerType>
-std::vector<BenchmarkResult> runZerializeBenchmarks() {
-    std::vector<BenchmarkResult> results;
+// -------------------------
+// Reflect-cpp serialization methods
 
-    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
-    std::string sharedStr = "hello world";
-    std::string key1 = "hint_value";
-    std::string key2 = "double_value";
-    std::string key3 = "string_value";
-    std::string key4 = "array_value";
+SmallStruct testDataSmallStruct {
+    42, 
+    3.14159,
+    "hello world", 
+    {1,2,3,4,5,6,7,8,9,10}
+};
 
-    std::map<std::string, std::any> m = { 
-        { "int_value", 42 },
-        { "double_value", 3.14159 },
-        { "string_value", "hello world"},
-        { "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10} }
-    };
+std::vector<size_t> small_shape = { 4, 4 };
+rfl::Bytestring small_vector = {
+    std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04}, std::byte{0x05}
+};
 
-    // Medium data: Map nested values
-    {
-        // Benchmark serialization
-        double serTime = ZerializeAsVector ?
-            benchmark([&]() {
-                auto serialized = serialize<SerializerType>({
-                    42,
-                    3.14159,
-                    "hello world",
-                    std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-                });
-                return serialized;
-            }) :
-            benchmark([&]() {
-                auto serialized = serialize<SerializerType>(
-                    // {
-                    // {"int_value", 42},
-                    // {"double_value", 3.14159},
-                    // {"string_value", "hello world"},
-                    // {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }}
-                    // }
+SmallTensorStruct testDataSmallTensorStruct {
+    42, 
+    3.14159, 
+    "hello world",
+    TensorWrapper{
+        small_shape,
+        8,
+        small_vector
+    }
+    //smallXtensor
+};
 
-                    // {"int_value", 42},
-                    // {"double_value", 3.14159},
-                    // {"string_value", sharedStr},
-                    // {"array_value", sharedVec}
-                    //zmap(
-                        zkv("int_value", 42),
-                        zkv("double_value", 3.14159),
-                        zkv("string_value", sharedStr),
-                        zkv("array_value", sharedVec)
-                    //)
+// Create large tensor data to match the zerialize version
+std::vector<size_t> large_shape = { 3, 1024, 768 };
+//std::vector<std::uint8_t> large_vector(3 * 1024 * 768, 3); // Fill with value 3 like largeXTensor
+rfl::Bytestring large_vector(3 * 1024 * 768, std::byte{3});
 
-                    // kv( "int_value", 42 ),
-                    // kv( "double_value", 3.14159 ),
-                    // kv( "string_value", "hello world" ),
-                    // kv( "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } )
+LargeTensorStruct testDataLargeTensorStruct {
+    42, 
+    3.14159, 
+    "hello world",
+    //large_vector
+    TensorWrapper{
+        large_shape,
+        1, // uint8_t dtype
+        large_vector
+    }
+};
 
-                    // kv( key1, 42 ),
-                    // kv( key2, 3.14159 ),
-                    // kv( key3, sharedStr ),
-                    // kv( key4, sharedVec )
+template <SerializationType ST, typename DT>
+auto get_reflected_data(DT&& data) {
+    if constexpr (ST == SerializationType::Flex) {
+        return rfl::flexbuf::write(data);
+    } else if constexpr (ST == SerializationType::MsgPack) {
+        return rfl::msgpack::write(data);
+    } else {
+        return rfl::json::write(data);
+    }
+}
 
-                    // kv( "string_value", "hello world" ),
-                    // kv( "array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } )
-                );
-                return serialized;
-            });
-            // benchmark([&]() {
-            //     auto serialized = serialize<SerializerType>(m);
-            //     return serialized;
-            // }) :
-            // benchmark([&]() {
-            //     auto serialized = serialize<SerializerType>(m);
-            //     return serialized;
-            // });
-       
-        // // Create serialized data once for deserialization tests
-        // auto serialized = ZerializeAsVector ?
-        //    serialize<SerializerType>({
-        //         42,
-        //         3.14159,
-        //         "hello world",
-        //         std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-        //     }) :
-        //     serialize<SerializerType>({
-        //         {"int_value", 42},
-        //         {"double_value", 3.14159},
-        //         {"string_value", "hello world"},
-        //         {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
-        //     });
-        // Create serialized data once for deserialization tests
+template <SerializationType ST, typename DT>
+auto get_reflected_data_flat(DT&& data) {
+    if constexpr (ST == SerializationType::Flex) {
+        return rfl::flexbuf::write<rfl::NoFieldNames>(data);
+    } else if constexpr (ST == SerializationType::MsgPack) {
+        return rfl::msgpack::write<rfl::NoFieldNames>(data);
+    } else {
+        return rfl::json::write<rfl::NoFieldNames>(data);
+    }
+}
 
-        auto buffer = ZerializeAsVector ?
-           serialize<SerializerType>({
-                42,
-                3.14159,
-                "hello world",
-                std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-            }) :
-            serialize<SerializerType>({
-                {"int_value", 42},
-                {"double_value", 3.14159},
-                {"string_value", "hello world"},
-                {"array_value", std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
-            });
+template <SerializationType ST, DataType DT>
+auto get_reflected() {
+    if constexpr (DT == DataType::SmallStruct) {
+        return get_reflected_data<ST>(testDataSmallStruct);
+    } else if constexpr (DT == DataType::SmallStructAsVector) {
+        return get_reflected_data_flat<ST>(testDataSmallStruct);
+    } else if constexpr (DT == DataType::SmallTensorStruct) {
+        return get_reflected_data<ST>(testDataSmallTensorStruct);
+    } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
+        return get_reflected_data_flat<ST>(testDataSmallTensorStruct);
+    } else {
+        return get_reflected_data_flat<ST>(testDataLargeTensorStruct);
+    }
+}
 
 
-        //std::vector<uint8_t> bufferCopy(serialized.buf().begin(), serialized.buf().end());
+// -------------------------
+// Unified serialization method
+
+template <SerializationType ST, DataType DT, CompetitorType CT>
+auto get_serialized() {
+    if constexpr (CT == CompetitorType::Zerialize) {
+        return get_zerialized<ST, DT>();
+    } else {
+        return get_reflected<ST, DT>();
+    }
+}
+
+
+// -------------------------
+// Utility methods
+
+template <DataType DT>
+size_t num_iterations() {
+    if constexpr (DT == DataType::SmallStruct) { return 1000000; } 
+    else if constexpr (DT == DataType::SmallStructAsVector) { return 1000000; } 
+    else if constexpr (DT == DataType::SmallTensorStruct) { return 1000000; } 
+    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return 1000000; } 
+    else if constexpr (DT == DataType::LargeTensorStruct) { return 10; } 
+    else { return 1; }
+}
+
+inline void release_assert(bool condition, const string& message = "") {
+    if (!condition) {
+        std::cerr << "Assertion failed: " << message << "\n";
+        std::abort();
+    }
+}
+
+// -------------------------
+// Deserialization methods
+
+
+// -------------------------
+// Zerialize deserialization methods
+
+template <SerializationType ST, DataType /*DT*/>
+auto get_zerialize_deserialized(std::span<const uint8_t> buf) {
+    if constexpr (ST == SerializationType::Flex) {
+        typename zerialize::Flex::Deserializer d(buf);
+        return d;
+    } else if constexpr (ST == SerializationType::MsgPack) {
+        typename zerialize::MsgPack::Deserializer d(buf);
+        return d;
+    } else {
+        typename zerialize::JSON::Deserializer d(buf);
+        return d;
+    }
+}
+
+// -------------------------
+// Reflect deserialization methods
+
+template <SerializationType ST, typename DataType, bool Flat>
+auto get_reflect_deserialized_object(const auto& buf) {
+    if constexpr (ST == SerializationType::Flex) {
+        if constexpr (Flat) {
+            return rfl::flexbuf::read<DataType, rfl::NoFieldNames>(buf).value();
+        } else {
+            return rfl::flexbuf::read<DataType>(buf).value();
+        }
+    } else if constexpr (ST == SerializationType::MsgPack) {
+        if constexpr (Flat) {
+            return rfl::msgpack::read<DataType, rfl::NoFieldNames>(buf).value();
+        } else {
+            return rfl::msgpack::read<DataType>(buf).value();
+        }
+    } else {
+        if constexpr (Flat) {
+            return rfl::json::read<DataType, rfl::NoFieldNames>(buf).value();
+        } else {
+            return rfl::json::read<DataType>(buf).value();
+        }
+    }
+}
+
+template <SerializationType ST, DataType DT>
+auto get_reflect_deserialized(const auto& buf) {
+    if constexpr (DT == DataType::SmallStruct) {
+        return get_reflect_deserialized_object<ST, SmallStruct, false>(buf);
+    } else if constexpr (DT == DataType::SmallStructAsVector) {
+        return get_reflect_deserialized_object<ST, SmallStruct, true>(buf);
+    } else if constexpr (DT == DataType::SmallTensorStruct) {
+        return get_reflect_deserialized_object<ST, SmallTensorStruct, false>(buf);
+    } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
+        return get_reflect_deserialized_object<ST, SmallTensorStruct, true>(buf);
+    } else {
+        return get_reflect_deserialized_object<ST, LargeTensorStruct, true>(buf);
+    }
+}
+
+template <SerializationType ST, DataType DT, CompetitorType CT>
+auto get_deserialized(const auto& buf) {
+    if constexpr (CT == CompetitorType::Zerialize) {
+        return get_zerialize_deserialized<ST, DT>(buf);
+    } else {
+        return get_reflect_deserialized<ST, DT>(buf);
+    }
+}
+
+int perform_read_zerialize_smallstruct(const auto& deserializer) {
+    int i = deserializer["int_value"].asInt64();
+    double d = deserializer["double_value"].asDouble();
+    string s = deserializer["string_value"].asString();
+    auto arr = deserializer["array_value"];
+    int sum = 0;
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_smallstructasvector(const auto& deserializer) {
+    int i = deserializer[0].asInt64();
+    double d = deserializer[1].asDouble();
+    string s = deserializer[2].asString();
+    auto arr = deserializer[3];
+    int sum = 0;
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStructAsVector contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_smalltensorstruct(const auto& deserializer) {
+    int i = deserializer["int_value"].asInt64();
+    double d = deserializer["double_value"].asDouble();
+    string s = deserializer["string_value"].asString();
+    auto tensor = xtensor::asXTensor<double, 2>(deserializer["tensor_value"]);
+    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "SmallTensorStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_smalltensorstructasvector(const auto& deserializer) {
+    int i = deserializer[0].asInt64();
+    double d = deserializer[1].asDouble();
+    string s = deserializer[2].asString();
+    auto tensor = xtensor::asXTensor<double, 2>(deserializer[3]);
+    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "SmallTensorStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_largetensorstruct(const auto& deserializer) {
+    int i = deserializer["int_value"].asInt64();
+    double d = deserializer["double_value"].asDouble();
+    string s = deserializer["string_value"].asString();
+    auto tensor = xtensor::asXTensor<uint8_t, 3>(deserializer["tensor_value"]);
+    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "LargeTensorStruct contents not correct.");
+    return sum;
+}
+
+template <DataType DT>
+int perform_read_zerialize(const auto& deserializer) {
+    if constexpr (DT == DataType::SmallStruct) { 
+        return perform_read_zerialize_smallstruct(deserializer);
+    } else if constexpr (DT == DataType::SmallStructAsVector) { 
+        return perform_read_zerialize_smallstructasvector(deserializer);
+    } else if constexpr (DT == DataType::SmallTensorStruct) { 
+        return perform_read_zerialize_smalltensorstruct(deserializer);
+    } else if constexpr (DT == DataType::SmallTensorStructAsVector) { 
+        return perform_read_zerialize_smalltensorstructasvector(deserializer);
+    } else { 
+        return perform_read_zerialize_largetensorstruct(deserializer);
+    }
+}
+
+int perform_read_reflect_smallstruct(const SmallStruct& obj) {
+    int i = obj.int_value;
+    double d = obj.double_value;
+    string s = obj.string_value;
+    auto arr = obj.array_value;
+    int sum = 0;
+    for (size_t i = 0; i < arr.size(); i++) {
+        sum += arr[i];
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_reflect_smallstructasvector(const SmallStruct& obj) {
+    return perform_read_reflect_smallstruct(obj);
+    // int i = obj.int_value;
+    // double d = obj.double_value;
+    // string s = obj.string_value;
+    // auto arr = obj.array_value;
+    // int sum = 0;
+    // for (size_t i = 0; i < arr.size(); i++) {
+    //     sum += arr[i];
+    // }
+    // release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStructAsVector contents not correct.");
+    // return sum;
+}
+
+int perform_read_reflect_smalltensorstruct(const SmallTensorStruct& obj) {
+    return 0;
+}
+
+int perform_read_reflect_smalltensorstructasvector(const SmallTensorStruct& obj) {
+    return 0;
+}
+
+int perform_read_reflect_largetensorstruct(const LargeTensorStruct& obj) {
+    int i = obj.int_value;
+    double d = obj.double_value;
+    string s = obj.string_value;
+    auto tensor = obj.tensor_value;
+    // Basic validation of the tensor data
+    size_t expected_size = 3 * 1024 * 768;
+    return 0;
+    // //size_t sum = tensor.data.size(); // Use data size as a proxy for validation
+    // size_t sum = tensor.size(); // Use data size as a proxy for validation
+    // //std::cout << "--- " << tensor.size() << std::endl;
+    // //release_assert(i == 42 && d == 3.14159 && s == "hello world" && tensor.data.size() == expected_size, "LargeTensorStruct contents not correct.");
+    // return sum;
+}
+
+template <DataType DT>
+int perform_read_reflect(const auto& obj) {
+    if constexpr (DT == DataType::SmallStruct) { 
+        return perform_read_reflect_smallstruct(obj);
+    } else if constexpr (DT == DataType::SmallStructAsVector) { 
+        return perform_read_reflect_smallstructasvector(obj);
+    } else if constexpr (DT == DataType::SmallTensorStruct) { 
+        return perform_read_reflect_smalltensorstruct(obj);
+    } else if constexpr (DT == DataType::SmallTensorStructAsVector) { 
+        return perform_read_reflect_smalltensorstructasvector(obj);
+    } else { 
+        return perform_read_reflect_largetensorstruct(obj);
+    }
+}
+
+template <DataType DT, CompetitorType CT>
+int perform_read(const auto& deserializer) {
+    if constexpr (CT == CompetitorType::Zerialize) {
+        return perform_read_zerialize<DT>(deserializer);
+    } else {
+        return perform_read_reflect<DT>(deserializer);
+    }
+}
+
+template <SerializationType ST, DataType DT, CompetitorType CT>
+BenchmarkResult perform_benchmark() {
+    
+    // We change the number of iterations for different tests - some are very slow...
+    size_t iterations = num_iterations<DT>();
+
+    // Measure serialization time
+    double serializationTime = benchmark([&]() {
+        return get_serialized<ST, DT, CT>();
+    }, iterations);
+
+    double deSerializationTime = 0.0;
+    double readTime = 0.0;
+    size_t serializedSize = 0;
+
+    // Measure deserialization time, read time, and others
+    if constexpr(CT == CompetitorType::Zerialize) {
+
+        // Get a buffer from a serialized object, use that to measure deserialization time
+        auto buffer = get_serialized<ST, DT, CT>();
         auto bufCopy = buffer.to_vector_copy();
-        span<const uint8_t> newBuf(bufCopy.begin(), bufCopy.end());
+        serializedSize = bufCopy.size();
+        std::span<const uint8_t> newBuf(bufCopy.begin(), bufCopy.end());
 
-        // for (int i=0; i<bufCopy.size(); i++) {
-        //     std::cout << "" << (char)bufCopy[i];
-        // }
+        // Measure deserialization time
+        deSerializationTime = benchmark([&]() {
+            return get_deserialized<ST, DT, CT>(newBuf);
+        }, iterations);
 
-        // Measure deserialization time (instantiating Buffer from copy)
-        double deserTime = benchmark([&]() {
-            typename SerializerType::BufferType deserialized(newBuf);
-            return deserialized;
+        // Get a Deserializer, use that to measure read time
+        auto deserializer = get_deserialized<ST, DT, CT>(newBuf);
+        readTime = benchmark([&]() {
+            return perform_read<DT, CT>(deserializer);
+        }, iterations);
+    } else {
+        // Measure deserialization time
+        auto buffer = get_serialized<ST, DT, CT>();
+        serializedSize = buffer.size();
 
-            // int i = buffer["int_value"].template as<int>();
-            // double d = buffer["double_value"].template as<double>();
-            // std::string s = buffer["string_value"].template as<std::string>();
-            // auto arr = buffer["array_value"];
-            // int sum = 0;
-            // for (size_t i = 0; i < arr.arraySize(); i++) {
-            //     sum += arr[i].asInt32();
-            // }
+        deSerializationTime = benchmark([&]() {
+            return get_deserialized<ST, DT, CT>(buffer);
+        }, iterations);
 
-            // std::vector<int> vec;
-            // vec.reserve(arr.arraySize());
-            // for (size_t i = 0; i < arr.arraySize(); i++) {
-            //     vec.emplace_back(arr[i].asInt32());
-            // }
-            // TestData td{
-            //     .int_value = i,
-            //     .double_value = d,
-            //     .string_value = s,
-            //     .array_value = vec
-            // };
-
-            //return td;
-        });
-        
-        // Measure read time
-
-        auto serialized = typename SerializerType::BufferType(buffer.to_vector_copy());
-
-        double readTime = ZerializeAsVector ?
-            // Just to use the values
-            benchmark([&]() {
-                int i = serialized[0].template as<int>();
-                double d = serialized[1].template as<double>();
-                std::string s = serialized[2].template as<std::string>();
-                auto arr = serialized[3];
-                int sum = 0;
-                for (size_t i = 0; i < arr.arraySize(); i++) {
-                    sum += arr[i].asInt32();
-                }
-
-                std::vector<int> vec;
-                vec.reserve(arr.arraySize());
-                for (size_t i = 0; i < arr.arraySize(); i++) {
-                    vec.push_back(arr[i].asInt32());
-                }
-                TestData td{
-                    .int_value = serialized[0].template as<int>(),
-                    .double_value = serialized[1].template as<double>(),
-                    .string_value = serialized[2].template as<std::string>(),
-                    .array_value = vec
-                };
-
-                return i + d + s.size() + sum; 
-            }) :
-            benchmark([&]() {
-                int i = serialized["int_value"].template as<int>();
-                double d = serialized["double_value"].template as<double>();
-                std::string s = serialized["string_value"].template as<std::string>();
-                auto arr = serialized["array_value"];
-                int sum = 0;
-                for (size_t i = 0; i < arr.arraySize(); i++) {
-                    sum += arr[i].asInt32();
-                }
-
-                std::vector<int> v;
-                v.reserve(arr.arraySize());
-                for (size_t i = 0; i < arr.arraySize(); i++) {
-                    v.emplace_back(arr[i].asInt32());
-                }            
-
-                TestData testData{
-                    i,
-                    d,
-                    s,
-                    v //{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-                };
-                // for (size_t i = 0; i < arr.arraySize(); i++) {
-                //     testData.array_value.push_back(arr[i].asInt32());
-                // }
-                
-
-                // std::vector<int> vec;
-                // vec.reserve(arr.arraySize());
-                // for (size_t i = 0; i < arr.arraySize(); i++) {
-                //     vec.emplace_back(arr[i].asInt32());
-                // }
-                // TestData td{
-                //     .int_value = i,
-                //     .double_value = d,
-                //     .string_value = s,
-                //     .array_value = vec
-                // };
-                return testData;
-                //return testData.int_value + testData.double_value + testData.string_value.size() + testData.array_value.size();
-                //return i + d + s.size() + sum;
-            });
-
-        results.push_back({
-            "Zerialize: Map Nested Values", 
-            serTime, 
-            deserTime,
-            readTime,
-            serialized.size(),
-            10000000
-        });
+        // Get a Deserializer, use that to measure read time
+        auto deserializer = get_deserialized<ST, DT, CT>(buffer);
+        readTime = benchmark([&]() {
+            return perform_read<DT, CT>(deserializer);
+        }, iterations);
     }
-    
-    return results;
+
+    return {
+        .serializationTime = serializationTime,
+        .deserializationTime = deSerializationTime,
+        .readTime = readTime,
+        .deserializeAndReadTime = 0.0,
+        .deserializeAndInstantiateTime = 0.0,
+        .dataSize = serializedSize,
+        .iterations = iterations
+    };
 }
 
-// Run Reflect-cpp JSON benchmarks
-std::vector<BenchmarkResult> runReflectCppJsonBenchmarks() {
-    std::vector<BenchmarkResult> results;
-    
-    // Measure serialization time
-    double serTime = benchmark([&]() {
-        auto serialized = rfl::json::write(testData);
-        return serialized;
-    });
-    
-    // Create serialized data once for deserialization tests
-    auto serialized = rfl::json::write(testData);
-    
-    // Measure deserialization time
-    double deserTime = benchmark([&]() {
-        // auto deserialized = reflect::json::from_string<TestData>(serialized);
-        auto deserialized = rfl::json::read<TestData>(serialized).value();
-        return deserialized;
-    });
-
-    auto deserialized = rfl::json::read<TestData>(serialized).value();
-
-    // Measure read time
-    double readTime = benchmark([&]() {
-        int i = deserialized.int_value;
-        double d = deserialized.double_value;
-        std::string s = deserialized.string_value;
-        auto arr = deserialized.array_value;
-        int sum = 0;
-        for (size_t i = 0; i < arr.size(); i++) {
-            sum += arr[i];
-        }
-        return i + d + s.size() + sum;  // Just to use the values
-    });
-    
-    results.push_back({
-        "Reflect-cpp: JSON", 
-        serTime, 
-        deserTime,
-        readTime,
-        serialized.size(),
-        1000000
-    });
-    
-    return results;
+template <SerializationType ST, DataType DT, CompetitorType CT>
+void test_for_competitor_type() {
+    auto result = perform_benchmark<ST, DT, CT>();
+    cout << left << "    " << setw(16) << ct_to_string<CT>()
+        << right << setw(18) << fixed << setprecision(3) << result.serializationTime 
+        << setw(18) << fixed << setprecision(3) << result.deserializationTime 
+        << setw(18) << fixed << setprecision(3) << result.readTime 
+        << setw(18) << fixed << setprecision(3) << result.deserializeAndReadTime 
+        << setw(18) << fixed << setprecision(3) << result.deserializeAndInstantiateTime 
+        << setw(18) << result.dataSize
+        << setw(18) << result.iterations << endl;
 }
 
-// Run Reflect-cpp FlexBuffers benchmarks
-std::vector<BenchmarkResult> runReflectCppFlexBuffersBenchmarks() {
-    std::vector<BenchmarkResult> results;
-    
-    // Measure serialization time
-    double serTime = benchmark([&]() {
-        const auto serialized = rfl::flexbuf::write(testData);
-        return serialized;
-    });
-    
-    // Create serialized data once for deserialization tests
-    const auto serialized = rfl::flexbuf::write(testData);
-    
-    // Measure deserialization time
-    double deserTime = benchmark([&]() {
-        const auto deserialized = rfl::flexbuf::read<TestData>(serialized);
-        return deserialized;
-    });
-    
-    auto deserialized = rfl::flexbuf::read<TestData>(serialized).value();
-
-    // Measure read time
-    double readTime = benchmark([&]() {
-        int i = deserialized.int_value;
-        double d = deserialized.double_value;
-        std::string s = deserialized.string_value;
-        auto arr = deserialized.array_value;
-        int sum = 0;
-        for (size_t i = 0; i < arr.size(); i++) {
-            sum += arr[i];
-        }
-        return i + d + s.size() + sum;  // Just to use the values
-    });
-
-    results.push_back({
-        "Reflect-cpp: FlexBuffers", 
-        serTime, 
-        deserTime,
-        readTime,
-        serialized.size(),
-        1000000
-    });
-    
-    return results;
+template <SerializationType ST, DataType DT>
+void test_for_data_type() {
+    cout << dt_to_string<DT>() << endl;
+    test_for_competitor_type<ST, DT, CompetitorType::Zerialize>();
+    test_for_competitor_type<ST, DT, CompetitorType::ReflectCpp>();
+    cout << endl;
 }
 
-// Run Reflect-cpp MessagePack benchmarks
-std::vector<BenchmarkResult> runReflectCppMsgPackBenchmarks() {
-    std::vector<BenchmarkResult> results;
-    
-    // Measure serialization time
-    double serTime = benchmark([&]() {
-        auto serialized = rfl::msgpack::write(testData);
-        return serialized;
-    });
-    
-    // Create serialized data once for deserialization tests
-    auto serialized = rfl::msgpack::write(testData);
-    
-    // Measure deserialization time
-    double deserTime = benchmark([&]() {
-        auto deserialized = rfl::msgpack::read<TestData>(serialized);
-        return deserialized;
-    });
-    
-    auto deserialized = rfl::msgpack::read<TestData>(serialized).value();
+template <SerializationType ST>
+void test_for_serialization_type() {
+    cout << left << "--- " << setw(16) << st_to_string<ST>()
+        << right << setw(19) << "Serialize (µs)" 
+        << setw(19) << "Deserialize (µs)" 
+        << setw(19) << "Read (µs)" 
+        << setw(19) << "Deser+Read (µs)" 
+        << setw(19) << "Deser+Inst (µs)" 
+        << setw(18) << "Size (bytes)"
+        << setw(18) << "(samples)" << endl << endl;
 
-    // Measure read time
-    double readTime = benchmark([&]() {
-        int i = deserialized.int_value;
-        double d = deserialized.double_value;
-        std::string s = deserialized.string_value;
-        auto arr = deserialized.array_value;
-        int sum = 0;
-        for (size_t i = 0; i < arr.size(); i++) {
-            sum += arr[i];
-        }
-        return i + d + s.size() + sum;  // Just to use the values
-    });
-
-    results.push_back({
-        "Reflect-cpp: MessagePack", 
-        serTime, 
-        deserTime,
-        readTime,
-        serialized.size(),
-        10000000
-    });
-    
-    return results;
-}
-
-double get_pure_serialization_time_msgpack(const std::array<int, 10>& sharedVec) {
-
-    return benchmark([&]() {
-        msgpack_sbuffer sbuf;
-        msgpack_packer pk;
-
-        msgpack_sbuffer_init(&sbuf);
-        msgpack_packer_init(&pk, &sbuf, msgpack_sbuffer_write);
-
-        msgpack_pack_map(&pk, 4);
-
-        const std::string k1 = "int_value";
-        const std::string k2 = "double_value";
-        const std::string k3 = "string_value";
-        const std::string k4 = "array_value";
-        const std::string v = "string_value";
-
-        msgpack_pack_str(&pk, k1.size()); 
-        msgpack_pack_str_body(&pk, k1.data(), k1.size());
-        msgpack_pack_int32(&pk, 42);
-
-        msgpack_pack_str(&pk, k2.size()); 
-        msgpack_pack_str_body(&pk, k2.data(), k2.size());
-        msgpack_pack_double(&pk, 3.14159);
-
-        msgpack_pack_str(&pk, k3.size()); 
-        msgpack_pack_str_body(&pk, k3.data(), k3.size());
-        msgpack_pack_str(&pk, v.size()); 
-        msgpack_pack_str_body(&pk, v.data(), v.size());
-
-        msgpack_pack_str(&pk, k4.size()); 
-        msgpack_pack_str_body(&pk, k4.data(), k4.size());
-
-        msgpack_pack_array(&pk, sharedVec.size());
-        for (auto & k: sharedVec) {
-            msgpack_pack_int32(&pk, k);
-        }
-
-        size_t size = sbuf.size;
-        char* data = sbuf.data;
-        //auto owned = std::unique_ptr<uint8_t[]>(reinterpret_cast<uint8_t*>(sbuf.data));
-
-        // Prevent sbuffer from double-freeing
-        sbuf.data = nullptr;
-        sbuf.size = 0;
-        sbuf.alloc = 0;
-
-        //return MsgPackBuffer(std::move(owned), size);
-        return ZBuffer(data, size, ZBuffer::Deleters::Free);
-    });
-}
-
-double get_pure_serialization_time_yyjson(const std::array<int, 10>& sharedVec) {
-
-    // Pre-define keys outside the lambda to avoid repeated construction
-    // if the benchmark runs the lambda multiple times.
-    const std::string k1 = "int_value";
-    const std::string k2 = "double_value";
-    const std::string k3 = "string_value";
-    const std::string k4 = "array_value";
-    const std::string v_str = "string_value"; // Renamed 'v' for clarity
-
-    return benchmark([&]() { // Capture strings by reference
-
-        // 1. Initialize yyjson mutable document
-        yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr); // Use default allocator
-        if (!doc) {
-            // In a real benchmark, might abort or return specific error code
-            // instead of throwing, as throwing can add overhead.
-            throw std::runtime_error("yyjson_mut_doc_new failed");
-        }
-
-        // 2. Create the root object
-        yyjson_mut_val *root_obj = yyjson_mut_obj(doc);
-        if (!root_obj) {
-            yyjson_mut_doc_free(doc); // Clean up doc
-            throw std::runtime_error("yyjson_mut_obj failed");
-        }
-
-        // --- Use a try-catch block to ensure doc is freed on error ---
-        std::vector<uint8_t> result_buffer; // Declare outside try for return
-        char* json_str = nullptr;           // Pointer for allocated string
-
-        try {
-            // 3. Add key-value pairs directly
-            // Note: yyjson_mut_obj_add takes ownership of key and val pointers
-            // after successful addition. No need to free them separately.
-
-            // Pair 1: int_value: 42
-            yyjson_mut_val* key1 = yyjson_mut_strncpy(doc, k1.data(), k1.size());
-            yyjson_mut_val* val1 = yyjson_mut_sint(doc, 42);
-            if (!key1 || !val1 || !yyjson_mut_obj_add(root_obj, key1, val1)) {
-                throw std::runtime_error("Failed to add int_value");
-            }
-
-            // Pair 2: double_value: 3.14159
-            yyjson_mut_val* key2 = yyjson_mut_strncpy(doc, k2.data(), k2.size());
-            yyjson_mut_val* val2 = yyjson_mut_real(doc, 3.14159);
-            if (!key2 || !val2 || !yyjson_mut_obj_add(root_obj, key2, val2)) {
-                throw std::runtime_error("Failed to add double_value");
-            }
-
-            // Pair 3: string_value: "string_value"
-            yyjson_mut_val* key3 = yyjson_mut_strncpy(doc, k3.data(), k3.size());
-            yyjson_mut_val* val3 = yyjson_mut_strncpy(doc, v_str.data(), v_str.size());
-            if (!key3 || !val3 || !yyjson_mut_obj_add(root_obj, key3, val3)) {
-                throw std::runtime_error("Failed to add string_value");
-            }
-
-            // Pair 4: array_value: [...]
-            yyjson_mut_val* key4 = yyjson_mut_strncpy(doc, k4.data(), k4.size());
-            yyjson_mut_val* arr = yyjson_mut_arr(doc);
-            if (!key4 || !arr) {
-                throw std::runtime_error("Failed to create key or array for array_value");
-            }
-            // Add elements to the array
-            for (int item : sharedVec) {
-                yyjson_mut_val* arr_item = yyjson_mut_sint(doc, item);
-                // yyjson_mut_arr_append takes ownership of arr_item on success
-                if (!arr_item || !yyjson_mut_arr_append(arr, arr_item)) {
-                    throw std::runtime_error("Failed to append item to array");
-                }
-            }
-            // Add the completed array to the root object
-            if (!yyjson_mut_obj_add(root_obj, key4, arr)) {
-                 throw std::runtime_error("Failed to add array_value");
-            }
-
-            // 4. Set the root of the document
-            yyjson_mut_doc_set_root(doc, root_obj);
-
-            // 5. Serialize the document to a string
-            size_t len = 0;
-            // Use YYJSON_WRITE_NOFLAG for potentially fastest output (no pretty print)
-            json_str = yyjson_mut_write(doc, YYJSON_WRITE_NOFLAG, &len);
-            if (!json_str) {
-                throw std::runtime_error("yyjson_mut_write failed");
-            }
-
-            // 6. Copy the result into the desired buffer format (vector<uint8_t>)
-            //    Do this *before* freeing the doc, as json_str points into doc memory?
-            //    Correction: yyjson_mut_write allocates separately, safe to copy then free doc.
-            result_buffer.assign(json_str, json_str + len);
-
-        } catch (...) {
-             // Clean up resources on exception
-             if(json_str) free(json_str); // Free allocated string if write succeeded partially
-             if(doc) yyjson_mut_doc_free(doc); // Free the document structure
-             throw; // Re-throw
-        }
-
-        // 7. Clean up yyjson resources (on success path)
-        free(json_str); // Free yyjson's allocated string
-        yyjson_mut_doc_free(doc); // Free the document structure and its pooled memory
-
-        // 8. Return the result buffer from the lambda (for benchmark wrapper)
-        return result_buffer;
-
-    }); // End benchmark lambda
+    test_for_data_type<ST, DataType::SmallStruct>();
+    test_for_data_type<ST, DataType::SmallStructAsVector>();
+    test_for_data_type<ST, DataType::SmallTensorStruct>();
+    test_for_data_type<ST, DataType::SmallTensorStructAsVector>();
+    // test_for_data_type<ST, DataType::LargeTensorStruct>();
+    cout << endl << endl;
 }
 
 int main() {
-    std::cout << "Benchmarking Zerialize vs Reflect-cpp" << std::endl;
-    std::cout << "====================================" << std::endl << std::endl;
-    
-    
-    // Run Zerialize benchmarks
-
-    // std::cout << "Zerialize JSON Serializer:" << std::endl;
-    // auto zerializeJsonResults = runZerializeBenchmarks<Json>();
-    // printResults(zerializeJsonResults);
-    // std::cout << std::endl;
-
-    std::cout << "Zerialize ---" << std::endl << std::endl;
-
-    std::cout << "YYJson Serializer:" << std::endl;
-    auto zerializeYYJsonPackResults = runZerializeBenchmarks<Yyjson>();
-    printResults(zerializeYYJsonPackResults);
-    std::cout << std::endl;
-
-    std::cout << "Flex Serializer:" << std::endl;
-    auto zerializeFlexResults = runZerializeBenchmarks<Flex>();
-    printResults(zerializeFlexResults);
-    std::cout << std::endl;
-    
-    std::cout << "MsgPack Serializer:" << std::endl;
-    auto zerializeMsgPackResults = runZerializeBenchmarks<MsgPack>();
-    printResults(zerializeMsgPackResults);
-    std::cout << std::endl;
-
-    
-    // Run Reflect-cpp benchmarks
-
-    std::cout << "Reflect-cpp ---" << std::endl << std::endl;
-
-    std::cout << "JSON:" << std::endl;
-    auto reflectCppJsonResults = runReflectCppJsonBenchmarks();
-    printResults(reflectCppJsonResults);
-    std::cout << std::endl;
-    
-    std::cout << "FlexBuffers:" << std::endl;
-    auto reflectCppFlexBuffersResults = runReflectCppFlexBuffersBenchmarks();
-    printResults(reflectCppFlexBuffersResults);
-    std::cout << std::endl;
-    
-    std::cout << "MessagePack:" << std::endl;
-    auto reflectCppMsgPackResults = runReflectCppMsgPackBenchmarks();
-    printResults(reflectCppMsgPackResults);
-    std::cout << std::endl;
-
-
-    std::array<int, 10> sharedVec = {1,2,3,4,5,6,7,8,9,10};
-    std::cout << "Pure serialization time, msgpack: " << get_pure_serialization_time_msgpack(sharedVec) << "µs" << std::endl;
-    std::cout << "Pure serialization time, yyjson:  " << get_pure_serialization_time_yyjson(sharedVec)  << "µs"<< std::endl;
-    
-    std::cout << "Benchmark complete!" << std::endl;
+    test_for_serialization_type<SerializationType::Flex>();
+    test_for_serialization_type<SerializationType::MsgPack>();
+    test_for_serialization_type<SerializationType::Json>();
+    std::cout << "\nBenchmark complete!" << std::endl;
     return 0;
 }

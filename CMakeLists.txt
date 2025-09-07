@@ -71,7 +71,8 @@ FetchContent_MakeAvailable(xsimd)
 FetchContent_Declare(xtensor
     # URL https://github.com/xtensor-stack/xtensor/archive/0.24.6.zip
     # URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
-    URL https://github.com/xtensor-stack/xtensor/archive/0.26.0.zip
+    # URL https://github.com/xtensor-stack/xtensor/archive/0.26.0.zip
+    URL https://github.com/xtensor-stack/xtensor/archive/0.27.0.zip
     #URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
     #DOWNLOAD_NO_PROGRESS ON
     #DOWNLOAD_EXTRACT_TIMESTAMP 1
