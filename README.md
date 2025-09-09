@@ -211,7 +211,7 @@ auto json_buffer = zerialize::serialize<zerialize::JSON>(
 zerialize::JSON::Deserializer json_data(json_buffer.buf());
 
 // Translate to MessagePack
-auto msgpack_buffer = zerialize::translate<zerialize::MsgPack>(json_data);
+auto msgpack_data = zerialize::translate<zerialize::MsgPack>(json_data);
 
 // Now you have the same data in MessagePack format!
 ```
