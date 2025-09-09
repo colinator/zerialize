@@ -65,6 +65,11 @@ int main() {
     //     "age": 37
     // }
 
+    // Read attributes dynamically and lazily. You provide the type.
+    std::cout << "JSON AGENT " 
+              << "agent name: " << d["name"].asString()
+              <<       " age: " << d["age"].asUInt16() << std::endl;
+
     // Translate from one format to another.
     z::Flex::Deserializer f = z::translate<z::Flex>(d);
 

@@ -56,5 +56,13 @@ inline ZBuffer serialize(RootType&& rootValue) {
     }
     return rs.finish();
 }
+
+// Overload for 0 arguments: creates empty serialization. 
+// Not necessarily 0-byte; for example in json is "null".
+template <Protocol P>
+inline ZBuffer serialize() {
+    typename P::RootSerializer rs{};
+    return rs.finish();
+}
  
 } // namespace zerialize

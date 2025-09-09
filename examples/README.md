@@ -1,6 +1,6 @@
 # test zerialize
 
-A test of zerialize. Uses no external library - just one big main function. If it returns 0 and prints ALL SUCCEEDED at the end, all the tests worked. If some test fails, you'll see an exception.
+Demonstrates basic usage of zerialize.
 
 Contains many examples of serialization and deserialization.
 
@@ -13,4 +13,5 @@ Contains many examples of serialization and deserialization.
 
 ## Run
 
-    ./build/general_use
+    ./build/basic_usage
+    ./build/general_usage
