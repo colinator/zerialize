@@ -19,13 +19,13 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 ## Building
 
-This is a **header-only library**, and contains nothing to build. The `test/`, `benchmark/`, and `composite_example/` directories contain executables with examples of how to organize CMake projects.
+This is a **header-only library**, and contains nothing to build. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
 
 Just include the headers and you're ready to serialize all the things.
 
 ## Usage Examples
 
-See `/examples` for the basics and `/test` for tests and many more examples, including xtensor, eigen, and custom structures.
+See `examples/` for the basics and `test/` for tests and many more examples, including xtensor, eigen, and custom structures.
 
 ### Basic Serialization with the DSL
 
