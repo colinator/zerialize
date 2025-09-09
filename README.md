@@ -1,6 +1,6 @@
 # zerialize
 
-Zero-copy multi-format serialization/deserialization for C++.
+Zero-copy multi-format serialization/deserialization for c++20.
 
 ## Goals
 
