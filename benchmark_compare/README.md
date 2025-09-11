@@ -1,7 +1,6 @@
 # benchmark_compare
 
-Compares zerialize vs reflect-cpp vs ???
-
+Compares zerialize vs reflect-cpp.
 
 ## Build
 
