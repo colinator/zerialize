@@ -24,7 +24,7 @@ FetchContent_MakeAvailable(json)
 FetchContent_Declare(
     yyjson
     GIT_REPOSITORY https://github.com/ibireme/yyjson.git
-    GIT_TAG 0.10.0
+    GIT_TAG 0.12.0
 )
 FetchContent_MakeAvailable(yyjson)
 
