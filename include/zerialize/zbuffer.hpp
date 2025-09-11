@@ -1,6 +1,9 @@
 #pragma once
 
+#include <iomanip>
+#include <cctype>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <span>
 #include <variant>
@@ -229,6 +232,51 @@ public:
             // Return an empty std::vector if the buffer is empty or invalid
             return std::vector<uint8_t>();
         }
+    }
+
+    // Pretty hexdump (like `hexdump -C`): offset, hex, and ASCII column.
+    // Requires <iomanip> and <cctype>.
+    std::string hexdump(std::size_t bytes_per_row = 16) const {
+        std::ostringstream os;
+        const uint8_t* p = data();
+        const std::size_t n = size();
+        if (!p || n == 0) {
+            return "(empty)\n";
+        }
+    
+        // Save stream formatting
+        std::ios::fmtflags f = os.flags();
+        char old_fill = os.fill();
+    
+        for (std::size_t i = 0; i < n; i += bytes_per_row) {
+            // Offset
+            os << std::setw(8) << std::setfill('0') << std::hex << i << "  ";
+    
+            // Hex bytes (with an extra space between the two 8-byte halves)
+            for (std::size_t j = 0; j < bytes_per_row; ++j) {
+                if (i + j < n) {
+                    os << std::setw(2) << std::setfill('0') << std::hex
+                       << static_cast<int>(p[i + j]) << ' ';
+                } else {
+                    os << "   ";
+                }
+                if (j == 7) os << ' ';
+            }
+    
+            // ASCII column
+            os << " |";
+            for (std::size_t j = 0; j < bytes_per_row && (i + j) < n; ++j) {
+                unsigned char c = static_cast<unsigned char>(p[i + j]);
+                os << (std::isprint(c) ? static_cast<char>(c) : '.');
+            }
+            os << "|\n";
+        }
+    
+        // Restore stream formatting
+        os.flags(f);
+        os.fill(old_fill);
+    
+        return os.str();
     }
 };
 
