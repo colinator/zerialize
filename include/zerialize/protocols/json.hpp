@@ -295,24 +295,10 @@ struct Serializer {
     void string(std::string_view sv) {
         push_value(yyjson_mut_strn(doc(), sv.data(), sv.size()));
     }
-    // Encode binary as array of 0..255 (keeps parity with your previous JSON writer)
+    // Encode binary as array of 0..255
     void binary(std::span<const std::byte> b) {
-        // // Encode blob as Base64 string
-
         std::string s = base64Encode(b);
-
         push_value(yyjson_mut_strncpy(doc(), s.data(), s.size()));
-        //this->string(s);
-        // set_value(yyjson_mut_strncpy(doc_, s.data(), s.size()));
-
-        // yyjson_mut_val* arr = yyjson_mut_arr(doc());
-        // if (!arr) throw std::bad_alloc{};
-        // for (std::size_t i = 0; i < b.size(); ++i) {
-        //     const auto u = static_cast<unsigned>(std::to_integer<unsigned char>(b[i]));
-        //     if (!yyjson_mut_arr_add_val(arr, yyjson_mut_uint(doc(), static_cast<uint64_t>(u))))
-        //         throw std::bad_alloc{};
-        // }
-        // push_value(arr);
     }
 
     // ── structures ──────────────────────────────────────────────
