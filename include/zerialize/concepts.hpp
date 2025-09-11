@@ -2,7 +2,7 @@
 //
 // concepts.hpp — Core zerialize concepts for (de)serialization
 //
-// This header defines the fundamental C++20 concepts and types used across the
+// This header defines the fundamental C++20 concepts used across the
 // library:
 //
 //   • BlobView        — “blob-like” types that can be viewed as a
