@@ -340,3 +340,102 @@ struct Flex {
 };
 
 } // namespace zerialize
+
+
+namespace zerialize {
+namespace flex {
+namespace debugging {
+
+    static void print_ref(flexbuffers::Reference r, int indent = 0);
+
+    static void print_indent(int n) { while (n--) std::cout << ' '; }
+
+    static void print_map(flexbuffers::Map m, int indent) {
+        auto keys = m.Keys();
+        auto vals = m.Values();
+        std::cout << "{\n";
+        for (size_t i = 0; i < m.size(); ++i) {
+            print_indent(indent + 2);
+            std::string k = keys[i].AsString().str();
+            std::cout << std::quoted(k) << ": ";
+            print_ref(vals[i], indent + 2);
+            if (i + 1 < m.size()) std::cout << ",";
+            std::cout << "\n";
+        }
+        print_indent(indent);
+        std::cout << "}";
+    }
+
+    static void print_vector(flexbuffers::Vector v, int indent) {
+        std::cout << "[\n";
+        for (size_t i = 0; i < v.size(); ++i) {
+            print_indent(indent + 2);
+            print_ref(v[i], indent + 2);
+            if (i + 1 < v.size()) std::cout << ",";
+            std::cout << "\n";
+        }
+        print_indent(indent);
+        std::cout << "]";
+    }
+
+    static void print_blob(flexbuffers::Blob b) {
+        std::cout << "<blob:" << b.size() << " bytes>";
+    }
+
+    static void print_ref(flexbuffers::Reference r, int indent) {
+        using T = flexbuffers::Type;
+        switch (r.GetType()) {
+            case T::FBT_NULL:   std::cout << "null"; break;
+            case T::FBT_BOOL:   std::cout << (r.AsBool() ? "true" : "false"); break;
+            case T::FBT_INT:    std::cout << r.AsInt64(); break;
+            case T::FBT_UINT:   std::cout << r.AsUInt64(); break;
+            case T::FBT_FLOAT:  std::cout << r.AsDouble(); break;
+
+            // String may return a char* via .str(); wrap it so quoted works everywhere
+            case T::FBT_STRING:
+                std::cout << std::quoted(std::string(r.AsString().str()));
+                break;
+
+            // Key often is just const char*; wrap it too
+            case T::FBT_KEY:
+                std::cout << std::quoted(std::string(r.AsKey()));
+                break;
+
+            case T::FBT_BLOB:
+                print_blob(r.AsBlob());
+                break;
+
+            case T::FBT_VECTOR:
+            case T::FBT_VECTOR_INT:
+            case T::FBT_VECTOR_UINT:
+            case T::FBT_VECTOR_FLOAT:
+            case T::FBT_VECTOR_BOOL:
+            case T::FBT_VECTOR_KEY:
+                print_vector(r.AsVector(), indent);
+                break;
+
+            case T::FBT_MAP:
+                print_map(r.AsMap(), indent);
+                break;
+
+            default:
+                std::cout << "<unknown>";
+                break;
+        }
+    }
+
+    // Original pointer-based overload
+    static void dump_flex(const uint8_t* data, size_t size) {
+        auto root = flexbuffers::GetRoot(data, size);
+        print_ref(root);
+        std::cout << "\n";
+    }
+
+    // Convenience overload for span (so you can pass k.buf() directly)
+    static void dump_flex(std::span<const uint8_t> bytes) {
+        dump_flex(bytes.data(), bytes.size());
+    }
+
+} // namespace debugging
+} // namespace flex
+} // namespace zerialize
