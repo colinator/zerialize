@@ -18,6 +18,7 @@ Compares zerialize vs reflect-cpp.
 
 ## Results
 
+```
 Serialize:    produce bytes
 Deserialize:  consume bytes
 Read:         read and check every value from pre-deserialized, compute tensor element sums
@@ -96,5 +97,4 @@ SmallStruct
 SmallStructAsVector
     Zerialize                    0.334             0.146             0.127             0.273                49           1000000
     ReflectCpp                   0.254             0.461             0.073             0.534                49           1000000
-
-    
+```
