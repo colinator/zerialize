@@ -97,4 +97,6 @@ SmallStruct
 SmallStructAsVector
     Zerialize                    0.334             0.146             0.127             0.273                49           1000000
     ReflectCpp                   0.254             0.461             0.073             0.534                49           1000000
+
 ```
+*Zerialize has support for tensors (with blobs via base64 encoded strings) in json, but reflect doesn't, so don't even try.*
