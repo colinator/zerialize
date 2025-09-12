@@ -43,13 +43,13 @@ inline rfl::Bytestring to_bytestring(const xt::xtensor<T, N>& x)
     const std::byte* p   = reinterpret_cast<const std::byte*>(x.data());
     const std::size_t n  = x.size() * sizeof(T);
 
-    // // Fast path if Bytestring has a range constructor (it usually does):
-    // return rfl::Bytestring(p, p + n);
+    // Fast path if Bytestring has a range constructor (it usually does):
+    return rfl::Bytestring(p, p + n);
 
-    // If your Bytestring lacks that constructor, use this instead:
-    rfl::Bytestring out(n);
-    std::memcpy(out.data(), p, n);
-    return out;
+    // // If your Bytestring lacks that constructor, use this instead:
+    // rfl::Bytestring out(n);
+    // std::memcpy(out.data(), p, n);
+    // return out;
 }
 
 // Simple benchmarking function that measures execution time
@@ -90,6 +90,8 @@ enum class DataType {
     SmallStructAsVector,
     SmallTensorStruct,
     SmallTensorStructAsVector,
+    MediumTensorStruct,
+    MediumTensorStructAsVector,
     LargeTensorStruct
 };
 
@@ -98,6 +100,27 @@ enum class CompetitorType {
     Zerialize,
     ReflectCpp
 };
+
+
+// Tensor tooling for reflect
+using TensorWrapper = rfl::Tuple<int, std::vector<size_t>, rfl::Bytestring>;
+
+template <typename T>
+auto tensorFromWrapper(const TensorWrapper& tw) {
+    //const int dataType = tw.get<0>();
+    const auto& sizes = tw.get<1>();
+    const auto& blob = tw.get<2>();
+
+    const T* data_typed = reinterpret_cast<const T*>(blob.data());
+    const std::size_t tensor_size = blob.size() / sizeof(T);
+
+    return xt::adapt(
+        data_typed,
+        tensor_size,
+        xt::no_ownership(),
+        sizes
+    );
+}
 
 
 // -------------------------
@@ -110,20 +133,27 @@ struct SmallStruct {
     std::vector<int> array_value;
 };
 
-
-using TensorWrapper = rfl::Tuple<int, std::vector<size_t>, rfl::Bytestring>;
-
 struct SmallTensorStruct {
     int int_value;
     double double_value;
     std::string string_value;
+    std::vector<int> array_value;
     TensorWrapper tensor_value; // Small 4x4 tensor
+};
+
+struct MediumTensorStruct {
+    int int_value;
+    double double_value;
+    std::string string_value;
+    std::vector<int> array_value;
+    TensorWrapper tensor_value; // Medium 10x2048 tensor
 };
 
 struct LargeTensorStruct {
     int int_value;
     double double_value;
     std::string string_value;
+    std::vector<int> array_value;
     TensorWrapper tensor_value; // Large 3x1024x768 tensor
 };
 
@@ -142,9 +172,11 @@ template <DataType DT>
 constexpr string dt_to_string() {
     if constexpr (DT == DataType::SmallStruct) { return "SmallStruct"; } 
     else if constexpr (DT == DataType::SmallStructAsVector) { return "SmallStructAsVector"; } 
-    else if constexpr (DT == DataType::SmallTensorStruct) { return "SmallTensorStruct";} 
-    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return "SmallTensorStructAsVector"; } 
-    else if constexpr (DT == DataType::LargeTensorStruct) { return "LargeTensorStruct"; } 
+    else if constexpr (DT == DataType::SmallTensorStruct) { return "SmallTensorStruct 4x4 double";} 
+    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return "SmallTensorStructAsVector 4x4 double"; }
+    else if constexpr (DT == DataType::MediumTensorStruct) { return "MediumTensorStruct 10x2048 float";} 
+    else if constexpr (DT == DataType::MediumTensorStructAsVector) { return "MediumTensorStructAsVector 10x2048 float"; } 
+    else if constexpr (DT == DataType::LargeTensorStruct) { return "LargeTensorStruct 3x1024x768 uint8"; } 
     else { return "unknown"; }
 }
 
@@ -174,7 +206,9 @@ struct BenchmarkResult {
 
 std::array<int, 10> smallArray = {1,2,3,4,5,6,7,8,9,10};
 xt::xtensor<double, 2> smallXtensor{{1.0, 2.0, 3.0, 4.0}, {4.0, 5.0, 6.0, 7.0}, {8.0, 9.0, 10.0, 11.0}, {12.0, 13.0, 14.0, 15.0}};
-xt::xtensor<uint8_t, 3> largeXTensor({3, 1024, 768});
+const size_t MediumN = 10;
+xt::xtensor<float, 2> mediumXtensor({MediumN, 2048}, 3);
+xt::xtensor<uint8_t, 3> largeXTensor({3, 1024, 768}, 3);
 
 
 // -------------------------
@@ -184,10 +218,7 @@ template <typename P>
 ZBuffer get_zerialized_smallstruct() {
     return serialize<P>(
         zmap<"int_value","double_value","string_value","array_value">(
-            42,
-            3.14159,
-            "hello world",
-            smallArray
+            42, 3.14159, "hello world", smallArray
         )
     );
 }
@@ -202,11 +233,8 @@ ZBuffer get_zerialized_smallstructasvector() {
 template <typename P>
 ZBuffer get_zerialized_smalltensorstruct() {
     return serialize<P>(
-        zmap<"int_value","double_value","string_value","tensor_value">(
-            42,
-            3.14159,
-            "hello world",
-            smallXtensor
+        zmap<"int_value","double_value","string_value","array_value","tensor_value">(
+            42, 3.14159, "hello world", smallArray, smallXtensor
         )
     );
 }
@@ -214,18 +242,31 @@ ZBuffer get_zerialized_smalltensorstruct() {
 template <typename P>
 ZBuffer get_zerialized_smalltensorstructasvector() {
     return serialize<P>(
-        zvec(42, 3.14159, "hello world", smallXtensor)
+        zvec(42, 3.14159, "hello world", smallArray, smallXtensor)
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_mediumtensorstruct() {
+    return serialize<P>(
+        zmap<"int_value","double_value","string_value","array_value","tensor_value">(
+            42, 3.14159, "hello world", smallArray, mediumXtensor
+        )
+    );
+}
+
+template <typename P>
+ZBuffer get_zerialized_mediumtensorstructasvector() {
+    return serialize<P>(
+        zvec(42, 3.14159, "hello world", smallArray, mediumXtensor)
     );
 }
 
 template <typename P>
 ZBuffer get_zerialized_largetensorstruct() {
     return serialize<P>(
-        zmap<"int_value","double_value","string_value","tensor_value">(
-            42,
-            3.14159,
-            "hello world",
-            largeXTensor
+        zmap<"int_value","double_value","string_value","array_value","tensor_value">(
+            42, 3.14159, "hello world", smallArray, largeXTensor
         )
     );
 }
@@ -240,6 +281,10 @@ ZBuffer get_zerialized_data() {
         return get_zerialized_smalltensorstruct<P>();
     } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
         return get_zerialized_smalltensorstructasvector<P>();
+    } else if constexpr (DT == DataType::MediumTensorStruct) {
+        return get_zerialized_mediumtensorstruct<P>();
+    } else if constexpr (DT == DataType::MediumTensorStructAsVector) {
+        return get_zerialized_mediumtensorstructasvector<P>();
     } else {
         return get_zerialized_largetensorstruct<P>();
     }
@@ -266,34 +311,44 @@ SmallStruct testDataSmallStruct {
     {1,2,3,4,5,6,7,8,9,10}
 };
 
-std::vector<size_t> small_shape = { 4, 4 };
-rfl::Bytestring small_vector = to_bytestring<double, 2>(smallXtensor);
-
 SmallTensorStruct testDataSmallTensorStruct {
     42, 
     3.14159, 
     "hello world",
+    {1,2,3,4,5,6,7,8,9,10},
     TensorWrapper{
-        8,
-        small_shape,
-        small_vector
+        11,
+        { 4, 4 },
+        to_bytestring<double, 2>(smallXtensor)
     }
 };
 
-// Create large tensor data to match the zerialize version
-std::vector<size_t> large_shape = { 3, 1024, 768 };
-// rfl::Bytestring large_vector(3 * 1024 * 768, std::byte{3});
-rfl::Bytestring large_vector = to_bytestring<uint8_t, 3>(largeXTensor);
+MediumTensorStruct testDataMediumTensorStruct {
+    42, 
+    3.14159, 
+    "hello world",
+    {1,2,3,4,5,6,7,8,9,10},
+    TensorWrapper{
+        10,
+        { MediumN, 2048 },
+        to_bytestring<float, 2>(mediumXtensor)
+    }
+};
 
+
+// Create large tensor data to match the zerialize version
+// std::vector<size_t> large_shape = { 3, 1024, 768 };
+// rfl::Bytestring large_vector = to_bytestring<uint8_t, 3>(largeXTensor);
 
 LargeTensorStruct testDataLargeTensorStruct {
     42, 
     3.14159, 
     "hello world",
+    {1,2,3,4,5,6,7,8,9,10},
     TensorWrapper{
-        1, // uint8_t dtype
-        large_shape,
-        large_vector
+        4, // uint8_t dtype
+        { 3, 1024, 768 }, //large_shape,
+        to_bytestring<uint8_t, 3>(largeXTensor) //large_vector
     }
 };
 
@@ -329,6 +384,10 @@ auto get_reflected() {
         return get_reflected_data<ST>(testDataSmallTensorStruct);
     } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
         return get_reflected_data_flat<ST>(testDataSmallTensorStruct);
+    } else if constexpr (DT == DataType::MediumTensorStruct) {
+        return get_reflected_data<ST>(testDataMediumTensorStruct);
+    } else if constexpr (DT == DataType::MediumTensorStructAsVector) {
+        return get_reflected_data_flat<ST>(testDataMediumTensorStruct);
     } else {
         return get_reflected_data_flat<ST>(testDataLargeTensorStruct);
     }
@@ -353,11 +412,13 @@ auto get_serialized() {
 
 template <DataType DT>
 size_t num_iterations() {
-    if constexpr (DT == DataType::SmallStruct) { return 1000000; } 
-    else if constexpr (DT == DataType::SmallStructAsVector) { return 1000000; } 
-    else if constexpr (DT == DataType::SmallTensorStruct) { return 1000000; } 
-    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return 1000000; } 
-    else if constexpr (DT == DataType::LargeTensorStruct) { return 10000; } 
+    if constexpr (DT == DataType::SmallStruct) { return                     1000000; } 
+    else if constexpr (DT == DataType::SmallStructAsVector) { return        1000000; } 
+    else if constexpr (DT == DataType::SmallTensorStruct) { return          1000000; } 
+    else if constexpr (DT == DataType::SmallTensorStructAsVector) { return  1000000; } 
+    else if constexpr (DT == DataType::MediumTensorStruct) { return          100000; } 
+    else if constexpr (DT == DataType::MediumTensorStructAsVector) { return  100000; } 
+    else if constexpr (DT == DataType::LargeTensorStruct) { return            10000; } 
     else { return 1; }
 }
 
@@ -436,6 +497,10 @@ auto get_reflect_deserialized(const auto& buf) {
         return get_reflect_deserialized_object<ST, SmallTensorStruct, false>(buf);
     } else if constexpr (DT == DataType::SmallTensorStructAsVector) {
         return get_reflect_deserialized_object<ST, SmallTensorStruct, true>(buf);
+    } else if constexpr (DT == DataType::MediumTensorStruct) {
+        return get_reflect_deserialized_object<ST, MediumTensorStruct, false>(buf);
+    } else if constexpr (DT == DataType::MediumTensorStructAsVector) {
+        return get_reflect_deserialized_object<ST, MediumTensorStruct, true>(buf);
     } else {
         return get_reflect_deserialized_object<ST, LargeTensorStruct, true>(buf);
     }
@@ -480,9 +545,13 @@ int perform_read_zerialize_smalltensorstruct(const auto& deserializer) {
     int i = deserializer["int_value"].asInt64();
     double d = deserializer["double_value"].asDouble();
     string s = deserializer["string_value"].asString();
+    auto arr = deserializer["array_value"];
     auto tensor = xtensor::asXTensor<double, 2>(deserializer["tensor_value"]);
-    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "SmallTensorStruct contents not correct.");
+    size_t sum = xt::sum(tensor)();
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallTensorStruct contents not correct.");
     return sum;
 }
 
@@ -490,9 +559,41 @@ int perform_read_zerialize_smalltensorstructasvector(const auto& deserializer) {
     int i = deserializer[0].asInt64();
     double d = deserializer[1].asDouble();
     string s = deserializer[2].asString();
-    auto tensor = xtensor::asXTensor<double, 2>(deserializer[3]);
-    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "SmallTensorStruct contents not correct.");
+    auto arr = deserializer[3];
+    auto tensor = xtensor::asXTensor<double, 2>(deserializer[4]);
+    size_t sum = xt::sum(tensor)();
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallTensorStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_mediumtensorstruct(const auto& deserializer) {
+    int i = deserializer["int_value"].asInt64();
+    double d = deserializer["double_value"].asDouble();
+    string s = deserializer["string_value"].asString();
+    auto arr = deserializer["array_value"];
+    auto tensor = xtensor::asXTensor<float, 2>(deserializer["tensor_value"]);
+    size_t sum = xt::sum(tensor)();
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumTensorStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_zerialize_mediumtensorstructasvector(const auto& deserializer) {
+    int i = deserializer[0].asInt64();
+    double d = deserializer[1].asDouble();
+    string s = deserializer[2].asString();
+    auto arr = deserializer[3];
+    auto tensor = xtensor::asXTensor<float, 2>(deserializer[4]);
+    size_t sum = xt::sum(tensor)();
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumTensorStruct contents not correct.");
     return sum;
 }
 
@@ -500,9 +601,13 @@ int perform_read_zerialize_largetensorstruct(const auto& deserializer) {
     int i = deserializer["int_value"].asInt64();
     double d = deserializer["double_value"].asDouble();
     string s = deserializer["string_value"].asString();
+    auto arr = deserializer["array_value"];
     auto tensor = xtensor::asXTensor<uint8_t, 3>(deserializer["tensor_value"]);
-    size_t sum = 124.0; //xt::sum(tensor)(); // not _really_ part of the test...
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 124.0, "LargeTensorStruct contents not correct.");
+    size_t sum = xt::sum(tensor)();
+    for (size_t i = 0; i < arr.arraySize(); i++) {
+        sum += arr[i].asInt32();
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3*1024*768*3, "LargeTensorStruct contents not correct.");
     return sum;
 }
 
@@ -516,6 +621,10 @@ int perform_read_zerialize(const auto& deserializer) {
         return perform_read_zerialize_smalltensorstruct(deserializer);
     } else if constexpr (DT == DataType::SmallTensorStructAsVector) { 
         return perform_read_zerialize_smalltensorstructasvector(deserializer);
+    } else if constexpr (DT == DataType::MediumTensorStruct) { 
+        return perform_read_zerialize_mediumtensorstruct(deserializer);
+    } else if constexpr (DT == DataType::MediumTensorStructAsVector) { 
+        return perform_read_zerialize_mediumtensorstructasvector(deserializer);
     } else { 
         return perform_read_zerialize_largetensorstruct(deserializer);
     }
@@ -536,52 +645,59 @@ int perform_read_reflect_smallstruct(const SmallStruct& obj) {
 
 int perform_read_reflect_smallstructasvector(const SmallStruct& obj) {
     return perform_read_reflect_smallstruct(obj);
-    // int i = obj.int_value;
-    // double d = obj.double_value;
-    // string s = obj.string_value;
-    // auto arr = obj.array_value;
-    // int sum = 0;
-    // for (size_t i = 0; i < arr.size(); i++) {
-    //     sum += arr[i];
-    // }
-    // release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStructAsVector contents not correct.");
-    // return sum;
 }
 
 int perform_read_reflect_smalltensorstruct(const SmallTensorStruct& obj) {
     int i = obj.int_value;
     double d = obj.double_value;
     string s = obj.string_value;
-    auto arr = obj.tensor_value;
-    // int sum = 0;
-    // for (size_t i = 0; i < arr.size(); i++) {
-    //     sum += arr[i];
-    // }
-    //release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55, "SmallStruct contents not correct.");
-    release_assert(i == 42 && d == 3.14159 && s == "hello world", "SmallStruct contents not correct.");
-    return 0;
-
-    //return 0;
+    auto arr = obj.array_value;
+    auto tensor = obj.tensor_value;
+    auto actualTensor = tensorFromWrapper<double>(tensor); 
+    size_t sum = xt::sum(actualTensor)();
+    for (size_t i = 0; i < arr.size(); i++) {
+        sum += arr[i];
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallStruct contents not correct.");
+    return sum;
 }
 
 int perform_read_reflect_smalltensorstructasvector(const SmallTensorStruct& obj) {
     return perform_read_reflect_smalltensorstruct(obj);
-    //return 0;
+}
+
+int perform_read_reflect_mediumtensorstruct(const MediumTensorStruct& obj) {
+    int i = obj.int_value;
+    double d = obj.double_value;
+    string s = obj.string_value;
+    auto arr = obj.array_value;
+    auto tensor = obj.tensor_value;
+    auto actualTensor = tensorFromWrapper<float>(tensor); 
+    size_t sum = xt::sum(actualTensor)();
+    for (size_t i = 0; i < arr.size(); i++) {
+        sum += arr[i];
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumStruct contents not correct.");
+    return sum;
+}
+
+int perform_read_reflect_mediumtensorstructasvector(const MediumTensorStruct& obj) {
+    return perform_read_reflect_mediumtensorstruct(obj);
 }
 
 int perform_read_reflect_largetensorstruct(const LargeTensorStruct& obj) {
     int i = obj.int_value;
     double d = obj.double_value;
     string s = obj.string_value;
+    auto arr = obj.array_value;
     auto tensor = obj.tensor_value;
-    // Basic validation of the tensor data
-    size_t expected_size = 3 * 1024 * 768;
-    return 0;
-    // //size_t sum = tensor.data.size(); // Use data size as a proxy for validation
-    // size_t sum = tensor.size(); // Use data size as a proxy for validation
-    // //std::cout << "--- " << tensor.size() << std::endl;
-    // //release_assert(i == 42 && d == 3.14159 && s == "hello world" && tensor.data.size() == expected_size, "LargeTensorStruct contents not correct.");
-    // return sum;
+    auto actualTensor = tensorFromWrapper<uint8_t>(tensor);
+    size_t sum = xt::sum(actualTensor)();
+    for (size_t i = 0; i < arr.size(); i++) {
+        sum += arr[i];
+    }
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3*1024*768*3, "LargeTensorStruct contents not correct.");
+    return sum;
 }
 
 template <DataType DT>
@@ -594,6 +710,10 @@ int perform_read_reflect(const auto& obj) {
         return perform_read_reflect_smalltensorstruct(obj);
     } else if constexpr (DT == DataType::SmallTensorStructAsVector) { 
         return perform_read_reflect_smalltensorstructasvector(obj);
+    } else if constexpr (DT == DataType::MediumTensorStruct) { 
+        return perform_read_reflect_mediumtensorstruct(obj);
+    } else if constexpr (DT == DataType::MediumTensorStructAsVector) { 
+        return perform_read_reflect_mediumtensorstructasvector(obj);
     } else { 
         return perform_read_reflect_largetensorstruct(obj);
     }
@@ -663,7 +783,7 @@ BenchmarkResult perform_benchmark() {
         .serializationTime = serializationTime,
         .deserializationTime = deSerializationTime,
         .readTime = readTime,
-        .deserializeAndReadTime = 0.0,
+        .deserializeAndReadTime = deSerializationTime + readTime,
         .deserializeAndInstantiateTime = 0.0,
         .dataSize = serializedSize,
         .iterations = iterations
@@ -678,7 +798,7 @@ void test_for_competitor_type() {
         << setw(18) << fixed << setprecision(3) << result.deserializationTime 
         << setw(18) << fixed << setprecision(3) << result.readTime 
         << setw(18) << fixed << setprecision(3) << result.deserializeAndReadTime 
-        << setw(18) << fixed << setprecision(3) << result.deserializeAndInstantiateTime 
+        // << setw(18) << fixed << setprecision(3) << result.deserializeAndInstantiateTime 
         << setw(18) << result.dataSize
         << setw(18) << result.iterations << endl;
 }
@@ -698,7 +818,7 @@ void test_for_serialization_type() {
         << setw(19) << "Deserialize (µs)" 
         << setw(19) << "Read (µs)" 
         << setw(19) << "Deser+Read (µs)" 
-        << setw(19) << "Deser+Inst (µs)" 
+        // << setw(19) << "Deser+Inst (µs)" 
         << setw(18) << "Size (bytes)"
         << setw(18) << "(samples)" << endl << endl;
 
@@ -709,12 +829,19 @@ void test_for_serialization_type() {
         // but reflectcpp does not. So just don't even compare.
         test_for_data_type<ST, DataType::SmallTensorStruct>();
         test_for_data_type<ST, DataType::SmallTensorStructAsVector>();
+        test_for_data_type<ST, DataType::MediumTensorStruct>();
+        test_for_data_type<ST, DataType::MediumTensorStructAsVector>();
         test_for_data_type<ST, DataType::LargeTensorStruct>();
     }
     cout << endl << endl;
 }
 
 int main() {
+    std::cout << "Serialize:    produce bytes" << std::endl;
+    std::cout << "Deserialize:  consume bytes" << std::endl;
+    std::cout << "Read:         read and check every value from pre-deserialized" << std::endl;
+    std::cout << "Deser+Read:   deserialize, read and check every value" << std::endl;
+    std::cout << std::endl;
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
     test_for_serialization_type<SerializationType::Json>();
