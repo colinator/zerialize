@@ -839,8 +839,8 @@ void test_for_serialization_type() {
 int main() {
     std::cout << "Serialize:    produce bytes" << std::endl;
     std::cout << "Deserialize:  consume bytes" << std::endl;
-    std::cout << "Read:         read and check every value from pre-deserialized" << std::endl;
-    std::cout << "Deser+Read:   deserialize, read and check every value" << std::endl;
+    std::cout << "Read:         read and check every value from pre-deserialized, compute tensor element sums" << std::endl;
+    std::cout << "Deser+Read:   deserialize, then read" << std::endl;
     std::cout << std::endl;
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
