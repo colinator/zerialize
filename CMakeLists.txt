@@ -12,14 +12,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(flatbuffers)
 
-# Fetch nlohmann json
-FetchContent_Declare(
-    json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(json)
-
 # Fetch yyjson
 FetchContent_Declare(
     yyjson
@@ -28,22 +20,50 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yyjson)
 
-# Fetch msgpack-c (MessagePack for C/C++)
-FetchContent_Declare(
-    msgpack
-    GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
-    GIT_TAG c_master
-)
-FetchContent_GetProperties(msgpack)
-if(NOT msgpack_POPULATED)
-    FetchContent_Populate(msgpack)
-    # Explicitly disable Boost
-    set(MSGPACK_BOOST OFF CACHE BOOL "Disable Boost dependency" FORCE)
-    set(MSGPACK_USE_BOOST OFF CACHE BOOL "Disable Boost dependency" FORCE)
-    set(MSGPACK_BUILD_EXAMPLES OFF CACHE BOOL "Don't build examples" FORCE)
-    set(MSGPACK_BUILD_TESTS OFF CACHE BOOL "Don't build tests" FORCE)
-    add_subdirectory(${msgpack_SOURCE_DIR} ${msgpack_BINARY_DIR})
+# Fetch msgpack
+# If some toolchain (vcpkg, system) already provided msgpack targets, reuse them.
+if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
+  # Vendor via FetchContent
+  FetchContent_Declare(
+      msgpack
+      GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
+      GIT_TAG c_master
+  )
+  FetchContent_GetProperties(msgpack)
+  if(NOT msgpack_POPULATED)
+      FetchContent_Populate(msgpack)
+      # Disable Boost / samples / tests
+      set(MSGPACK_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
+      set(MSGPACK_USE_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
+      set(MSGPACK_BUILD_EXAMPLES OFF CACHE BOOL "Don't build examples" FORCE)
+      set(MSGPACK_BUILD_TESTS OFF CACHE BOOL "Don't build tests" FORCE)
+      add_subdirectory(${msgpack_SOURCE_DIR} ${msgpack_BINARY_DIR})
+  endif()
 endif()
+
+# Normalize to a single name consumers can link against:
+if(TARGET msgpack-c)
+  add_library(zerialize_msgpack ALIAS msgpack-c)
+elseif(TARGET msgpackc-cxx)
+  add_library(zerialize_msgpack ALIAS msgpackc-cxx)
+elseif(TARGET msgpackc)
+  add_library(zerialize_msgpack ALIAS msgpackc)
+else()
+  message(FATAL_ERROR "Could not locate a msgpack CMake target (msgpack-c/msgpackc-cxx/msgpackc).")
+endif()
+
+# Unify msgpack target name for consumers of this project:
+# (vcpkg or upstream may expose different target names)
+if(TARGET msgpack-c)
+  add_library(zerialize_msgpack ALIAS msgpack-c)
+elseif(TARGET msgpackc-cxx)
+  add_library(zerialize_msgpack ALIAS msgpackc-cxx)
+elseif(TARGET msgpackc)
+  add_library(zerialize_msgpack ALIAS msgpackc)
+else()
+  message(FATAL_ERROR "Could not locate a msgpack CMake target (msgpack-c/msgpackc-cxx/msgpackc).")
+endif()
+
 
 # Download and configure xtl
 FetchContent_Declare(xtl
@@ -106,7 +126,6 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
 target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     ${flatbuffers_SOURCE_DIR}/include
-    nlohmann_json::nlohmann_json
     ${msgpack_SOURCE_DIR}/include
     ${yyjson_SOURCE_DIR}/src
     #$<INSTALL_INTERFACE:include/eigen3>
@@ -117,12 +136,11 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 # Doesn't really 'link' - just how to do transitive
 # includes in cmake...
 target_link_libraries(${PROJECT_NAME} INTERFACE
-    nlohmann_json::nlohmann_json
     flatbuffers
     xtensor 
     xsimd 
     xtl
     eigen
-    msgpack-c
+    zerialize_msgpack
     yyjson
 )

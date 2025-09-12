@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(reflectcpp CONFIG REQUIRED)
 
+set(ZERIALIZE_VENDOR_MSGPACK OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
 
 add_executable(${PROJECT_NAME} 

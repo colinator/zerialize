@@ -15,3 +15,4 @@ Compares zerialize vs reflect-cpp.
 ## Run
 
     ./build/benchmark_compare
+    

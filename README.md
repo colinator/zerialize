@@ -1,4 +1,4 @@
-# zerialize
+# <i>z</i>erialize
 
 Zero-copy multi-format serialization/deserialization for c++20.
 

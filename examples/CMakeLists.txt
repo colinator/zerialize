@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(.. ${CMAKE_BINARY_DIR}/zerialize)
 
-add_executable(basic_usage general_usage.cpp)
+add_executable(basic_usage basic_usage.cpp)
 target_link_libraries(basic_usage PRIVATE zerialize)
 
 add_executable(general_usage general_usage.cpp)
