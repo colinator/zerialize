@@ -1,4 +1,7 @@
 #include <iostream>
+#include <vector>
+#include <array>
+#include <map>
 #include <zerialize/zerialize.hpp>
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/flex.hpp>
@@ -79,8 +82,19 @@ int main() {
     cout << d6["description"].asString() << endl 
          << zerialize::eigen::asEigenMatrix<double, 3, 2>(d6["tensor"]) << endl;
    
+    // std::vector (can also be nested in zmap/zvec)
+    std::vector<int> vec {1,2,3};
+    ZBuffer b7 = serialize<MsgPack>(vec);
+    auto d7 = MsgPack::Deserializer(b7.buf());
+    cout << d7[0].asInt32() << " " << d7[1].asInt32() << " " << d7[2].asInt32() << endl;
 
-    // Outputs:
+    // std::map (can also be nested in zmap/zvec)
+    std::map<std::string, int> mappy {{"a", 1}, {"b", 2}};
+    ZBuffer b8 = serialize<JSON>(mappy);
+    auto d8 = JSON::Deserializer(b8.buf());
+    cout << d8["a"].asInt32() << " " << d8["b"].asInt32() << endl;
+
+    // Outputs:JSON
     //
     // null
     // {}
@@ -95,5 +109,7 @@ int main() {
     // 1 2
     // 3 4
     // 5 6
+    // 1 2 3
+    // 1 2
 }
 
