@@ -1,10 +1,10 @@
-# test zerialize
+# examples
 
 Demonstrates basic usage of zerialize.
 
-Contains many examples of serialization and deserialization.
+Contains examples of serialization and deserialization. Start with the very basics in `basic_usage.cpp`, and find more examples in `general_usage.cpp`.
 
-    cd test
+    cd examples
 
 ## Build
 
