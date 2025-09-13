@@ -105,9 +105,18 @@ auto nested_buffer = zerialize::serialize<zerialize::JSON>(
 );
 ```
 
+### A note on blobs
+
+Blobs are stored as 'blobs' in protocols that support this (flex, msgpack). Protocols that don't (JSON) store blobs as arrays of ["~b", "base64", "base64-encoded data as a string"]
+
 ### Working with Tensors (xtensor)
 
-Zerialize has first-class support for xtensor with zero-copy where possible:
+Zerialize has first-class support for xtensor with zero-copy where possible.
+
+Tensors (both xtensor and eigen) are stored as arrays of size 3, where the type code is the numpy-compatible primitive type code. See include/zerialize/tensor/utils.hpp.
+
+    [type code, [dimension 1 size, dimension 2 size, etc], blob]
+
 
 ```cpp
 #include <zerialize/tensor/xtensor.hpp>

@@ -236,6 +236,35 @@ void test_translate_dsl() {
                 && outer[1][1].asString()=="B";
         });
 
+    // C: nested mixed container with tensors
+    xt::xtensor<double, 2> smallXtensor{{1.0, 2.0, 3.0, 4.0}, {4.0, 5.0, 6.0, 7.0}, {8.0, 9.0, 10.0, 11.0}, {12.0, 13.0, 14.0, 15.0}};
+    test_serialization<DstP>("xlate: tensor",
+        [smallXtensor](){
+            auto src = serialize<SrcP>( zmap<"outer">(
+                zvec( zmap<"n">(44), zvec("A",smallXtensor) )
+            ));
+            auto srd = typename SrcP::Deserializer(src.buf());
+            auto drd = translate<DstP>(srd);
+
+            //auto tensor = xtensor::asXTensor<double, 2>(deserializer["tensor_value"]);
+
+            return serialize<DstP>( zmap<"outer">(
+                zvec( zmap<"n">( drd["outer"][0]["n"].asInt64() ),
+                      zvec( drd["outer"][1][0].asString(),
+                      xtensor::asXTensor<double, 2>(drd["outer"][1][1]) ) )
+            ));
+        },
+        [smallXtensor](const DV& v){
+            return true;
+            if (!v.isMap()) return false;
+            auto outer = v["outer"];
+            if (!outer.isArray() || outer.arraySize()!=2) return false;
+            if (!(outer[0].isMap() && outer[0]["n"].asInt64()==44)) return false;
+            return outer[1].isArray() && outer[1].arraySize()==2
+                && outer[1][0].asString()=="A"
+                && xtensor::asXTensor<double, 2>(outer[1][1])==smallXtensor;
+        });
+
     std::cout << "== Translate (DSL) <" << SrcP::Name << "> → <" << DstP::Name << "> passed ==\n\n";
 }
 

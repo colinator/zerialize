@@ -16,6 +16,8 @@
 namespace zerialize {
 namespace json {
 
+const std::string blobTag("~b");
+const std::string blobEncoding("base64");
 
 // A forward range of string_view over an object's keys.
 struct KeysView {
@@ -145,7 +147,12 @@ public:
     bool isMap()    const { return cur_ && yyjson_is_obj(cur_); }
     bool isArray()  const { return cur_ && yyjson_is_arr(cur_); }
     // Blob policy: base64 string
-    bool isBlob()   const { return isString(); }
+    bool isBlob()   const { 
+        return isArray() && arraySize() == 3 && 
+            (*this)[0].isString() && (*this)[0].asString() == blobTag &&
+            (*this)[1].isString() && (*this)[1].asString() == blobEncoding && 
+            (*this)[1].isString();
+    }
 
     // --- scalars ---
     int8_t   asInt8()   const { check(yyjson_is_int,  "signed integer"); return static_cast<int8_t>(yyjson_get_sint(cur_)); }
@@ -173,8 +180,8 @@ public:
     }
 
     std::vector<std::byte> asBlob() const {
-        check(yyjson_is_str, "string (blob as base64)");
-        return base64Decode(asStringView());
+        ensure(isBlob(), "not a blob");
+        return base64Decode((*this)[2].asStringView());
     }
 
     // --- map interface ---
@@ -186,21 +193,8 @@ public:
     }
 
     KeysView mapKeys() const {
-    //std::set<std::string_view> mapKeys() const {
         check(yyjson_is_obj, "map/object");
         return KeysView{cur_};
-
-        // check(yyjson_is_obj, "map/object");
-        // std::set<std::string_view> keys;
-        // yyjson_obj_iter it;
-        // yyjson_obj_iter_init(cur_, &it);
-        // yyjson_val* k; // iter returns key node
-        // while ((k = yyjson_obj_iter_next(&it))) {
-        //     // keys in JSON are strings
-        //     keys.insert(std::string_view(yyjson_get_str(k), yyjson_get_len(k)));
-        //     // If you needed the value: yyjson_val* v = yyjson_obj_iter_get_val(k);
-        // }
-        // return keys;
     }
 
     JsonDeserializer operator[](std::string_view key) const {
@@ -298,7 +292,14 @@ struct Serializer {
     // Encode binary as array of 0..255
     void binary(std::span<const std::byte> b) {
         std::string s = base64Encode(b);
+
+        // A 'binary' will actually be an array, the first element 
+        // will be a string with the magic string "~b"
+        begin_array(3);
+        this->string(blobTag);
+        this->string(blobEncoding);
         push_value(yyjson_mut_strncpy(doc(), s.data(), s.size()));
+        end_array();
     }
 
     // ── structures ──────────────────────────────────────────────

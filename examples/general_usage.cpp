@@ -77,8 +77,9 @@ int main() {
     // the protocol allows (flex, msgpack so far).
     auto eigen_mat = Eigen::Matrix<double, 3, 2>();
     eigen_mat << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
-    ZBuffer b6 = serialize<Flex>(zmap<"tensor", "description">(eigen_mat, "counts"));
-    auto d6 = Flex::Deserializer(b6.buf());
+    ZBuffer b6 = serialize<JSON>(zmap<"tensor", "description">(eigen_mat, "counts"));
+    auto d6 = JSON::Deserializer(b6.buf());
+    cout << "--------" << std::endl << d6.to_string() << std::endl;
     cout << d6["description"].asString() << endl 
          << zerialize::eigen::asEigenMatrix<double, 3, 2>(d6["tensor"]) << endl;
    
