@@ -19,7 +19,7 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 ## Building
 
-This is a **header-only library**, and contains nothing to build. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
+This is a **header-only library**, and contains nothing to build. Well, sort of: the core library is header-only. Each supported protocol relies on 3rd-party libraries, which may or may not be header-only. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
 
 Just include the headers and you're ready to serialize all the things.
 
