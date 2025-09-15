@@ -276,7 +276,7 @@ public:
             using reference         = std::string_view;
 
             iterator() = default;
-            iterator(const ::flexbuffers::TypedVector* ks) : keys(ks), i(ks->size()) {}
+            iterator(const ::flexbuffers::TypedVector* ks, std::size_t idx) : keys(ks), i(idx) {}
 
             reference operator*() const {
                 auto s = (*keys)[i].AsString();
@@ -284,7 +284,6 @@ public:
             }
 
             iterator& operator++() { ++i; return *this; }
-            // (optional) post-increment to be thorough
             iterator operator++(int) { iterator tmp = *this; ++(*this); return tmp; }
 
             friend bool operator==(const iterator& a, const iterator& b) {
@@ -292,12 +291,9 @@ public:
             }
         };
 
-        // Provide both const and non-const begin/end (libc++ checks both T& and const T&)
-        iterator begin() { return iterator{&keys}; }
-        iterator end()   { return iterator{&keys}; }
-
-        iterator begin() const { return iterator{&keys}; }
-        iterator end()   const { return iterator{&keys}; }
+        // Read-only iteration is sufficient
+        iterator begin() const { return iterator{&keys, 0}; }
+        iterator end()   const { return iterator{&keys, keys.size()}; }
     };
 
     //inline KeysView mapKeys() const { return KeysView{ ref_.AsMap() }; }
