@@ -79,7 +79,6 @@ int main() {
     eigen_mat << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
     ZBuffer b6 = serialize<JSON>(zmap<"tensor", "description">(eigen_mat, "counts"));
     auto d6 = JSON::Deserializer(b6.buf());
-    cout << "--------" << std::endl << d6.to_string() << std::endl;
     cout << d6["description"].asString() << endl 
          << zerialize::eigen::asEigenMatrix<double, 3, 2>(d6["tensor"]) << endl;
    
