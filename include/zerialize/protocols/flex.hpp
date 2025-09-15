@@ -262,11 +262,11 @@ public:
 
     // Zero-alloc forward range of keys (StringViewRange-compatible)
     struct KeysView {
-        ::flexbuffers::Map map; // non-owning view over backing bytes
+        ::flexbuffers::TypedVector keys;
 
         struct iterator {
             // default-constructible → satisfies forward_iterator
-            const ::flexbuffers::Map* map = nullptr;
+            const ::flexbuffers::TypedVector* keys = nullptr;
             std::size_t i = 0;
 
             using iterator_category = std::forward_iterator_tag;
@@ -276,11 +276,10 @@ public:
             using reference         = std::string_view;
 
             iterator() = default;
-            iterator(const ::flexbuffers::Map* m, std::size_t idx) : map(m), i(idx) {}
+            iterator(const ::flexbuffers::TypedVector* ks) : keys(ks), i(ks->size()) {}
 
             reference operator*() const {
-                auto keys = map->Keys();
-                auto s    = keys[i].AsString();
+                auto s = (*keys)[i].AsString();
                 return std::string_view(s.c_str(), s.size());
             }
 
@@ -289,19 +288,20 @@ public:
             iterator operator++(int) { iterator tmp = *this; ++(*this); return tmp; }
 
             friend bool operator==(const iterator& a, const iterator& b) {
-                return a.map == b.map && a.i == b.i;
+                return a.keys == b.keys && a.i == b.i;
             }
         };
 
         // Provide both const and non-const begin/end (libc++ checks both T& and const T&)
-        iterator begin() { return iterator{&map, 0}; }
-        iterator end()   { auto keys = map.Keys(); return iterator{&map, keys.size()}; }
+        iterator begin() { return iterator{&keys}; }
+        iterator end()   { return iterator{&keys}; }
 
-        iterator begin() const { return iterator{&map, 0}; }
-        iterator end()   const { auto keys = map.Keys(); return iterator{&map, keys.size()}; }
+        iterator begin() const { return iterator{&keys}; }
+        iterator end()   const { return iterator{&keys}; }
     };
 
-    inline KeysView mapKeys() const { return KeysView{ ref_.AsMap() }; }
+    //inline KeysView mapKeys() const { return KeysView{ ref_.AsMap() }; }
+    inline KeysView mapKeys() const { return KeysView{ ref_.AsMap().Keys() }; }
 
     bool contains(std::string_view key) const {
         auto m = ref_.AsMap();
