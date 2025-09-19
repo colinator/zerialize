@@ -16,6 +16,7 @@ Zero-copy multi-format serialization/deserialization for c++20.
 *   **JSON** (via yyjson)
 *   **Flexbuffers** (Google's schema-less binary format)
 *   **MessagePack** (compact binary serialization)
+*   **CBOR** (via jsoncons)
 
 ## Building
 
