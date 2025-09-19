@@ -9,6 +9,7 @@
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/flex.hpp>
 #include <zerialize/protocols/msgpack.hpp>
+#include <zerialize/protocols/cbor.hpp>
 
 #include <xtensor/generators/xbuilder.hpp>
 
@@ -382,21 +383,30 @@ int main() {
     test_protocol_dsl<JSON>();
     test_protocol_dsl<Flex>();
     test_protocol_dsl<MsgPack>();
+    test_protocol_dsl<CBOR>();
 
     // Custom struct tests
     test_custom_structs<JSON>();
     test_custom_structs<Flex>();
     test_custom_structs<MsgPack>();
+    test_custom_structs<CBOR>();
 
-    // Cross-protocol (both directions) built with the same DSL
+    // Translate cross-protocol (both directions) built with the same DSL
     test_translate_dsl<JSON, MsgPack>();
-    test_translate_dsl<MsgPack, JSON>();
-
     test_translate_dsl<JSON, Flex>();
-    test_translate_dsl<Flex, JSON>();
+    test_translate_dsl<JSON, CBOR>();
 
     test_translate_dsl<Flex, MsgPack>();
+    test_translate_dsl<Flex, JSON>();
+    test_translate_dsl<Flex, CBOR>();
+
+    test_translate_dsl<MsgPack, JSON>();
     test_translate_dsl<MsgPack, Flex>();
+    test_translate_dsl<MsgPack, CBOR>();
+
+    test_translate_dsl<CBOR, JSON>();
+    test_translate_dsl<CBOR, Flex>();
+    test_translate_dsl<CBOR, MsgPack>();
 
     std::cout << "\nAll tests complete ✅\n";
     return 0;

@@ -7,6 +7,7 @@
 #include <zerialize/protocols/flex.hpp>
 #include <zerialize/protocols/msgpack.hpp>
 #include <zerialize/protocols/json.hpp>
+#include <zerialize/protocols/cbor.hpp>
 #include <zerialize/tensor/xtensor.hpp>
 
 #include <xtensor/core/xmath.hpp>
@@ -15,6 +16,7 @@
 #include <rfl/json.hpp>
 #include <rfl/flexbuf.hpp>
 #include <rfl/msgpack.hpp>
+#include <rfl/cbor.hpp>
 #include <rfl.hpp>
 
 using namespace zerialize;
@@ -81,7 +83,8 @@ double benchmark(Func&& func, size_t iterations = 1000000) {
 enum class SerializationType {
     Flex,
     MsgPack,
-    Json
+    Json,
+    CBOR
 };
 
 // Test across these data variations
@@ -130,7 +133,7 @@ struct SmallStruct {
     int int_value;
     double double_value;
     std::string string_value;
-    std::vector<int> array_value;
+    std::array<int, 10> array_value;
 };
 
 struct SmallTensorStruct {
@@ -164,7 +167,8 @@ struct LargeTensorStruct {
 template <SerializationType ST>
 constexpr string st_to_string() {
     if constexpr (ST == SerializationType::Flex) { return "Flex"; } 
-    else if constexpr (ST == SerializationType::MsgPack) { return "MsgPack"; } 
+    else if constexpr (ST == SerializationType::MsgPack) { return "MsgPack"; }
+    else if constexpr (ST == SerializationType::CBOR) { return "CBOR"; } 
     else { return "Json"; }
 }
 
@@ -296,6 +300,8 @@ ZBuffer get_zerialized() {
         return get_zerialized_data<zerialize::Flex, DT>();
     } else if constexpr (ST == SerializationType::MsgPack) {
         return get_zerialized_data<zerialize::MsgPack, DT>();
+    } else if constexpr (ST == SerializationType::CBOR) {
+        return get_zerialized_data<zerialize::CBOR, DT>();
     } else {
         return get_zerialized_data<zerialize::JSON, DT>();
     }
@@ -308,7 +314,7 @@ SmallStruct testDataSmallStruct {
     42, 
     3.14159,
     "hello world", 
-    {1,2,3,4,5,6,7,8,9,10}
+    smallArray
 };
 
 SmallTensorStruct testDataSmallTensorStruct {
@@ -358,6 +364,8 @@ auto get_reflected_data(DT&& data) {
         return rfl::flexbuf::write(data);
     } else if constexpr (ST == SerializationType::MsgPack) {
         return rfl::msgpack::write(data);
+    } else if constexpr (ST == SerializationType::CBOR) {
+        return rfl::cbor::write(data);
     } else {
         return rfl::json::write(data);
     }
@@ -369,6 +377,8 @@ auto get_reflected_data_flat(DT&& data) {
         return rfl::flexbuf::write<rfl::NoFieldNames>(data);
     } else if constexpr (ST == SerializationType::MsgPack) {
         return rfl::msgpack::write<rfl::NoFieldNames>(data);
+    } else if constexpr (ST == SerializationType::CBOR) {
+        return rfl::cbor::write<rfl::NoFieldNames>(data);
     } else {
         return rfl::json::write<rfl::NoFieldNames>(data);
     }
@@ -455,6 +465,9 @@ auto get_zerialize_deserialized(std::span<const uint8_t> buf) {
     } else if constexpr (ST == SerializationType::MsgPack) {
         typename zerialize::MsgPack::Deserializer d(buf);
         return d;
+    } else if constexpr (ST == SerializationType::CBOR) {
+        typename zerialize::CBOR::Deserializer d(buf);
+        return d;
     } else {
         typename zerialize::JSON::Deserializer d(buf);
         return d;
@@ -477,6 +490,12 @@ auto get_reflect_deserialized_object(const auto& buf) {
             return rfl::msgpack::read<DataType, rfl::NoFieldNames>(buf).value();
         } else {
             return rfl::msgpack::read<DataType>(buf).value();
+        }
+    } else if constexpr (ST == SerializationType::CBOR) {
+        if constexpr (Flat) {
+            return rfl::cbor::read<DataType, rfl::NoFieldNames>(buf).value();
+        } else {
+            return rfl::cbor::read<DataType>(buf).value();
         }
     } else {
         if constexpr (Flat) {
@@ -842,6 +861,7 @@ int main() {
     std::cout << "Read:         read and check every value from pre-deserialized, compute tensor element sums" << std::endl;
     std::cout << "Deser+Read:   deserialize, then read" << std::endl;
     std::cout << std::endl;
+    test_for_serialization_type<SerializationType::CBOR>();
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
     test_for_serialization_type<SerializationType::Json>();

@@ -6,13 +6,14 @@
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/flex.hpp>
 #include <zerialize/protocols/msgpack.hpp>
+#include <zerialize/protocols/cbor.hpp>
 #include <zerialize/tensor/eigen.hpp>
 #include <zerialize/translate.hpp>
 
 namespace z = zerialize;
 
 using z::ZBuffer, z::serialize, z::zvec, z::zmap;
-using z::JSON, z::Flex, z::MsgPack;
+using z::JSON, z::Flex, z::MsgPack, z::CBOR;
 using std::cout, std::endl;
 
 int main() {
@@ -58,7 +59,7 @@ int main() {
     cout << d4["value"].asDouble() << " " << d4["description"].asString() << endl;
 
     // Nesting
-    ZBuffer b5 = serialize<Flex>(
+    ZBuffer b5 = serialize<CBOR>(
         zmap<"users", "metadata">(
             zvec(
                 zmap<"id", "name">(1, "Alice"),
@@ -70,8 +71,8 @@ int main() {
             )
         )
     );
-    auto d5 = Flex::Deserializer(b5.buf());
-    cout << d5["users"][0]["name"].asString() << " " << d5["users"][1]["name"].asString() << endl;
+    auto d5 = CBOR::Deserializer(b5.buf());
+    cout << "D$: " << d5["users"][0]["name"].asString() << " " << d5["users"][1]["name"].asString() << " " << d5["metadata"]["timestamp"].asUInt64() << endl;
 
     // Eigen matrices (and xtensors) are zero-copy deserializeable if
     // the protocol allows (flex, msgpack so far).

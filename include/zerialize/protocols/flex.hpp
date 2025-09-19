@@ -383,6 +383,7 @@ public:
     // -------- pretty printer with type codes --------
     std::string to_string() const {
         std::ostringstream os;
+        os << "Flex ";
         dump_rec(os, ref_, 0);
         return os.str();
     }

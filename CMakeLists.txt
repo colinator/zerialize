@@ -20,6 +20,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yyjson)
 
+# Fetch or reuse jsoncons (header-only). Guard to avoid target name collisions
+if(NOT TARGET jsoncons AND NOT TARGET jsoncons::jsoncons)
+  FetchContent_Declare(
+      jsoncons
+      GIT_REPOSITORY https://github.com/danielaparker/jsoncons.git
+      GIT_TAG v1.4.0
+  )
+  FetchContent_MakeAvailable(jsoncons)
+endif()
+
 # Fetch msgpack
 # If some toolchain (vcpkg, system) already provided msgpack targets, reuse them.
 if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
@@ -41,19 +51,15 @@ if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
   endif()
 endif()
 
-# Normalize to a single name consumers can link against:
-if(TARGET msgpack-c)
-  add_library(zerialize_msgpack ALIAS msgpack-c)
-elseif(TARGET msgpackc-cxx)
-  add_library(zerialize_msgpack ALIAS msgpackc-cxx)
-elseif(TARGET msgpackc)
-  add_library(zerialize_msgpack ALIAS msgpackc)
-else()
-  message(FATAL_ERROR "Could not locate a msgpack CMake target (msgpack-c/msgpackc-cxx/msgpackc).")
-endif()
+# # Fetch libcbor
+# FetchContent_Declare(
+#     libcbor
+#     GIT_REPOSITORY https://github.com/PJK/libcbor.git
+#     GIT_TAG v0.13.0
+# )
+# FetchContent_MakeAvailable(libcbor)
 
-# Unify msgpack target name for consumers of this project:
-# (vcpkg or upstream may expose different target names)
+# Normalize to a single name consumers can link against:
 if(TARGET msgpack-c)
   add_library(zerialize_msgpack ALIAS msgpack-c)
 elseif(TARGET msgpackc-cxx)
@@ -128,10 +134,20 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     ${flatbuffers_SOURCE_DIR}/include
     ${msgpack_SOURCE_DIR}/include
     ${yyjson_SOURCE_DIR}/src
+    # libcbor exposes proper include dirs via its target; no need to add here
     #$<INSTALL_INTERFACE:include/eigen3>
     #${xtensor_SOURCE_DIR}/include
     ${xtensor_INCLUDE_DIRS}
 )
+
+# Propagate jsoncons headers (prefer an existing target if provided by toolchain)
+if(TARGET jsoncons)
+  target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons)
+elseif(TARGET jsoncons::jsoncons)
+  target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons::jsoncons)
+elseif(DEFINED jsoncons_SOURCE_DIR)
+  target_include_directories(${PROJECT_NAME} INTERFACE ${jsoncons_SOURCE_DIR}/include)
+endif()
 
 # Doesn't really 'link' - just how to do transitive
 # includes in cmake...
@@ -143,4 +159,5 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
     eigen
     zerialize_msgpack
     yyjson
+    # cbor
 )
