@@ -861,10 +861,10 @@ int main() {
     std::cout << "Read:         read and check every value from pre-deserialized, compute tensor element sums" << std::endl;
     std::cout << "Deser+Read:   deserialize, then read" << std::endl;
     std::cout << std::endl;
-    test_for_serialization_type<SerializationType::CBOR>();
+    test_for_serialization_type<SerializationType::Json>();
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
-    test_for_serialization_type<SerializationType::Json>();
+    test_for_serialization_type<SerializationType::CBOR>();
     std::cout << "\nBenchmark complete!" << std::endl;
     return 0;
 }
