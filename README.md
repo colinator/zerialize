@@ -5,8 +5,8 @@ Zero-copy multi-format serialization/deserialization for c++20.
 ## Goals
 
 1. **Ergonomic and performant** serialization and deserialization of C++ data structures and primitives.
-2. **Support as many dynamic protocols as possible** (JSON, Flexbuffers, MessagePack. More to come).
-3. For underlying protocols that support it (FlexBuffers, MessagePack, JSON in some cases), provide support for **zero-copy, zero-work, lazy deserialization**. For serialization, minimize copies.
+2. **Support as many dynamic protocols as possible** (JSON, Flexbuffers, MessagePack, CBOR. More to come).
+3. For underlying protocols that support it (FlexBuffers, MessagePack, CBOR, JSON in some cases), provide support for **zero-copy, zero-work, lazy deserialization**. For serialization, minimize copies.
 4. Support **easy conversion between protocols**.
 5. Transparently support serialization and deserialization into **xtensor tensors and eigen matrices**. Do this with zero-copy, if possible.
 6. Still to come: support serialization and deserialization into 'statically-typed' formats, such as Protobuf and Flatbuffers.
