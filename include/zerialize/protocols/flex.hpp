@@ -304,36 +304,36 @@ public:
         // Note: we're not strictly guaranteed a null-terminated
         // string here. But we totally control 'key' code, so
         // we sort of are...
-        auto r = m[key.data()];
-        return !r.IsNull();
+        // auto r = m[key.data()];
+        // return !r.IsNull();
         
         // Other implementation: hand-coded binary search.
         // This works with even non-null-terminated strings.
         
-        // auto keys = m.Keys();
-        // // Binary search over sorted Flex keys without allocating.
-        // std::size_t lo = 0, hi = keys.size();
-        // while (lo < hi) {
-        //     std::size_t mid = (lo + hi) / 2;
-        //     auto s = keys[mid].AsString();
-        //     std::string_view sv{s.c_str(), s.size()};
-        //     const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
-        //     int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
-        //     if (cmp < 0) {
-        //         lo = mid + 1; // sv < key
-        //     } else if (cmp > 0) {
-        //         hi = mid;     // sv > key
-        //     } else {
-        //         if (sv.size() < key.size()) {
-        //             lo = mid + 1; // sv < key (prefix)
-        //         } else if (sv.size() > key.size()) {
-        //             hi = mid;     // sv > key (key is prefix)
-        //         } else {
-        //             return true;  // exact match
-        //         }
-        //     }
-        // }
-        // return false;
+        auto keys = m.Keys();
+        // Binary search over sorted Flex keys without allocating.
+        std::size_t lo = 0, hi = keys.size();
+        while (lo < hi) {
+            std::size_t mid = (lo + hi) / 2;
+            auto s = keys[mid].AsString();
+            std::string_view sv{s.c_str(), s.size()};
+            const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
+            int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
+            if (cmp < 0) {
+                lo = mid + 1; // sv < key
+            } else if (cmp > 0) {
+                hi = mid;     // sv > key
+            } else {
+                if (sv.size() < key.size()) {
+                    lo = mid + 1; // sv < key (prefix)
+                } else if (sv.size() > key.size()) {
+                    hi = mid;     // sv > key (key is prefix)
+                } else {
+                    return true;  // exact match
+                }
+            }
+        }
+        return false;
     }
 
     FlexDeserializer operator[](std::string_view key) const {
@@ -341,37 +341,37 @@ public:
         // Note: we're not strictly guaranteed a null-terminated
         // string here. But we totally control 'key' code, so
         // we sort of are...
-        return FlexDeserializer(m[key.data()]);
+        // return FlexDeserializer(m[key.data()]);
 
         // Other implementation: hand-coded binary search.
         // This works with even non-null-terminated strings.
 
-        // auto keys = m.Keys();
-        // auto vals = m.Values();
-        // std::size_t lo = 0, hi = keys.size();
-        // while (lo < hi) {
-        //     std::size_t mid = (lo + hi) / 2;
-        //     auto s = keys[mid].AsString();
-        //     std::string_view sv{s.c_str(), s.size()};
-        //     const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
-        //     int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
-        //     if (cmp < 0) {
-        //         lo = mid + 1; // sv < key
-        //     } else if (cmp > 0) {
-        //         hi = mid;     // sv > key
-        //     } else {
-        //         if (sv.size() < key.size()) {
-        //             lo = mid + 1; // sv < key (prefix)
-        //         } else if (sv.size() > key.size()) {
-        //             hi = mid;     // sv > key (key is prefix)
-        //         } else {
-        //             return FlexDeserializer(vals[mid]); // exact match
-        //         }
-        //     }
-        // }
-        // // Fallback: allocate once to preserve exact flex semantics for edge cases.
-        // std::string k(key);
-        // return FlexDeserializer(m[k.c_str()]);
+        auto keys = m.Keys();
+        auto vals = m.Values();
+        std::size_t lo = 0, hi = keys.size();
+        while (lo < hi) {
+            std::size_t mid = (lo + hi) / 2;
+            auto s = keys[mid].AsString();
+            std::string_view sv{s.c_str(), s.size()};
+            const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
+            int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
+            if (cmp < 0) {
+                lo = mid + 1; // sv < key
+            } else if (cmp > 0) {
+                hi = mid;     // sv > key
+            } else {
+                if (sv.size() < key.size()) {
+                    lo = mid + 1; // sv < key (prefix)
+                } else if (sv.size() > key.size()) {
+                    hi = mid;     // sv > key (key is prefix)
+                } else {
+                    return FlexDeserializer(vals[mid]); // exact match
+                }
+            }
+        }
+        // Fallback: allocate once to preserve exact flex semantics for edge cases.
+        std::string k(key);
+        return FlexDeserializer(m[k.c_str()]);
     }
 
     std::size_t arraySize() const { return ref_.AsVector().size(); }
