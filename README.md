@@ -22,15 +22,11 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 This is a **header-only library**, and contains nothing to build. Well, sort of: the core library is header-only. Each supported protocol relies on 3rd-party libraries, which may or may not be header-only. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
 
-Just include the headers and you're ready to serialize all the things.
-
-## Usage Examples
+## Usage
 
 See `examples/` for the basics and `test/` for tests and many more examples, including xtensor, eigen, and custom structures.
 
-### Basic Serialization with the DSL
-
-The zerialize DSL makes building complex nested structures a breeze:
+The basics:
 
 ```cpp
 #include <iostream>
