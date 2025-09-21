@@ -187,9 +187,7 @@ public:
     // --- map interface ---
     bool contains(std::string_view key) const {
         if (!isMap()) return false;
-        // yyjson_obj_get needs null-terminated char*
-        std::string k(key);
-        return yyjson_obj_get(cur_, k.c_str()) != nullptr;
+        return yyjson_obj_getn(cur_, key.data(), key.size()) != nullptr;
     }
 
     KeysView mapKeys() const {
@@ -199,8 +197,7 @@ public:
 
     JsonDeserializer operator[](std::string_view key) const {
         check(yyjson_is_obj, "map/object");
-        std::string k(key);
-        yyjson_val* v = yyjson_obj_get(cur_, k.c_str());
+        yyjson_val* v = yyjson_obj_getn(cur_, key.data(), key.size());
         if (!v) throw DeserializationError("Key not found: " + std::string(key));
         return JsonDeserializer(v, doc_); // view
     }
