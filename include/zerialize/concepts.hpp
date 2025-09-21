@@ -72,14 +72,13 @@ concept StringViewRange =
         std::string_view
     >;
 
-//──────────────────────────  Reader  ───────────────────────────
-//
-// A read-only “value view” surface. Conforming types expose exact
-// predicates, exact-typed scalar accessors, random access for arrays,
-// key access for maps (with a zero-alloc key range), and a blob view.
-//
+//────────────────────────  ValueView (core)  ─────────────────────────
+// Core read-only “value view” surface without constraining subscript
+// return types. Used to allow lightweight subviews to be returned by
+// operator[] while still guaranteeing the full Reader API on those
+// subviews.
 template<class V>
-concept Reader =
+concept ValueView =
     requires (const V& v, std::string_view key, std::size_t index) {
 
       // --- Type predicates (must be exact bool; no proxies) ---
@@ -111,15 +110,19 @@ concept Reader =
       // --- Map interface (zero-alloc keys) ---
       { v.mapKeys()    } -> StringViewRange;
       { v.contains(key)} -> std::same_as<bool>;
-      { v[key]         } -> std::same_as<V>;
 
       // --- Array interface ---
       { v.arraySize()  } -> std::same_as<std::size_t>;
-      { v[index]       } -> std::same_as<V>;
 
       // --- Blob view ---
       { v.asBlob()     } -> BlobView;
   };
+
+// Full Reader: ValueView plus subscript that returns more ValueViews.
+template<class V>
+concept Reader = ValueView<V> &&
+    ValueView<decltype(std::declval<const V&>()[std::declval<std::string_view>()])> &&
+    ValueView<decltype(std::declval<const V&>()[std::declval<std::size_t>()])>;
 
 //───────────────────────────────  Writer  ──────────────────────────────
 //
