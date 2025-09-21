@@ -263,12 +263,11 @@ struct RootSerializer {
             throw std::runtime_error("yyjson_mut_write failed");
         }
 
-        std::vector<uint8_t> data(reinterpret_cast<uint8_t*>(s),
-                                  reinterpret_cast<uint8_t*>(s) + len);
-        free(s);
+        // The returned buffer 's' is allocated via malloc and independent of the document.
+        // Hand ownership directly to ZBuffer to avoid a copy.
         yyjson_mut_doc_free(doc);
         doc = nullptr;
-        return ZBuffer(std::move(data));
+        return ZBuffer(static_cast<void*>(s), len, ZBuffer::Deleters::Free);
     }
 };
 
