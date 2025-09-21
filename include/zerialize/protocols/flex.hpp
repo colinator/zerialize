@@ -97,17 +97,19 @@ private:
     }
 };
 
-// Optional protocol binder
 // ========================== Reader (Deserializer) =============================
 
-class FlexDeserializer {
+// Forward declare FlexValue so FlexViewBase can return it.
+class FlexValue;
+
+// Shared non-virtual base implementing the Reader surface on top of a
+// flexbuffers::Reference. Both FlexDeserializer (root) and FlexValue (subviews)
+// derive from this to avoid code duplication.
+class FlexViewBase {
 protected:
-    // If we construct from a vector, we own the bytes here.
-    std::vector<uint8_t> owned_;
-    // If we construct as a non-owning view, we keep a span here.
-    std::span<const uint8_t> view_;
-    // Reference into whichever storage is active.
     ::flexbuffers::Reference ref_{};
+    FlexViewBase() = default;
+    explicit FlexViewBase(::flexbuffers::Reference r) : ref_(r) {}
 
     static std::string json_escape(std::string_view s) {
         std::string out;
@@ -201,31 +203,7 @@ protected:
     }
 
 public:
-    // -------- constructors (owning) --------
-    explicit FlexDeserializer(const std::vector<uint8_t>& buf)
-      : owned_(buf),
-        ref_(owned_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(owned_)) {}
-
-    explicit FlexDeserializer(std::vector<uint8_t>&& buf)
-      : owned_(std::move(buf)),
-        ref_(owned_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(owned_)) {}
-
-    // -------- constructors (non-owning / zero-copy) --------
-    explicit FlexDeserializer(std::span<const uint8_t> bytes)
-      : view_(bytes),
-        ref_(view_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(view_.data(), view_.size())) {}
-
-    explicit FlexDeserializer(const uint8_t* data, std::size_t n)
-      : view_(data, n),
-        ref_(n == 0 ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(data, n)) {}
-
-    explicit FlexDeserializer(const std::byte* data, std::size_t n)
-      : FlexDeserializer(reinterpret_cast<const uint8_t*>(data), n) {}
-
-    // -------- view ctor from Reference (nested access) --------
-    explicit FlexDeserializer(::flexbuffers::Reference r) : ref_(r) {}
-
-    // -------- predicates --------
+    // Predicates
     bool isNull()   const { return ref_.IsNull(); }
     bool isBool()   const { return ref_.IsBool(); }
     bool isInt()    const { return ref_.IsInt(); }
@@ -236,7 +214,7 @@ public:
     bool isMap()    const { return ref_.IsMap(); }
     bool isArray()  const { return ref_.IsAnyVector() && !ref_.IsMap(); }
 
-    // -------- scalars --------
+    // Scalars
     int8_t   asInt8()   const { return ref_.AsInt8(); }
     int16_t  asInt16()  const { return ref_.AsInt16(); }
     int32_t  asInt32()  const { return ref_.AsInt32(); }
@@ -263,55 +241,33 @@ public:
     // Zero-alloc forward range of keys (StringViewRange-compatible)
     struct KeysView {
         ::flexbuffers::TypedVector keys;
-
         struct iterator {
-            // default-constructible → satisfies forward_iterator
             const ::flexbuffers::TypedVector* keys = nullptr;
             std::size_t i = 0;
-
             using iterator_category = std::forward_iterator_tag;
             using iterator_concept  = std::forward_iterator_tag;
             using value_type        = std::string_view;
             using difference_type   = std::ptrdiff_t;
             using reference         = std::string_view;
-
             iterator() = default;
             iterator(const ::flexbuffers::TypedVector* ks, std::size_t idx) : keys(ks), i(idx) {}
-
             reference operator*() const {
                 auto s = (*keys)[i].AsString();
                 return std::string_view(s.c_str(), s.size());
             }
-
             iterator& operator++() { ++i; return *this; }
             iterator operator++(int) { iterator tmp = *this; ++(*this); return tmp; }
-
-            friend bool operator==(const iterator& a, const iterator& b) {
-                return a.keys == b.keys && a.i == b.i;
-            }
+            friend bool operator==(const iterator& a, const iterator& b) { return a.keys==b.keys && a.i==b.i; }
         };
-
-        // Read-only iteration is sufficient
         iterator begin() const { return iterator{&keys, 0}; }
         iterator end()   const { return iterator{&keys, keys.size()}; }
     };
 
-    //inline KeysView mapKeys() const { return KeysView{ ref_.AsMap() }; }
     inline KeysView mapKeys() const { return KeysView{ ref_.AsMap().Keys() }; }
 
     bool contains(std::string_view key) const {
         auto m = ref_.AsMap();
-        // Note: we're not strictly guaranteed a null-terminated
-        // string here. But we totally control 'key' code, so
-        // we sort of are...
-        // auto r = m[key.data()];
-        // return !r.IsNull();
-        
-        // Other implementation: hand-coded binary search.
-        // This works with even non-null-terminated strings.
-        
         auto keys = m.Keys();
-        // Binary search over sorted Flex keys without allocating.
         std::size_t lo = 0, hi = keys.size();
         while (lo < hi) {
             std::size_t mid = (lo + hi) / 2;
@@ -319,74 +275,135 @@ public:
             std::string_view sv{s.c_str(), s.size()};
             const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
             int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
-            if (cmp < 0) {
-                lo = mid + 1; // sv < key
-            } else if (cmp > 0) {
-                hi = mid;     // sv > key
-            } else {
-                if (sv.size() < key.size()) {
-                    lo = mid + 1; // sv < key (prefix)
-                } else if (sv.size() > key.size()) {
-                    hi = mid;     // sv > key (key is prefix)
-                } else {
-                    return true;  // exact match
-                }
+            if (cmp < 0) { lo = mid + 1; }
+            else if (cmp > 0) { hi = mid; }
+            else {
+                if (sv.size() < key.size()) { lo = mid + 1; }
+                else if (sv.size() > key.size()) { hi = mid; }
+                else { return true; }
             }
         }
         return false;
     }
 
-    FlexDeserializer operator[](std::string_view key) const {
-        auto m = ref_.AsMap();
-        // Note: we're not strictly guaranteed a null-terminated
-        // string here. But we totally control 'key' code, so
-        // we sort of are...
-        // return FlexDeserializer(m[key.data()]);
-
-        // Other implementation: hand-coded binary search.
-        // This works with even non-null-terminated strings.
-
-        auto keys = m.Keys();
-        auto vals = m.Values();
-        std::size_t lo = 0, hi = keys.size();
-        while (lo < hi) {
-            std::size_t mid = (lo + hi) / 2;
-            auto s = keys[mid].AsString();
-            std::string_view sv{s.c_str(), s.size()};
-            const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
-            int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
-            if (cmp < 0) {
-                lo = mid + 1; // sv < key
-            } else if (cmp > 0) {
-                hi = mid;     // sv > key
-            } else {
-                if (sv.size() < key.size()) {
-                    lo = mid + 1; // sv < key (prefix)
-                } else if (sv.size() > key.size()) {
-                    hi = mid;     // sv > key (key is prefix)
-                } else {
-                    return FlexDeserializer(vals[mid]); // exact match
-                }
-            }
-        }
-        // Fallback: allocate once to preserve exact flex semantics for edge cases.
-        std::string k(key);
-        return FlexDeserializer(m[k.c_str()]);
-    }
-
     std::size_t arraySize() const { return ref_.AsVector().size(); }
-    FlexDeserializer operator[](std::size_t idx) const {
-        auto v = ref_.AsVector();
-        return FlexDeserializer(v[idx]);
-    }
 
-    // -------- pretty printer with type codes --------
+    // Declarations (defined after FlexValue is declared)
+    FlexValue operator[](std::string_view key) const;
+    FlexValue operator[](std::size_t idx) const;
+
     std::string to_string() const {
         std::ostringstream os;
         os << "Flex ";
         dump_rec(os, ref_, 0);
         return os.str();
     }
+};
+
+// Subview that just carries the reference; inherits full Reader surface.
+class FlexValue final : public FlexViewBase {
+public:
+    explicit FlexValue(::flexbuffers::Reference r) : FlexViewBase(r) {}
+};
+
+// Define FlexViewBase subscriptors now that FlexValue is complete.
+inline FlexValue FlexViewBase::operator[](std::string_view key) const {
+    auto m = ref_.AsMap();
+    auto keys = m.Keys();
+    auto vals = m.Values();
+    std::size_t lo = 0, hi = keys.size();
+    while (lo < hi) {
+        std::size_t mid = (lo + hi) / 2;
+        auto s = keys[mid].AsString();
+        std::string_view sv{s.c_str(), s.size()};
+        const std::size_t n = sv.size() < key.size() ? sv.size() : key.size();
+        int cmp = std::char_traits<char>::compare(sv.data(), key.data(), n);
+        if (cmp < 0) { lo = mid + 1; }
+        else if (cmp > 0) { hi = mid; }
+        else {
+            if (sv.size() < key.size()) { lo = mid + 1; }
+            else if (sv.size() > key.size()) { hi = mid; }
+            else { return FlexValue(vals[mid]); }
+        }
+    }
+    std::string k(key);
+    return FlexValue(m[k.c_str()]);
+}
+
+inline FlexValue FlexViewBase::operator[](std::size_t idx) const {
+    auto v = ref_.AsVector();
+    return FlexValue(v[idx]);
+}
+
+class FlexDeserializer : public FlexViewBase {
+protected:
+    // If we construct from a vector, we own the bytes here.
+    std::vector<uint8_t> owned_;
+    // If we construct as a non-owning view, we keep a span here.
+    std::span<const uint8_t> view_;
+    // Reference into whichever storage is active.
+    // ref_ is inherited from FlexViewBase
+
+    // No duplicate helpers here; FlexViewBase handles formatting/debug.
+
+public:
+    // -------- constructors (owning) --------
+    explicit FlexDeserializer(const std::vector<uint8_t>& buf)
+      : FlexViewBase(), owned_(buf) {
+        ref_ = owned_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(owned_);
+      }
+
+    explicit FlexDeserializer(std::vector<uint8_t>&& buf)
+      : FlexViewBase(), owned_(std::move(buf)) {
+        ref_ = owned_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(owned_);
+      }
+
+    // -------- constructors (non-owning / zero-copy) --------
+    explicit FlexDeserializer(std::span<const uint8_t> bytes)
+      : FlexViewBase(), view_(bytes) {
+        ref_ = view_.empty() ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(view_.data(), view_.size());
+      }
+
+    explicit FlexDeserializer(const uint8_t* data, std::size_t n)
+      : FlexViewBase(), view_(data, n) {
+        ref_ = (n == 0) ? ::flexbuffers::Reference{} : ::flexbuffers::GetRoot(data, n);
+      }
+
+    explicit FlexDeserializer(const std::byte* data, std::size_t n)
+      : FlexDeserializer(reinterpret_cast<const uint8_t*>(data), n) {}
+
+    // -------- view ctor from Reference (nested access) --------
+    explicit FlexDeserializer(::flexbuffers::Reference r) : FlexViewBase(r) {}
+
+    // FlexViewBase provides Reader methods, including subscripts.
+    using FlexViewBase::isNull;
+    using FlexViewBase::isBool;
+    using FlexViewBase::isInt;
+    using FlexViewBase::isUInt;
+    using FlexViewBase::isFloat;
+    using FlexViewBase::isString;
+    using FlexViewBase::isBlob;
+    using FlexViewBase::isMap;
+    using FlexViewBase::isArray;
+    using FlexViewBase::asInt8;
+    using FlexViewBase::asInt16;
+    using FlexViewBase::asInt32;
+    using FlexViewBase::asInt64;
+    using FlexViewBase::asUInt8;
+    using FlexViewBase::asUInt16;
+    using FlexViewBase::asUInt32;
+    using FlexViewBase::asUInt64;
+    using FlexViewBase::asFloat;
+    using FlexViewBase::asDouble;
+    using FlexViewBase::asBool;
+    using FlexViewBase::asString;
+    using FlexViewBase::asStringView;
+    using FlexViewBase::asBlob;
+    using FlexViewBase::mapKeys;
+    using FlexViewBase::contains;
+    using FlexViewBase::arraySize;
+    using FlexViewBase::operator[];
+    using FlexViewBase::to_string;
 };
 
 } // namespace flex
