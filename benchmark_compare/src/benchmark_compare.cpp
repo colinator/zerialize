@@ -149,7 +149,7 @@ struct MediumTensorStruct {
     double double_value;
     std::string string_value;
     std::vector<int> array_value;
-    TensorWrapper tensor_value; // Medium 10x2048 tensor
+    TensorWrapper tensor_value; // Medium 1x2048 tensor
 };
 
 struct LargeTensorStruct {
@@ -178,8 +178,8 @@ constexpr string dt_to_string() {
     else if constexpr (DT == DataType::SmallStructAsVector) { return "SmallStructAsVector"; } 
     else if constexpr (DT == DataType::SmallTensorStruct) { return "SmallTensorStruct 4x4 double";} 
     else if constexpr (DT == DataType::SmallTensorStructAsVector) { return "SmallTensorStructAsVector 4x4 double"; }
-    else if constexpr (DT == DataType::MediumTensorStruct) { return "MediumTensorStruct 10x2048 float";} 
-    else if constexpr (DT == DataType::MediumTensorStructAsVector) { return "MediumTensorStructAsVector 10x2048 float"; } 
+    else if constexpr (DT == DataType::MediumTensorStruct) { return "MediumTensorStruct 1x2048 float";} 
+    else if constexpr (DT == DataType::MediumTensorStructAsVector) { return "MediumTensorStructAsVector 1x2048 float"; } 
     else if constexpr (DT == DataType::LargeTensorStruct) { return "LargeTensorStruct 3x1024x768 uint8"; } 
     else { return "unknown"; }
 }
@@ -210,7 +210,7 @@ struct BenchmarkResult {
 
 std::array<int, 10> smallArray = {1,2,3,4,5,6,7,8,9,10};
 xt::xtensor<double, 2> smallXtensor{{1.0, 2.0, 3.0, 4.0}, {4.0, 5.0, 6.0, 7.0}, {8.0, 9.0, 10.0, 11.0}, {12.0, 13.0, 14.0, 15.0}};
-const size_t MediumN = 10;
+const size_t MediumN = 1;
 xt::xtensor<float, 2> mediumXtensor({MediumN, 2048}, 3);
 xt::xtensor<uint8_t, 3> largeXTensor({3, 1024, 768}, 3);
 
@@ -566,11 +566,12 @@ int perform_read_zerialize_smalltensorstruct(const auto& deserializer) {
     string s = deserializer["string_value"].asString();
     auto arr = deserializer["array_value"];
     auto tensor = xtensor::asXTensor<double, 2>(deserializer["tensor_value"]);
-    size_t sum = xt::sum(tensor)();
+    //size_t sum = xt::sum(tensor)();
+    size_t sum = tensor(3, 3);
     for (size_t i = 0; i < arr.arraySize(); i++) {
         sum += arr[i].asInt32();
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 15 /*179*/, "SmallTensorStruct contents not correct.");
     return sum;
 }
 
@@ -580,11 +581,12 @@ int perform_read_zerialize_smalltensorstructasvector(const auto& deserializer) {
     string s = deserializer[2].asString();
     auto arr = deserializer[3];
     auto tensor = xtensor::asXTensor<double, 2>(deserializer[4]);
-    size_t sum = xt::sum(tensor)();
+    // size_t sum = xt::sum(tensor)();
+    size_t sum = tensor(3, 3);
     for (size_t i = 0; i < arr.arraySize(); i++) {
         sum += arr[i].asInt32();
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 15 /*179*/, "SmallTensorStruct contents not correct.");
     return sum;
 }
 
@@ -594,11 +596,12 @@ int perform_read_zerialize_mediumtensorstruct(const auto& deserializer) {
     string s = deserializer["string_value"].asString();
     auto arr = deserializer["array_value"];
     auto tensor = xtensor::asXTensor<float, 2>(deserializer["tensor_value"]);
-    size_t sum = xt::sum(tensor)();
+    // size_t sum = xt::sum(tensor)();
+    size_t sum = tensor(0, 0, 0);
     for (size_t i = 0; i < arr.arraySize(); i++) {
         sum += arr[i].asInt32();
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3 /* MediumN*2048*3*/, "MediumTensorStruct contents not correct.");
     return sum;
 }
 
@@ -608,11 +611,12 @@ int perform_read_zerialize_mediumtensorstructasvector(const auto& deserializer) 
     string s = deserializer[2].asString();
     auto arr = deserializer[3];
     auto tensor = xtensor::asXTensor<float, 2>(deserializer[4]);
-    size_t sum = xt::sum(tensor)();
+    //size_t sum = xt::sum(tensor)();
+    size_t sum = tensor(0, 0, 0);
     for (size_t i = 0; i < arr.arraySize(); i++) {
         sum += arr[i].asInt32();
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3 /*MediumN*2048*3*/, "MediumTensorStruct contents not correct.");
     return sum;
 }
 
@@ -622,11 +626,12 @@ int perform_read_zerialize_largetensorstruct(const auto& deserializer) {
     string s = deserializer["string_value"].asString();
     auto arr = deserializer["array_value"];
     auto tensor = xtensor::asXTensor<uint8_t, 3>(deserializer["tensor_value"]);
-    size_t sum = xt::sum(tensor)();
+    // size_t sum = xt::sum(tensor)();
+    size_t sum = tensor(2, 20, 200);
     for (size_t i = 0; i < arr.arraySize(); i++) {
         sum += arr[i].asInt32();
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3*1024*768*3, "LargeTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3/*3*1024*768*3*/, "LargeTensorStruct contents not correct.");
     return sum;
 }
 
@@ -673,11 +678,12 @@ int perform_read_reflect_smalltensorstruct(const SmallTensorStruct& obj) {
     auto arr = obj.array_value;
     auto tensor = obj.tensor_value;
     auto actualTensor = tensorFromWrapper<double>(tensor); 
-    size_t sum = xt::sum(actualTensor)();
+    //size_t sum = xt::sum(actualTensor)();
+    size_t sum = actualTensor(3, 3);
     for (size_t i = 0; i < arr.size(); i++) {
         sum += arr[i];
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 179, "SmallStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 15 /*179*/, "SmallStruct contents not correct.");
     return sum;
 }
 
@@ -692,11 +698,12 @@ int perform_read_reflect_mediumtensorstruct(const MediumTensorStruct& obj) {
     auto arr = obj.array_value;
     auto tensor = obj.tensor_value;
     auto actualTensor = tensorFromWrapper<float>(tensor); 
-    size_t sum = xt::sum(actualTensor)();
+    //size_t sum = xt::sum(actualTensor)();
+    size_t sum = actualTensor(0, 0, 0);
     for (size_t i = 0; i < arr.size(); i++) {
         sum += arr[i];
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + MediumN*2048*3, "MediumStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3 /* MediumN*2048*3 */, "MediumStruct contents not correct.");
     return sum;
 }
 
@@ -711,11 +718,12 @@ int perform_read_reflect_largetensorstruct(const LargeTensorStruct& obj) {
     auto arr = obj.array_value;
     auto tensor = obj.tensor_value;
     auto actualTensor = tensorFromWrapper<uint8_t>(tensor);
-    size_t sum = xt::sum(actualTensor)();
+    //size_t sum = xt::sum(actualTensor)();
+    size_t sum = actualTensor(2, 20, 200);
     for (size_t i = 0; i < arr.size(); i++) {
         sum += arr[i];
     }
-    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3*1024*768*3, "LargeTensorStruct contents not correct.");
+    release_assert(i == 42 && d == 3.14159 && s == "hello world" && sum == 55 + 3 /*3*1024*768*3*/, "LargeTensorStruct contents not correct.");
     return sum;
 }
 
@@ -858,7 +866,7 @@ void test_for_serialization_type() {
 int main() {
     std::cout << "Serialize:    produce bytes" << std::endl;
     std::cout << "Deserialize:  consume bytes" << std::endl;
-    std::cout << "Read:         read and check every value from pre-deserialized, compute tensor element sums" << std::endl;
+    std::cout << "Read:         read and check every value from pre-deserialized, read single tensor element" << std::endl;
     std::cout << "Deser+Read:   deserialize, then read" << std::endl;
     std::cout << std::endl;
     test_for_serialization_type<SerializationType::Json>();

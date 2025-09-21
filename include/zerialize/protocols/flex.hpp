@@ -33,7 +33,7 @@ struct RootSerializer {
             fbb.Finish();
             finished_ = true;
         }
-        // FlexBuffers returns a const ref; we “steal” it (your prior pattern)
+        // FlexBuffers returns a const ref; we “steal” it
         const std::vector<uint8_t>& buf = fbb.GetBuffer();
         auto& hack = const_cast<std::vector<uint8_t>&>(buf);
         return ZBuffer(std::move(hack));
