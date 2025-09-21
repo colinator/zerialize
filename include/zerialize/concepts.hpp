@@ -119,6 +119,7 @@ concept ValueView =
   };
 
 // Full Reader: ValueView plus subscript that returns more ValueViews.
+// Requires subscript for size_t (vectors/arrays) and string_view (maps/objects).
 template<class V>
 concept Reader = ValueView<V> &&
     ValueView<decltype(std::declval<const V&>()[std::declval<std::string_view>()])> &&
