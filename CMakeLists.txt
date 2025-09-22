@@ -51,14 +51,6 @@ if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
   endif()
 endif()
 
-# # Fetch libcbor
-# FetchContent_Declare(
-#     libcbor
-#     GIT_REPOSITORY https://github.com/PJK/libcbor.git
-#     GIT_TAG v0.13.0
-# )
-# FetchContent_MakeAvailable(libcbor)
-
 # Normalize to a single name consumers can link against:
 if(TARGET msgpack-c)
   add_library(zerialize_msgpack ALIAS msgpack-c)
