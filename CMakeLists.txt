@@ -4,114 +4,15 @@ project(zerialize VERSION 1.0 LANGUAGES CXX)
 
 include(FetchContent)
 
-# Fetch flatbuffers
-FetchContent_Declare(
-    flatbuffers
-    GIT_REPOSITORY https://github.com/google/flatbuffers.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(flatbuffers)
+# -------------------
+# Options to selectively enable protocols and math backends
+option(ZERIALIZE_ENABLE_FLEXBUFFERS "Enable FlexBuffers (via FlatBuffers)" ON)
+option(ZERIALIZE_ENABLE_JSON        "Enable JSON (via yyjson)" ON)
+option(ZERIALIZE_ENABLE_CBOR        "Enable CBOR (via jsoncons)" ON)
+option(ZERIALIZE_ENABLE_MSGPACK     "Enable MessagePack (via msgpack-c)" ON)
 
-# Fetch yyjson
-FetchContent_Declare(
-    yyjson
-    GIT_REPOSITORY https://github.com/ibireme/yyjson.git
-    GIT_TAG 0.12.0
-)
-FetchContent_MakeAvailable(yyjson)
-
-# Fetch or reuse jsoncons (header-only). Guard to avoid target name collisions
-if(NOT TARGET jsoncons AND NOT TARGET jsoncons::jsoncons)
-  FetchContent_Declare(
-      jsoncons
-      GIT_REPOSITORY https://github.com/danielaparker/jsoncons.git
-      GIT_TAG v1.4.0
-  )
-  FetchContent_MakeAvailable(jsoncons)
-endif()
-
-# Fetch msgpack
-# If some toolchain (vcpkg, system) already provided msgpack targets, reuse them.
-if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
-  # Vendor via FetchContent
-  FetchContent_Declare(
-      msgpack
-      GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
-      GIT_TAG c_master
-  )
-  FetchContent_GetProperties(msgpack)
-  if(NOT msgpack_POPULATED)
-      FetchContent_Populate(msgpack)
-      # Disable Boost / samples / tests
-      set(MSGPACK_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
-      set(MSGPACK_USE_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
-      set(MSGPACK_BUILD_EXAMPLES OFF CACHE BOOL "Don't build examples" FORCE)
-      set(MSGPACK_BUILD_TESTS OFF CACHE BOOL "Don't build tests" FORCE)
-      add_subdirectory(${msgpack_SOURCE_DIR} ${msgpack_BINARY_DIR})
-  endif()
-endif()
-
-# Normalize to a single name consumers can link against:
-if(TARGET msgpack-c)
-  add_library(zerialize_msgpack ALIAS msgpack-c)
-elseif(TARGET msgpackc-cxx)
-  add_library(zerialize_msgpack ALIAS msgpackc-cxx)
-elseif(TARGET msgpackc)
-  add_library(zerialize_msgpack ALIAS msgpackc)
-else()
-  message(FATAL_ERROR "Could not locate a msgpack CMake target (msgpack-c/msgpackc-cxx/msgpackc).")
-endif()
-
-
-# Download and configure xtl
-FetchContent_Declare(xtl
-    # URL https://github.com/xtensor-stack/xtl/archive/0.7.5.zip
-    # URL_HASH SHA256=9e8e7dcc525500a4543226fe472a46a30636ee35274e4e30099071c5cbd4d05c
-    URL https://github.com/xtensor-stack/xtl/archive/0.8.0.zip
-    #URL_HASH SHA256=9e8e7dcc525500a4543226fe472a46a30636ee35274e4e30099071c5cbd4d05c
-    #DOWNLOAD_NO_PROGRESS ON
-    #DOWNLOAD_EXTRACT_TIMESTAMP 1
-)
-FetchContent_MakeAvailable(xtl)
-
-# Download and configure xsimd
-FetchContent_Declare(xsimd
-    # URL https://github.com/xtensor-stack/xsimd/archive/11.0.0.zip
-    # URL_HASH SHA256=5d362ec26c6f2332d1a2858891d770f5c0077133a81f885658f48c910a03fc90
-    URL https://github.com/xtensor-stack/xsimd/archive/13.2.0.zip
-    #URL_HASH SHA256=5d362ec26c6f2332d1a2858891d770f5c0077133a81f885658f48c910a03fc90
-    #DOWNLOAD_NO_PROGRESS ON
-    #DOWNLOAD_EXTRACT_TIMESTAMP 1
-)
-FetchContent_MakeAvailable(xsimd)
-
-# Download and configure xtensor
-FetchContent_Declare(xtensor
-    # URL https://github.com/xtensor-stack/xtensor/archive/0.24.6.zip
-    # URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
-    # URL https://github.com/xtensor-stack/xtensor/archive/0.26.0.zip
-    URL https://github.com/xtensor-stack/xtensor/archive/0.27.0.zip
-    #URL_HASH SHA256=8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
-    #DOWNLOAD_NO_PROGRESS ON
-    #DOWNLOAD_EXTRACT_TIMESTAMP 1
-)
-set(XTENSOR_USE_XSIMD 1)
-FetchContent_MakeAvailable(xtensor)
-
-# Download and configure eigen
-FetchContent_Declare(eigen_download
-    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-    URL_HASH SHA256=eba3f3d414d2f8cba2919c78ec6daab08fc71ba2ba4ae502b7e5d4d99fc02cda
-    GIT_TAG        origin/master
-)
-# FetchContent_MakeAvailable(eigen)
-FetchContent_GetProperties(eigen_download)
-if(NOT eigen_download_POPULATED)
-    FetchContent_Populate(eigen_download)
-endif()
-add_library(eigen INTERFACE IMPORTED)
-target_include_directories(eigen INTERFACE ${eigen_download_SOURCE_DIR})
-
+option(ZERIALIZE_ENABLE_XTENSOR     "Enable xtensor backend" ON)
+option(ZERIALIZE_ENABLE_EIGEN       "Enable Eigen backend" ON)
 
 # -------------------
 # Create header-only 'interface' library
@@ -120,36 +21,180 @@ add_library(${PROJECT_NAME} INTERFACE)
 # Specify the C++ standard
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
 
-# Include directories
+# Public headers
 target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    ${flatbuffers_SOURCE_DIR}/include
-    ${msgpack_SOURCE_DIR}/include
-    ${yyjson_SOURCE_DIR}/src
-    # libcbor exposes proper include dirs via its target; no need to add here
-    #$<INSTALL_INTERFACE:include/eigen3>
-    #${xtensor_SOURCE_DIR}/include
-    ${xtensor_INCLUDE_DIRS}
 )
 
-# Propagate jsoncons headers (prefer an existing target if provided by toolchain)
-if(TARGET jsoncons)
-  target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons)
-elseif(TARGET jsoncons::jsoncons)
-  target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons::jsoncons)
-elseif(DEFINED jsoncons_SOURCE_DIR)
-  target_include_directories(${PROJECT_NAME} INTERFACE ${jsoncons_SOURCE_DIR}/include)
+# -------------------
+# Protocol: FlatBuffers/FlexBuffers
+if(ZERIALIZE_ENABLE_FLEXBUFFERS)
+  # Try to reuse existing flatbuffers target first
+  set(_zerialize_flatbuffers_target "")
+  if(TARGET flatbuffers)
+    set(_zerialize_flatbuffers_target flatbuffers)
+  elseif(TARGET flatbuffers::flatbuffers)
+    set(_zerialize_flatbuffers_target flatbuffers::flatbuffers)
+  endif()
+  if(NOT _zerialize_flatbuffers_target)
+    # Vendor via FetchContent
+    FetchContent_Declare(
+        flatbuffers
+        GIT_REPOSITORY https://github.com/google/flatbuffers.git
+        GIT_TAG master
+    )
+    FetchContent_MakeAvailable(flatbuffers)
+    if(TARGET flatbuffers)
+      set(_zerialize_flatbuffers_target flatbuffers)
+    elseif(TARGET flatbuffers::flatbuffers)
+      set(_zerialize_flatbuffers_target flatbuffers::flatbuffers)
+    else()
+      message(FATAL_ERROR "FlatBuffers target not found after FetchContent")
+    endif()
+  endif()
+  add_library(zerialize_flatbuffers ALIAS ${_zerialize_flatbuffers_target})
+  target_link_libraries(${PROJECT_NAME} INTERFACE zerialize_flatbuffers)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_FLEXBUFFERS=1)
 endif()
 
-# Doesn't really 'link' - just how to do transitive
-# includes in cmake...
-target_link_libraries(${PROJECT_NAME} INTERFACE
-    flatbuffers
-    xtensor 
-    xsimd 
-    xtl
-    eigen
-    zerialize_msgpack
-    yyjson
-    # cbor
-)
+# Protocol: yyjson (JSON)
+if(ZERIALIZE_ENABLE_JSON)
+  set(_zerialize_yyjson_target "")
+  if(TARGET yyjson)
+    set(_zerialize_yyjson_target yyjson)
+  elseif(TARGET yyjson::yyjson)
+    set(_zerialize_yyjson_target yyjson::yyjson)
+  endif()
+  if(NOT _zerialize_yyjson_target)
+    FetchContent_Declare(
+        yyjson
+        GIT_REPOSITORY https://github.com/ibireme/yyjson.git
+        GIT_TAG 0.12.0
+    )
+    FetchContent_MakeAvailable(yyjson)
+    if(TARGET yyjson)
+      set(_zerialize_yyjson_target yyjson)
+    elseif(TARGET yyjson::yyjson)
+      set(_zerialize_yyjson_target yyjson::yyjson)
+    else()
+      message(FATAL_ERROR "yyjson target not found after FetchContent")
+    endif()
+  endif()
+  add_library(zerialize_yyjson ALIAS ${_zerialize_yyjson_target})
+  target_link_libraries(${PROJECT_NAME} INTERFACE zerialize_yyjson)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_JSON=1)
+endif()
+
+# Protocol: jsoncons (CBOR)
+if(ZERIALIZE_ENABLE_CBOR)
+  # Prefer an existing target
+  if(TARGET jsoncons)
+    target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons)
+  elseif(TARGET jsoncons::jsoncons)
+    target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons::jsoncons)
+  else()
+    # Vendor header-only jsoncons
+    if(NOT TARGET jsoncons AND NOT TARGET jsoncons::jsoncons)
+      FetchContent_Declare(
+          jsoncons
+          GIT_REPOSITORY https://github.com/danielaparker/jsoncons.git
+          GIT_TAG v1.4.0
+      )
+      FetchContent_MakeAvailable(jsoncons)
+    endif()
+    if(TARGET jsoncons)
+      target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons)
+    elseif(TARGET jsoncons::jsoncons)
+      target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons::jsoncons)
+    elseif(DEFINED jsoncons_SOURCE_DIR)
+      target_include_directories(${PROJECT_NAME} INTERFACE ${jsoncons_SOURCE_DIR}/include)
+    else()
+      message(FATAL_ERROR "jsoncons not available for CBOR support")
+    endif()
+  endif()
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_CBOR=1)
+endif()
+
+# Protocol: msgpack-c (MessagePack)
+if(ZERIALIZE_ENABLE_MSGPACK)
+  # Reuse if present; otherwise vendor
+  if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
+    FetchContent_Declare(
+        msgpack
+        GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
+        GIT_TAG c_master
+    )
+    FetchContent_GetProperties(msgpack)
+    if(NOT msgpack_POPULATED)
+        FetchContent_Populate(msgpack)
+        # Disable Boost / samples / tests
+        set(MSGPACK_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
+        set(MSGPACK_USE_BOOST OFF CACHE BOOL "Disable Boost" FORCE)
+        set(MSGPACK_BUILD_EXAMPLES OFF CACHE BOOL "Don't build examples" FORCE)
+        set(MSGPACK_BUILD_TESTS OFF CACHE BOOL "Don't build tests" FORCE)
+        add_subdirectory(${msgpack_SOURCE_DIR} ${msgpack_BINARY_DIR})
+    endif()
+  endif()
+
+  if(TARGET msgpack-c)
+    add_library(zerialize_msgpack ALIAS msgpack-c)
+  elseif(TARGET msgpackc-cxx)
+    add_library(zerialize_msgpack ALIAS msgpackc-cxx)
+  elseif(TARGET msgpackc)
+    add_library(zerialize_msgpack ALIAS msgpackc)
+  else()
+    message(FATAL_ERROR "Could not locate a msgpack CMake target (msgpack-c/msgpackc-cxx/msgpackc).")
+  endif()
+
+  target_link_libraries(${PROJECT_NAME} INTERFACE zerialize_msgpack)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_MSGPACK=1)
+endif()
+
+# -------------------
+# Math backends: xtensor and Eigen
+
+if(ZERIALIZE_ENABLE_XTENSOR)
+  # If a toolchain already provides xtensor target, reuse it
+  if(NOT TARGET xtensor)
+    # xtensor depends on xtl and optionally xsimd
+    FetchContent_Declare(xtl
+        URL https://github.com/xtensor-stack/xtl/archive/0.8.0.zip
+    )
+    FetchContent_MakeAvailable(xtl)
+
+    FetchContent_Declare(xsimd
+        URL https://github.com/xtensor-stack/xsimd/archive/13.2.0.zip
+    )
+    FetchContent_MakeAvailable(xsimd)
+
+    FetchContent_Declare(xtensor
+        URL https://github.com/xtensor-stack/xtensor/archive/0.27.0.zip
+    )
+    set(XTENSOR_USE_XSIMD 1)
+    FetchContent_MakeAvailable(xtensor)
+  endif()
+  target_link_libraries(${PROJECT_NAME} INTERFACE xtensor)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_USE_XTENSOR=1)
+endif()
+
+if(ZERIALIZE_ENABLE_EIGEN)
+  # Try to reuse Eigen3 if available, otherwise vendor a minimal interface
+  find_package(Eigen3 QUIET CONFIG)
+  if(TARGET Eigen3::Eigen)
+    target_link_libraries(${PROJECT_NAME} INTERFACE Eigen3::Eigen)
+  else()
+    FetchContent_Declare(eigen_download
+        URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
+        URL_HASH SHA256=eba3f3d414d2f8cba2919c78ec6daab08fc71ba2ba4ae502b7e5d4d99fc02cda
+        GIT_TAG        origin/master
+    )
+    FetchContent_GetProperties(eigen_download)
+    if(NOT eigen_download_POPULATED)
+        FetchContent_Populate(eigen_download)
+    endif()
+    add_library(eigen INTERFACE IMPORTED)
+    target_include_directories(eigen INTERFACE ${eigen_download_SOURCE_DIR})
+    target_link_libraries(${PROJECT_NAME} INTERFACE eigen)
+  endif()
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_USE_EIGEN=1)
+endif()
