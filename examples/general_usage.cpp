@@ -72,7 +72,7 @@ int main() {
         )
     );
     auto d5 = CBOR::Deserializer(b5.buf());
-    cout << "D$: " << d5["users"][0]["name"].asString() << " " << d5["users"][1]["name"].asString() << " " << d5["metadata"]["timestamp"].asUInt64() << endl;
+    cout << "D5: " << d5["users"][0]["name"].asString() << " " << d5["users"][1]["name"].asString() << " " << d5["metadata"]["timestamp"].asUInt64() << endl;
 
     // Eigen matrices (and xtensors) are zero-copy deserializeable if
     // the protocol allows (flex, msgpack so far).
