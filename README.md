@@ -104,7 +104,7 @@ using zerialize::ZBuffer;
 using zerialize::flex::FlexDeserializer;
 using zerialize::json::JsonDeserializer;
 
-int main(int argc, char* argv[]) {
+int main() {
     ZBuffer databuf = zerialize::serialize<JSON>(
         zerialize::zmap<"name", "age">("James Bond", 37)
     );
