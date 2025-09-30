@@ -21,7 +21,9 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 ## Building
 
-This is a **header-only library**, and contains nothing to build. Well, sort of: the core library is header-only. Each supported protocol relies on 3rd-party libraries, which may or may not be header-only. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
+This is a **header-only library**, and contains nothing to build. Well, sort of: the core library is header-only. Each supported protocol relies on 3rd-party libraries, which may or may not be header-only. Also, if using modules, the project must be built. The `examples/`, `test/`, and `benchmark_compare/` directories contain executables with examples of how to organize CMake projects.
+
+If using modules, the module is named `zerialize`.
 
 See [CMAKEHOWTO.md](CMAKEHOWTO.md) for details.
 
@@ -231,6 +233,7 @@ auto msgpack_buf = zerialize::serialize<zerialize::MsgPack>(my_data);
 - **Format agnostic**: Write once, serialize to any supported format
 - **Header-only**: No build dependencies, just include and go
 - **Exception-safe**: Clear error messages when things go wrong
+- **Modules support**: Offers support for modules, for C++20 onwards
 
 ## Advanced Usage
 

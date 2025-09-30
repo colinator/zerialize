@@ -4,6 +4,7 @@ Overview
 - Zerialize is a header‑only C++ library with optional protocol backends and math backends.
 - Dependencies are reused if your toolchain already provides CMake targets; otherwise they are fetched via FetchContent.
 - You can selectively enable or disable each backend via CMake options.
+- Zerialize optionally supports modules for C++20 and onwards, as module `zerialize`.
 
 Configure Options
 - ZERIALIZE_ENABLE_FLEXBUFFERS: Enable FlexBuffers (via FlatBuffers). Default: ON
@@ -12,6 +13,7 @@ Configure Options
 - ZERIALIZE_ENABLE_MSGPACK: Enable MessagePack (via msgpack-c). Default: ON
 - ZERIALIZE_ENABLE_XTENSOR: Enable xtensor math backend. Default: ON
 - ZERIALIZE_ENABLE_EIGEN: Enable Eigen math backend. Default: ON
+- ZERIALIZE_ENABLE_MODULES: Enable C++ modules. Default: OFF
 
 How Dependencies Are Resolved
 - FlatBuffers: Uses existing `flatbuffers` or `flatbuffers::flatbuffers` if present; otherwise fetched. Internally normalized to `zerialize_flatbuffers`.
@@ -87,4 +89,5 @@ Notes
 - Zerialize is header‑only; linking against the target propagates include paths and compile definitions for enabled features.
 - When using your own dependency targets, ensure they are visible before calling `add_subdirectory(zerialize)` so zerialize can reuse them.
 - If all protocols are disabled, zerialize builds a minimal interface target; your code should `#ifdef` on the compile definitions accordingly.
+- C++ modules are offered using CMake 3.28 and later. This requires a build generator that supports modules, such as Ninja.
 
