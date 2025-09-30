@@ -17,6 +17,7 @@ Zero-copy multi-format serialization/deserialization for c++20.
 *   **Flexbuffers** (Google's schema-less binary format)
 *   **MessagePack** (compact binary serialization)
 *   **CBOR** (via jsoncons)
+*   **NOTE:** Zerialize supports the least-common-denominator of serializeable objects: arrays, maps with string keys, and primitives: integers, floats, strings, but also blobs.
 
 ## Building
 
