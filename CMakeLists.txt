@@ -14,6 +14,8 @@ option(ZERIALIZE_ENABLE_MSGPACK     "Enable MessagePack (via msgpack-c)" ON)
 option(ZERIALIZE_ENABLE_XTENSOR     "Enable xtensor backend" ON)
 option(ZERIALIZE_ENABLE_EIGEN       "Enable Eigen backend" ON)
 
+option(ZERIALIZE_ENABLE_MODULES     "Build C++ modules support" OFF)
+
 # -------------------
 # Create header-only 'interface' library
 add_library(${PROJECT_NAME} INTERFACE)
@@ -29,6 +31,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 # -------------------
 # Protocol: FlatBuffers/FlexBuffers
 if(ZERIALIZE_ENABLE_FLEXBUFFERS)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_FLEXBUFFERS)
   # Try to reuse existing flatbuffers target first
   set(_zerialize_flatbuffers_target "")
   if(TARGET flatbuffers)
@@ -59,6 +62,7 @@ endif()
 
 # Protocol: yyjson (JSON)
 if(ZERIALIZE_ENABLE_JSON)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_JSON)
   set(_zerialize_yyjson_target "")
   if(TARGET yyjson)
     set(_zerialize_yyjson_target yyjson)
@@ -87,6 +91,7 @@ endif()
 
 # Protocol: jsoncons (CBOR)
 if(ZERIALIZE_ENABLE_CBOR)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_CBOR)
   # Prefer an existing target
   if(TARGET jsoncons)
     target_link_libraries(${PROJECT_NAME} INTERFACE jsoncons)
@@ -117,6 +122,7 @@ endif()
 
 # Protocol: msgpack-c (MessagePack)
 if(ZERIALIZE_ENABLE_MSGPACK)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_MSGPACK)
   # Reuse if present; otherwise vendor
   if(NOT TARGET msgpack-c AND NOT TARGET msgpackc-cxx AND NOT TARGET msgpackc)
     FetchContent_Declare(
@@ -154,6 +160,7 @@ endif()
 # Math backends: xtensor and Eigen
 
 if(ZERIALIZE_ENABLE_XTENSOR)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_XTENSOR)
   # If a toolchain already provides xtensor target, reuse it
   if(NOT TARGET xtensor)
     # xtensor depends on xtl and optionally xsimd
@@ -178,6 +185,7 @@ if(ZERIALIZE_ENABLE_XTENSOR)
 endif()
 
 if(ZERIALIZE_ENABLE_EIGEN)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_ENABLE_EIGEN)
   # Try to reuse Eigen3 if available, otherwise vendor a minimal interface
   find_package(Eigen3 QUIET CONFIG)
   if(TARGET Eigen3::Eigen)
@@ -197,4 +205,13 @@ if(ZERIALIZE_ENABLE_EIGEN)
     target_link_libraries(${PROJECT_NAME} INTERFACE eigen)
   endif()
   target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_USE_EIGEN=1)
+endif()
+
+if(ZERIALIZE_ENABLE_MODULES)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+        message(STATUS "Building zerialize C++ module")
+        add_subdirectory(modules)
+    else()
+        message(WARNING "Skipping zerialize C++ module (requires CMake 3.28+, found ${CMAKE_VERSION})")
+    endif()
 endif()
