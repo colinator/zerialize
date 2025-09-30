@@ -150,8 +150,8 @@ public:
     bool isBlob()   const { 
         return isArray() && arraySize() == 3 && 
             (*this)[0].isString() && (*this)[0].asString() == blobTag &&
-            (*this)[1].isString() && (*this)[1].asString() == blobEncoding && 
-            (*this)[1].isString();
+            (*this)[1].isString() &&
+            (*this)[2].isString() && (*this)[2].asString() == blobEncoding;
     }
 
     // --- scalars ---
@@ -181,7 +181,7 @@ public:
 
     std::vector<std::byte> asBlob() const {
         ensure(isBlob(), "not a blob");
-        return base64Decode((*this)[2].asStringView());
+        return base64Decode((*this)[1].asStringView());
     }
 
     // --- map interface ---
@@ -293,8 +293,8 @@ struct Serializer {
         // will be a string with the magic string "~b"
         begin_array(3);
         this->string(blobTag);
-        this->string(blobEncoding);
         push_value(yyjson_mut_strncpy(doc(), s.data(), s.size()));
+        this->string(blobEncoding);
         end_array();
     }
 
