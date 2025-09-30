@@ -92,6 +92,33 @@ auto nested_buffer = zerialize::serialize<zerialize::JSON>(
 );
 ```
 
+### Modules
+```cpp
+import std;
+import zerialize; // all dependencies automatically imported
+
+using std::span;
+using zerialize::Flex;
+using zerialize::JSON;
+using zerialize::ZBuffer;
+using zerialize::flex::FlexDeserializer;
+using zerialize::json::JsonDeserializer;
+
+int main(int argc, char* argv[]) {
+    ZBuffer databuf = zerialize::serialize<JSON>(
+        zerialize::zmap<"name", "age">("James Bond", 37)
+    );
+
+    span<const uint8_t> rawBytes = databuf.buf();
+
+    JsonDeserializer d(rawBytes);
+
+    std::println("JSON AGENT agent name: {} age: {}", d["name"].asString(), d["age"].asUInt16());
+
+    FlexDeserializer f = zerialize::translate<Flex>(d);
+}
+```
+
 ### A note on blobs
 
 Blobs are stored as 'blobs' in protocols that support this (flex, msgpack). Protocols that don't (JSON) store blobs as arrays of ["~b", <base64-encoded data as a string>, "base64"]
