@@ -7,6 +7,8 @@
 #include <vector>
 #include <span>
 #include <stdexcept>
+#include <iostream>
+#include <zerialize/zbuffer.hpp>
 
 namespace zerialize {
 namespace flex {
