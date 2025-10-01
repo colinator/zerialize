@@ -14,6 +14,7 @@
 
 #include <msgpack.h> // for the writer
 #include <zerialize/zbuffer.hpp>
+#include <zerialize/errors.hpp>
 
 
 namespace zerialize {
