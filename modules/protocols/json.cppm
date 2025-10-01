@@ -1,17 +1,17 @@
 module;
 
-#ifdef ZERIALIZE_ENABLE_JSON
+#ifdef ZERIALIZE_HAS_JSON
 #include <zerialize/protocols/json.hpp>
 #endif
 
 export module zerialize:json;
 
 export namespace zerialize {
-    #ifdef ZERIALIZE_ENABLE_JSON
+    #ifdef ZERIALIZE_HAS_JSON
     using zerialize::JSON;
     #endif
     namespace json {
-        #ifdef ZERIALIZE_ENABLE_JSON
+        #ifdef ZERIALIZE_HAS_JSON
         using zerialize::json::blobTag;
         using zerialize::json::blobEncoding;
         using zerialize::json::KeysView;
