@@ -14,6 +14,8 @@ option(ZERIALIZE_ENABLE_MSGPACK     "Enable MessagePack (via msgpack-c)" ON)
 option(ZERIALIZE_ENABLE_XTENSOR     "Enable xtensor backend" ON)
 option(ZERIALIZE_ENABLE_EIGEN       "Enable Eigen backend" ON)
 
+option(ZERIALIZE_ENABLE_MODULES     "Build C++ modules support" OFF)
+
 # -------------------
 # Create header-only 'interface' library
 add_library(${PROJECT_NAME} INTERFACE)
@@ -197,4 +199,13 @@ if(ZERIALIZE_ENABLE_EIGEN)
     target_link_libraries(${PROJECT_NAME} INTERFACE eigen)
   endif()
   target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_USE_EIGEN=1)
+endif()
+
+if(ZERIALIZE_ENABLE_MODULES)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+        message(STATUS "Building zerialize C++ module")
+        add_subdirectory(modules)
+    else()
+        message(WARNING "Skipping zerialize C++ module (requires CMake 3.28+, found ${CMAKE_VERSION})")
+    endif()
 endif()
