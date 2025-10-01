@@ -11,6 +11,7 @@
 #include <yyjson.h>
 #include <zerialize/zbuffer.hpp>
 #include <zerialize/errors.hpp>
+#include <zerialize/concepts.hpp>
 #include <zerialize/internals/base64.hpp>
 
 namespace zerialize {
