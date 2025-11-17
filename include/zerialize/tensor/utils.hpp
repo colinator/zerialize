@@ -2,6 +2,7 @@
 
 #include <zerialize/zerialize.hpp>
 #include <complex>
+#include <limits>
 
 // boooo... xtensor dependency...
 #include <xtl/xhalf_float.hpp>
@@ -84,12 +85,30 @@ inline std::vector<std::size_t> shape_of_sizet(const auto& tshape) {
 
 TensorShape tensor_shape(const Reader auto& d) {
     if (!d.isArray()) {
-        return {};
+        throw DeserializationError("tensor shape must be an array");
     }
     TensorShape vshape;
     vshape.reserve(d.arraySize());
     for (size_t i=0; i<d.arraySize(); i++) {
-        vshape.push_back(d[i].asUInt64());
+        auto elem = d[i];
+        if (elem.isUInt()) {
+            auto value = elem.asUInt64();
+            if (value > std::numeric_limits<TensorShapeElement>::max()) {
+                throw DeserializationError("tensor dimension exceeds TensorShapeElement range");
+            }
+            vshape.push_back(static_cast<TensorShapeElement>(value));
+        } else if (elem.isInt()) {
+            auto value = elem.asInt64();
+            if (value < 0) {
+                throw DeserializationError("tensor dimensions must be non-negative");
+            }
+            if (value > std::numeric_limits<TensorShapeElement>::max()) {
+                throw DeserializationError("tensor dimension exceeds TensorShapeElement range");
+            }
+            vshape.push_back(static_cast<TensorShapeElement>(value));
+        } else {
+            throw DeserializationError("tensor shape contains non-integer element");
+        }
     }
     return vshape;
 }

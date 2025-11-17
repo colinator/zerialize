@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <zerialize/zbuffer.hpp>
+#include <zerialize/errors.hpp>
 
 namespace zerialize {
 namespace flex {
@@ -112,6 +113,10 @@ protected:
     ::flexbuffers::Reference ref_{};
     FlexViewBase() = default;
     explicit FlexViewBase(::flexbuffers::Reference r) : ref_(r) {}
+
+    void require(bool cond, const char* msg) const {
+        if (!cond) throw DeserializationError(msg);
+    }
 
     static std::string json_escape(std::string_view s) {
         std::string out;
@@ -217,24 +222,25 @@ public:
     bool isArray()  const { return ref_.IsAnyVector() && !ref_.IsMap(); }
 
     // Scalars
-    int8_t   asInt8()   const { return ref_.AsInt8(); }
-    int16_t  asInt16()  const { return ref_.AsInt16(); }
-    int32_t  asInt32()  const { return ref_.AsInt32(); }
-    int64_t  asInt64()  const { return ref_.AsInt64(); }
+    int8_t   asInt8()   const { require(isInt(), "value is not a signed integer"); return ref_.AsInt8(); }
+    int16_t  asInt16()  const { require(isInt(), "value is not a signed integer"); return ref_.AsInt16(); }
+    int32_t  asInt32()  const { require(isInt(), "value is not a signed integer"); return ref_.AsInt32(); }
+    int64_t  asInt64()  const { require(isInt(), "value is not a signed integer"); return ref_.AsInt64(); }
 
-    uint8_t  asUInt8()  const { return static_cast<uint8_t>(ref_.AsUInt8()); }
-    uint16_t asUInt16() const { return static_cast<uint16_t>(ref_.AsUInt16()); }
-    uint32_t asUInt32() const { return static_cast<uint32_t>(ref_.AsUInt32()); }
-    uint64_t asUInt64() const { return static_cast<uint64_t>(ref_.AsUInt64()); }
+    uint8_t  asUInt8()  const { require(isUInt(), "value is not an unsigned integer"); return static_cast<uint8_t>(ref_.AsUInt8()); }
+    uint16_t asUInt16() const { require(isUInt(), "value is not an unsigned integer"); return static_cast<uint16_t>(ref_.AsUInt16()); }
+    uint32_t asUInt32() const { require(isUInt(), "value is not an unsigned integer"); return static_cast<uint32_t>(ref_.AsUInt32()); }
+    uint64_t asUInt64() const { require(isUInt(), "value is not an unsigned integer"); return static_cast<uint64_t>(ref_.AsUInt64()); }
 
-    float    asFloat()  const { return static_cast<float>(ref_.AsFloat()); }
-    double   asDouble() const { return ref_.AsDouble(); }
-    bool     asBool()   const { return ref_.AsBool(); }
+    float    asFloat()  const { require(isFloat(), "value is not a float"); return static_cast<float>(ref_.AsFloat()); }
+    double   asDouble() const { require(isFloat(), "value is not a float"); return ref_.AsDouble(); }
+    bool     asBool()   const { require(isBool(), "value is not a bool"); return ref_.AsBool(); }
 
-    std::string      asString()     const { auto s = ref_.AsString(); return s.str(); }
-    std::string_view asStringView() const { auto s = ref_.AsString(); return {s.c_str(), s.size()}; }
+    std::string      asString()     const { require(isString(), "value is not a string"); auto s = ref_.AsString(); return s.str(); }
+    std::string_view asStringView() const { require(isString(), "value is not a string"); auto s = ref_.AsString(); return {s.c_str(), s.size()}; }
 
     std::span<const std::byte> asBlob() const {
+        require(isBlob(), "value is not a blob");
         auto b = ref_.AsBlob();
         auto* p = reinterpret_cast<const std::byte*>(b.data());
         return {p, b.size()};
@@ -265,9 +271,13 @@ public:
         iterator end()   const { return iterator{&keys, keys.size()}; }
     };
 
-    inline KeysView mapKeys() const { return KeysView{ ref_.AsMap().Keys() }; }
+    inline KeysView mapKeys() const {
+        require(isMap(), "not a map");
+        return KeysView{ ref_.AsMap().Keys() };
+    }
 
     bool contains(std::string_view key) const {
+        if (!isMap()) return false;
         auto m = ref_.AsMap();
         auto keys = m.Keys();
         std::size_t lo = 0, hi = keys.size();
@@ -288,7 +298,10 @@ public:
         return false;
     }
 
-    std::size_t arraySize() const { return ref_.AsVector().size(); }
+    std::size_t arraySize() const {
+        require(isArray(), "not an array");
+        return ref_.AsVector().size();
+    }
 
     // Declarations (defined after FlexValue is declared)
     FlexValue operator[](std::string_view key) const;
@@ -310,6 +323,7 @@ public:
 
 // Define FlexViewBase subscriptors now that FlexValue is complete.
 inline FlexValue FlexViewBase::operator[](std::string_view key) const {
+    require(isMap(), "not a map");
     auto m = ref_.AsMap();
     auto keys = m.Keys();
     auto vals = m.Values();
@@ -328,12 +342,13 @@ inline FlexValue FlexViewBase::operator[](std::string_view key) const {
             else { return FlexValue(vals[mid]); }
         }
     }
-    std::string k(key);
-    return FlexValue(m[k.c_str()]);
+    throw DeserializationError("key not found: " + std::string(key));
 }
 
 inline FlexValue FlexViewBase::operator[](std::size_t idx) const {
+    require(isArray(), "not an array");
     auto v = ref_.AsVector();
+    require(idx < v.size(), "index out of bounds");
     return FlexValue(v[idx]);
 }
 

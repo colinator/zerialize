@@ -2,6 +2,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/xtensor.hpp>
@@ -16,6 +17,19 @@
 #include "testing_utils.hpp"
 
 namespace zerialize {
+
+// Small helper to assert we surface DeserializationError boundaries.
+template<class F>
+bool expect_deserialization_error(F&& fn) {
+    try {
+        std::forward<F>(fn)();
+    } catch (const DeserializationError&) {
+        return true;
+    } catch (...) {
+        return false;
+    }
+    return false;
+}
 
 // --------------------- Per-protocol DSL tests ---------------------
 template<class P>
@@ -374,6 +388,76 @@ void test_custom_structs() {
     std::cout << "== Custom struct tests for <" << P::Name << "> passed ==\n\n";
 }
 
+// --------------------- Failure mode coverage ---------------------
+template<class P>
+void test_failure_modes() {
+    using V = typename P::Deserializer;
+    std::cout << "== Failure-mode tests for <" << P::Name << "> ==\n";
+
+    test_serialization<P>("type mismatch throws",
+        [](){
+            return serialize<P>( zmap<"value">("not an int") );
+        },
+        [](const V& v){
+            return expect_deserialization_error([&]{
+                (void)v["value"].asInt64();
+            });
+        });
+
+    test_serialization<P>("blob accessor rejects scalars",
+        [](){
+            return serialize<P>( zmap<"value">(42) );
+        },
+        [](const V& v){
+            return expect_deserialization_error([&]{
+                (void)v["value"].asBlob();
+            });
+        });
+
+    test_serialization<P>("array index out of bounds throws",
+        [](){
+            return serialize<P>( zvec(1, 2) );
+        },
+        [](const V& v){
+            return expect_deserialization_error([&]{
+                (void)v[2];
+            });
+        });
+
+    std::cout << "== Failure-mode tests for <" << P::Name << "> passed ==\n\n";
+}
+
+void test_json_failure_modes() {
+    std::cout << "== JSON corruption tests ==\n";
+
+    bool invalid_base64 = expect_deserialization_error([](){
+        // Looks like a blob triple but base64 payload contains invalid chars.
+        json::JsonDeserializer jd(R"(["~b","!!!!","base64"])");
+        (void)jd.asBlob();
+    });
+    if (!invalid_base64) {
+        throw std::runtime_error("json invalid base64 should throw DeserializationError");
+    }
+
+    std::cout << "== JSON corruption tests passed ==\n\n";
+}
+
+void test_msgpack_failure_modes() {
+    std::cout << "== MsgPack corruption tests ==\n";
+
+    bool truncated_array = expect_deserialization_error([](){
+        // 0x91 = array header with one element but no payload bytes.
+        std::vector<uint8_t> bad = {0x91};
+        MsgPackDeserializer rd(bad);
+        (void)rd[0];
+    });
+    if (!truncated_array) {
+        throw std::runtime_error("msgpack truncated array should throw DeserializationError");
+    }
+
+    std::cout << "== MsgPack corruption tests passed ==\n\n";
+}
+
 } // namespace zerialize
 
 int main() {
@@ -390,6 +474,14 @@ int main() {
     test_custom_structs<Flex>();
     test_custom_structs<MsgPack>();
     test_custom_structs<CBOR>();
+
+    // Failure-mode coverage
+    test_failure_modes<JSON>();
+    test_failure_modes<Flex>();
+    test_failure_modes<MsgPack>();
+    test_failure_modes<CBOR>();
+    test_json_failure_modes();
+    test_msgpack_failure_modes();
 
     // Translate cross-protocol (both directions) built with the same DSL
     test_translate_dsl<JSON, MsgPack>();
