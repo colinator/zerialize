@@ -74,12 +74,11 @@ constexpr char DataKey[] = "data";
 using TensorShapeElement = uint32_t;
 using TensorShape = std::vector<TensorShapeElement>;
 
-inline std::vector<std::size_t> shape_of_sizet(const auto& tshape) {
-    // We should be able to pass vector<T> to serialize...
-    std::vector<std::size_t> shape;
+inline TensorShape shape_of_sizet(const auto& tshape) {
+    TensorShape shape;
     shape.reserve(tshape.size());
     std::transform(tshape.begin(), tshape.end(), std::back_inserter(shape),
-        [](TensorShapeElement x) { return x; });
+        [](auto x) { return static_cast<TensorShapeElement>(x); });
     return shape;
 }
 

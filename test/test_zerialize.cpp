@@ -1,8 +1,11 @@
 #include <array>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <cstring>
+#include <type_traits>
 
 #include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/xtensor.hpp>
@@ -203,6 +206,81 @@ void test_protocol_dsl() {
         });
 
     std::cout << "== DSL tests for <" << P::Name << "> passed ==\n\n";
+}
+
+// --------------------- Dynamic serialization tests ---------------------
+template<class P>
+void test_dynamic_serialization() {
+    using V = typename P::Deserializer;
+    namespace d = zerialize::dyn;
+    std::cout << "== Dynamic serialization tests for <" << P::Name << "> ==\n";
+
+    test_serialization<P>("dyn: map+array",
+        [](){
+            d::Value payload = d::map({
+                {"id",   99},
+                {"name", "dynamic"},
+                {"tags", d::array({"alpha", "beta", 3})}
+            });
+            return serialize<P>(payload);
+        },
+        [](const V& v){
+            if (!v.isMap()) return false;
+            if (v["id"].asInt64() != 99) return false;
+            if (v["name"].asString() != "dynamic") return false;
+            auto tags = v["tags"];
+            return tags.isArray() && tags.arraySize()==3
+                && tags[0].asString()=="alpha"
+                && tags[1].asString()=="beta"
+                && tags[2].asInt64()==3;
+        });
+
+    test_serialization<P>("dyn: tensor xtensor helper",
+        [](){
+            xt::xtensor<double, 2> tensor{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
+            d::Value payload = d::serializable(tensor);
+            return serialize<P>(payload);
+        },
+        [](const V& v){
+            if (!v.isArray()) return false;
+            auto restored = xtensor::asXTensor<double, 2>(v);
+            xt::xtensor<double, 2> expected{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}};
+            return restored == expected;
+        });
+
+    test_serialization<P>("dyn: tensor eigen manual",
+        [](){
+            Eigen::Matrix<double, 3, 2> m;
+            m << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
+            d::Value payload = d::serializable(m);
+            return serialize<P>(payload);
+        },
+        [](const V& v){
+            if (!v.isArray()) return false;
+            auto restored = eigen::asEigenMatrix<double, 3, 2>(v);
+            Eigen::Matrix<double, 3, 2> expected;
+            expected << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
+            return restored.isApprox(expected);
+        });
+
+    test_serialization<P>("dyn: tensor inside map",
+        [](){
+            xt::xtensor<double, 2> tensor{{10.0, 20.0}, {30.0, 40.0}};
+            d::Value payload = d::map({
+                {"meta", d::map({{"id", 7}})},
+                {"tensor", d::serializable(tensor)}
+            });
+            return serialize<P>(payload);
+        },
+        [](const V& v){
+            if (!v.isMap()) return false;
+            if (!v["meta"].isMap() || v["meta"]["id"].asInt64() != 7) return false;
+            auto restored = xtensor::asXTensor<double, 2>(v["tensor"]);
+            xt::xtensor<double, 2> expected{{10.0, 20.0}, {30.0, 40.0}};
+            return restored == expected;
+        });
+
+    std::cout << "== Dynamic serialization tests for <" << P::Name << "> passed ==\n\n";
 }
 
 // --------------------- Cross-protocol translation (DSL-built) ----------------
@@ -468,6 +546,12 @@ int main() {
     test_protocol_dsl<Flex>();
     test_protocol_dsl<MsgPack>();
     test_protocol_dsl<CBOR>();
+
+    // Dynamic serialization (runtime-built values)
+    test_dynamic_serialization<JSON>();
+    test_dynamic_serialization<Flex>();
+    test_dynamic_serialization<MsgPack>();
+    test_dynamic_serialization<CBOR>();
 
     // Custom struct tests
     test_custom_structs<JSON>();

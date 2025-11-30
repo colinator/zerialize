@@ -32,4 +32,11 @@ export namespace zerialize {
     using zerialize::BuilderWrapper;
     using zerialize::zvec;
     using zerialize::zmap;
+    using zerialize::DynamicValue;
+    using zerialize::dyn::Value;
+    using zerialize::dyn::array;
+    using zerialize::dyn::map;
+    using zerialize::dyn::serializable;
+    using zerialize::dyn::Null;
+    using zerialize::dyn::Binary;
 }

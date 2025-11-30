@@ -92,6 +92,32 @@ auto nested_buffer = zerialize::serialize<zerialize::JSON>(
 );
 ```
 
+### Dynamic serialization (runtime-built)
+
+Sometimes you only know the keys/shape at runtime. Use the dynamic builder to construct data on the fly:
+
+```cpp
+#include <zerialize/dynamic.hpp>
+#include <zerialize/zerialize.hpp>
+
+namespace z = zerialize;
+namespace d = zerialize::dyn;
+
+int main() {
+    d::Value payload = d::map({
+        {"id",    42},
+        {"name",  "Ada"},
+        {"tags",  d::array({"runner", "cpp"})},
+        {"score", 9.5},
+        // Existing types with serialize overloads (xtensor/eigen/etc) can be dropped
+        // into dynamic payloads via `serializable`.
+        {"tensor", d::serializable(xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}})}
+    });
+
+    z::ZBuffer buf = z::serialize<z::JSON>(payload);
+}
+```
+
 ### Modules
 ```cpp
 import std;
