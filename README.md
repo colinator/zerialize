@@ -147,7 +147,7 @@ int main() {
 
 ### A note on blobs
 
-Blobs are stored as 'blobs' in protocols that support this (flex, msgpack). Protocols that don't (JSON) store blobs as arrays of ["~b", <base64-encoded data as a string>, "base64"]
+Blobs are stored as 'blobs' in protocols that support this (flex, msgpack). Protocols that don't (JSON) store blobs as arrays of ["~b",  < base64-encoded data as a string >, "base64"]
 
 ### Working with Tensors (xtensor)
 
