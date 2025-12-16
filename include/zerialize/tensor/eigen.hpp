@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <cstring>
+#include <cstdint>
 #include <zerialize/zerialize.hpp>
 #include <Eigen/Dense>
 #include <zerialize/zerialize.hpp>
@@ -30,8 +32,8 @@ namespace eigen {
 
 // Deserialize an eigen matrix/map
 template <typename T, int NRows, int NCols, bool TensorIsMap=false, int Options=Eigen::ColMajor>
-auto asEigenMatrix(const Reader auto& buf) {
-    using MatrixType = Eigen::Matrix<T, NRows, NCols, Options>; // | Eigen::DontAlign>;
+Eigen::Matrix<T, NRows, NCols, Options | Eigen::DontAlign> asEigenMatrix(const Reader auto& buf) {
+    using MatrixType = Eigen::Matrix<T, NRows, NCols, Options | Eigen::DontAlign>;
 
     if (!isTensor<T>(buf)) { throw DeserializationError("not a tensor"); }
 
@@ -71,27 +73,35 @@ auto asEigenMatrix(const Reader auto& buf) {
     // read actual data
     auto data_ref = TensorIsMap ? buf[DataKey] : buf[2];
     auto blob = data_ref.asBlob();
-    T* data_typed = data_from_blobview<T>(blob);
 
-    // Create a Map object. If all is well, then this
-    // should perform no copies - it should basically
-    // be a 'view' over the blob's data.
-    // NOTE! Reading in this way from arbitrary data cannot
-    // guarantee any sort of alignment. This may or may not
-    // slow down SIMD instructions (which Eigen uses). 
-    auto in_place_matrix = Eigen::Map<const MatrixType>( //, Eigen::Unaligned>(
-        data_typed,
-        NRows,
-        NCols);
-    
-    // Depending on the blob type (is it owned or not), we might
-    // have to instantiate (copy) the matrix. This will happen for 
-    // serializable types that do not support 0-copy blobs (such as Json).
-    if constexpr (std::is_same_v<decltype(blob), std::vector<std::byte>>) {
-        // We've gotta copy it...
-        return MatrixType(in_place_matrix);
-    } else { //if constexpr (std::is_same_v<decltype(blob), span<const uint8_t>>) {
-        return in_place_matrix;
+    auto to_span = [](auto&& b) {
+        using B = std::remove_cvref_t<decltype(b)>;
+        if constexpr (std::is_same_v<B, std::span<const std::byte>>) {
+            return b;
+        } else {
+            return std::span<const std::byte>(std::data(b), std::size(b));
+        }
+    };
+    auto bytes = to_span(blob);
+
+    // If the blob is owning (e.g., JSON), copy. If it's a non-owning span, we can map unaligned.
+    if constexpr (!std::is_same_v<decltype(blob), std::span<const std::byte>>) {
+        MatrixType copy(NRows, NCols);
+        std::memcpy(copy.data(), bytes.data(), std::min(bytes.size(), copy.size() * sizeof(T)));
+        return copy;
+    } else {
+        // Eigen::Map with Unaligned still expects at least alignof(T).
+        std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(bytes.data());
+        bool scalar_aligned = (addr % alignof(T)) == 0;
+        if (!scalar_aligned) {
+            MatrixType copy(NRows, NCols);
+            std::memcpy(copy.data(), bytes.data(), std::min(bytes.size(), copy.size() * sizeof(T)));
+            return copy;
+        }
+        return Eigen::Map<const MatrixType, Eigen::Unaligned>(
+            reinterpret_cast<const T*>(bytes.data()),
+            NRows,
+            NCols);
     }
 }
 
