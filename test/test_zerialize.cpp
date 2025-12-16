@@ -10,10 +10,18 @@
 #include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/xtensor.hpp>
 #include <zerialize/tensor/eigen.hpp>
+#ifdef ZERIALIZE_HAS_JSON
 #include <zerialize/protocols/json.hpp>
+#endif
+#ifdef ZERIALIZE_HAS_FLEXBUFFERS
 #include <zerialize/protocols/flex.hpp>
+#endif
+#ifdef ZERIALIZE_HAS_MSGPACK
 #include <zerialize/protocols/msgpack.hpp>
+#endif
+#ifdef ZERIALIZE_HAS_CBOR
 #include <zerialize/protocols/cbor.hpp>
+#endif
 
 #include <xtensor/generators/xbuilder.hpp>
 
@@ -542,47 +550,109 @@ int main() {
     using namespace zerialize;
 
     // Per-protocol, DSL-only tests
+    #ifdef ZERIALIZE_HAS_JSON
     test_protocol_dsl<JSON>();
+    #endif
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
     test_protocol_dsl<Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_MSGPACK
     test_protocol_dsl<MsgPack>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
     test_protocol_dsl<CBOR>();
+    #endif
 
     // Dynamic serialization (runtime-built values)
+    #ifdef ZERIALIZE_HAS_JSON
     test_dynamic_serialization<JSON>();
+    #endif
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
     test_dynamic_serialization<Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_MSGPACK
     test_dynamic_serialization<MsgPack>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
     test_dynamic_serialization<CBOR>();
+    #endif
 
     // Custom struct tests
+    #ifdef ZERIALIZE_HAS_JSON
     test_custom_structs<JSON>();
+    #endif
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
     test_custom_structs<Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_MSGPACK
     test_custom_structs<MsgPack>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
     test_custom_structs<CBOR>();
+    #endif
 
     // Failure-mode coverage
+    #ifdef ZERIALIZE_HAS_JSON
     test_failure_modes<JSON>();
-    test_failure_modes<Flex>();
-    test_failure_modes<MsgPack>();
-    test_failure_modes<CBOR>();
     test_json_failure_modes();
+    #endif
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
+    test_failure_modes<Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_MSGPACK
+    test_failure_modes<MsgPack>();
     test_msgpack_failure_modes();
-
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
+    test_failure_modes<CBOR>();
+    #endif
+ 
     // Translate cross-protocol (both directions) built with the same DSL
+    #if defined(ZERIALIZE_HAS_JSON) && defined(ZERIALIZE_HAS_MSGPACK)
     test_translate_dsl<JSON, MsgPack>();
+    #endif
+    #if defined(ZERIALIZE_HAS_JSON) && defined(ZERIALIZE_HAS_FLEXBUFFERS)
     test_translate_dsl<JSON, Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
+    #ifdef ZERIALIZE_HAS_JSON)
     test_translate_dsl<JSON, CBOR>();
+    #endif
+    #endif
 
+    #if defined(ZERIALIZE_HAS_FLEXBUFFERS) && defined(ZERIALIZE_HAS_MSGPACK)
     test_translate_dsl<Flex, MsgPack>();
+    #endif
+    #if defined(ZERIALIZE_HAS_FLEXBUFFERS) && defined(ZERIALIZE_HAS_JSON)
     test_translate_dsl<Flex, JSON>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
     test_translate_dsl<Flex, CBOR>();
+    #endif
+    #endif
 
+    #if defined(ZERIALIZE_HAS_MSGPACK) && defined(ZERIALIZE_HAS_JSON)
     test_translate_dsl<MsgPack, JSON>();
+    #endif
+    #if defined(ZERIALIZE_HAS_MSGPACK) && defined(ZERIALIZE_HAS_FLEXBUFFERS)
     test_translate_dsl<MsgPack, Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_CBOR
+    #ifdef ZERIALIZE_HAS_MSGPACK
     test_translate_dsl<MsgPack, CBOR>();
+    #endif
 
+    #ifdef ZERIALIZE_HAS_JSON
     test_translate_dsl<CBOR, JSON>();
+    #endif
+    #ifdef ZERIALIZE_HAS_FLEXBUFFERS
     test_translate_dsl<CBOR, Flex>();
+    #endif
+    #ifdef ZERIALIZE_HAS_MSGPACK
     test_translate_dsl<CBOR, MsgPack>();
+    #endif
+    #endif
 
     std::cout << "\nAll tests complete ✅\n";
     return 0;
