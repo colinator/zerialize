@@ -31,31 +31,30 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 # -------------------
 # Protocol: FlatBuffers/FlexBuffers
 if(ZERIALIZE_ENABLE_FLEXBUFFERS)
-  # Try to reuse existing flatbuffers target first
-  set(_zerialize_flatbuffers_target "")
+  # FlexBuffers is header-only; we only need the headers on the include path.
+  # If a flatbuffers target exists, reuse its include dirs; otherwise FetchContent the source
+  # and add the include directory directly (no linking/building).
+  set(_zerialize_flatbuffers_includes "")
   if(TARGET flatbuffers)
-    set(_zerialize_flatbuffers_target flatbuffers)
+    get_target_property(_zerialize_flatbuffers_includes flatbuffers INTERFACE_INCLUDE_DIRECTORIES)
   elseif(TARGET flatbuffers::flatbuffers)
-    set(_zerialize_flatbuffers_target flatbuffers::flatbuffers)
+    get_target_property(_zerialize_flatbuffers_includes flatbuffers::flatbuffers INTERFACE_INCLUDE_DIRECTORIES)
   endif()
-  if(NOT _zerialize_flatbuffers_target)
-    # Vendor via FetchContent
+
+  if(NOT _zerialize_flatbuffers_includes)
     FetchContent_Declare(
         flatbuffers
         GIT_REPOSITORY https://github.com/google/flatbuffers.git
         GIT_TAG master
     )
-    FetchContent_MakeAvailable(flatbuffers)
-    if(TARGET flatbuffers)
-      set(_zerialize_flatbuffers_target flatbuffers)
-    elseif(TARGET flatbuffers::flatbuffers)
-      set(_zerialize_flatbuffers_target flatbuffers::flatbuffers)
-    else()
-      message(FATAL_ERROR "FlatBuffers target not found after FetchContent")
+    FetchContent_GetProperties(flatbuffers)
+    if(NOT flatbuffers_POPULATED)
+      FetchContent_Populate(flatbuffers)
     endif()
+    set(_zerialize_flatbuffers_includes ${flatbuffers_SOURCE_DIR}/include)
   endif()
-  add_library(zerialize_flatbuffers ALIAS ${_zerialize_flatbuffers_target})
-  target_link_libraries(${PROJECT_NAME} INTERFACE zerialize_flatbuffers)
+
+  target_include_directories(${PROJECT_NAME} INTERFACE ${_zerialize_flatbuffers_includes})
   target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_FLEXBUFFERS=1)
 endif()
 
