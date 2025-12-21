@@ -22,6 +22,9 @@
 #ifdef ZERIALIZE_HAS_CBOR
 #include <zerialize/protocols/cbor.hpp>
 #endif
+#ifdef ZERIALIZE_HAS_ZER
+#include <zerialize/protocols/zer.hpp>
+#endif
 
 #include <xtensor/generators/xbuilder.hpp>
 
@@ -544,6 +547,37 @@ void test_msgpack_failure_modes() {
     std::cout << "== MsgPack corruption tests passed ==\n\n";
 }
 
+void test_zer_specific() {
+    std::cout << "== Zer specific tests ==\n";
+
+    test_serialization<Zer>("u64 beyond int64 range",
+        [](){
+            constexpr std::uint64_t big = (std::uint64_t(1) << 63) + 5;
+            return serialize<Zer>( zmap<"big">(big) );
+        },
+        [](const Zer::Deserializer& v){
+            if (!v.isMap()) return false;
+            auto b = v["big"];
+            if (!b.isUInt()) return false;
+            if (b.asUInt64() != ((std::uint64_t(1) << 63) + 5)) return false;
+            return expect_deserialization_error([&]{
+                (void)b.asInt64();
+            });
+        });
+
+    test_serialization<Zer>("xtensor blob is zero-copy when aligned",
+        [](){
+            xt::xtensor<double, 2> t{{1.0, 2.0}, {3.0, 4.0}};
+            return serialize<Zer>(t);
+        },
+        [](const Zer::Deserializer& v){
+            auto view = xtensor::asXTensorView<double>(v);
+            return view.is_zero_copy() && view.array() == xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}};
+        });
+
+    std::cout << "== Zer specific tests passed ==\n\n";
+}
+
 } // namespace zerialize
 
 int main() {
@@ -562,6 +596,9 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_protocol_dsl<CBOR>();
     #endif
+    #ifdef ZERIALIZE_HAS_ZER
+    test_protocol_dsl<Zer>();
+    #endif
 
     // Dynamic serialization (runtime-built values)
     #ifdef ZERIALIZE_HAS_JSON
@@ -576,6 +613,9 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_dynamic_serialization<CBOR>();
     #endif
+    #ifdef ZERIALIZE_HAS_ZER
+    test_dynamic_serialization<Zer>();
+    #endif
 
     // Custom struct tests
     #ifdef ZERIALIZE_HAS_JSON
@@ -589,6 +629,9 @@ int main() {
     #endif
     #ifdef ZERIALIZE_HAS_CBOR
     test_custom_structs<CBOR>();
+    #endif
+    #ifdef ZERIALIZE_HAS_ZER
+    test_custom_structs<Zer>();
     #endif
 
     // Failure-mode coverage
@@ -606,6 +649,10 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_failure_modes<CBOR>();
     #endif
+    #ifdef ZERIALIZE_HAS_ZER
+    test_failure_modes<Zer>();
+    test_zer_specific();
+    #endif
  
     // Translate cross-protocol (both directions) built with the same DSL
     #if defined(ZERIALIZE_HAS_JSON) && defined(ZERIALIZE_HAS_MSGPACK)
@@ -615,9 +662,27 @@ int main() {
     test_translate_dsl<JSON, Flex>();
     #endif
     #ifdef ZERIALIZE_HAS_CBOR
-    #ifdef ZERIALIZE_HAS_JSON)
+    #ifdef ZERIALIZE_HAS_JSON
     test_translate_dsl<JSON, CBOR>();
     #endif
+    #endif
+
+    // ZER (built-in) ↔ other protocols
+    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_JSON)
+    test_translate_dsl<Zer, JSON>();
+    test_translate_dsl<JSON, Zer>();
+    #endif
+    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_FLEXBUFFERS)
+    test_translate_dsl<Zer, Flex>();
+    test_translate_dsl<Flex, Zer>();
+    #endif
+    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_MSGPACK)
+    test_translate_dsl<Zer, MsgPack>();
+    test_translate_dsl<MsgPack, Zer>();
+    #endif
+    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_CBOR)
+    test_translate_dsl<Zer, CBOR>();
+    test_translate_dsl<CBOR, Zer>();
     #endif
 
     #if defined(ZERIALIZE_HAS_FLEXBUFFERS) && defined(ZERIALIZE_HAS_MSGPACK)

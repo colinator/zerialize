@@ -2,11 +2,13 @@ Zerialize CMake How‑To
 
 Overview
 - Zerialize is a header‑only C++ library with optional protocol backends and math backends.
+- Zerialize also includes a built-in, dependency-free protocol backend: `Zer` (`include/zerialize/protocols/zer.hpp`).
 - Dependencies are reused if your toolchain already provides CMake targets; otherwise they are fetched via FetchContent.
 - You can selectively enable or disable each backend via CMake options.
 - Zerialize optionally supports modules for C++20 and onwards, as module `zerialize`.
 
 Configure Options
+- ZER (zer): Built-in protocol backend with no external dependencies. Always available (no CMake option).
 - ZERIALIZE_ENABLE_FLEXBUFFERS: Enable FlexBuffers (via FlatBuffers). Default: ON
 - ZERIALIZE_ENABLE_JSON: Enable JSON (via yyjson). Default: ON
 - ZERIALIZE_ENABLE_CBOR: Enable CBOR (via jsoncons). Default: ON
@@ -16,14 +18,15 @@ Configure Options
 - ZERIALIZE_ENABLE_MODULES: Enable C++ modules. Default: OFF
 
 How Dependencies Are Resolved
-- FlatBuffers: Uses existing `flatbuffers` or `flatbuffers::flatbuffers` if present; otherwise fetched. Internally normalized to `zerialize_flatbuffers`.
+- FlatBuffers: Uses existing `flatbuffers` or `flatbuffers::flatbuffers` include dirs if present; otherwise fetched (header-only usage via include dirs).
 - yyjson: Uses existing `yyjson` or `yyjson::yyjson` if present; otherwise fetched. Internally normalized to `zerialize_yyjson`.
 - msgpack-c: Reuses any of `msgpack-c`, `msgpackc-cxx`, or `msgpackc`; otherwise fetched. Internally normalized to `zerialize_msgpack`.
 - jsoncons (CBOR): Uses existing `jsoncons` or `jsoncons::jsoncons`; otherwise fetched header‑only and added via include dirs.
-- xtensor: Uses existing `xtensor` target if present; otherwise fetches `xtl`, `xsimd`, and `xtensor`.
+- xtensor: Uses existing `xtensor` target if present; otherwise fetches `xtl`, `xsimd`, and `xtensor` headers and wires them up as INTERFACE include directories (no upstream CMake build required).
 - Eigen: Tries `Eigen3::Eigen` via find_package; otherwise fetches headers and creates an imported `eigen` interface target.
 
 Compile Definitions Exposed
+- ZERIALIZE_HAS_ZER: Always defined (built-in Zer protocol is available).
 - ZERIALIZE_HAS_FLEXBUFFERS: Defined when FlexBuffers support is enabled.
 - ZERIALIZE_HAS_JSON: Defined when JSON support is enabled.
 - ZERIALIZE_HAS_CBOR: Defined when CBOR support is enabled.
@@ -64,7 +67,7 @@ cmake -S . -B build \
   -DZERIALIZE_ENABLE_JSON=OFF \
   -DZERIALIZE_ENABLE_MSGPACK=OFF
 
-# No protocols at all (headers only)
+# Disable all optional protocols (Zer is still available)
 cmake -S . -B build \
   -DZERIALIZE_ENABLE_FLEXBUFFERS=OFF \
   -DZERIALIZE_ENABLE_JSON=OFF \
@@ -88,6 +91,5 @@ cmake -S . -B build \
 Notes
 - Zerialize is header‑only; linking against the target propagates include paths and compile definitions for enabled features.
 - When using your own dependency targets, ensure they are visible before calling `add_subdirectory(zerialize)` so zerialize can reuse them.
-- If all protocols are disabled, zerialize builds a minimal interface target; your code should `#ifdef` on the compile definitions accordingly.
+- If you disable all optional protocols, `Zer` remains available; your code can `#ifdef` on the compile definitions accordingly.
 - C++ modules are offered using CMake 3.28 and later. This requires a build generator that supports modules, such as Ninja.
-

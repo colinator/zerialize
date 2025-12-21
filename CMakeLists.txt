@@ -28,6 +28,9 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
+# Built-in protocol: ZER (no external deps)
+target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_ZER=1)
+
 # -------------------
 # Protocol: FlatBuffers/FlexBuffers
 if(ZERIALIZE_ENABLE_FLEXBUFFERS)
@@ -157,22 +160,41 @@ endif()
 if(ZERIALIZE_ENABLE_XTENSOR)
   # If a toolchain already provides xtensor target, reuse it
   if(NOT TARGET xtensor)
-    # xtensor depends on xtl and optionally xsimd
+    # xtensor/xtl/xsimd are header-only, but their upstream CMake projects may
+    # require newer CMake than we target. Vendor headers without add_subdirectory.
     FetchContent_Declare(xtl
         URL https://github.com/xtensor-stack/xtl/archive/0.8.0.zip
     )
-    FetchContent_MakeAvailable(xtl)
+    FetchContent_GetProperties(xtl)
+    if(NOT xtl_POPULATED)
+      FetchContent_Populate(xtl)
+    endif()
 
     FetchContent_Declare(xsimd
         URL https://github.com/xtensor-stack/xsimd/archive/13.2.0.zip
     )
-    FetchContent_MakeAvailable(xsimd)
+    FetchContent_GetProperties(xsimd)
+    if(NOT xsimd_POPULATED)
+      FetchContent_Populate(xsimd)
+    endif()
 
     FetchContent_Declare(xtensor
         URL https://github.com/xtensor-stack/xtensor/archive/0.27.0.zip
     )
-    set(XTENSOR_USE_XSIMD 1)
-    FetchContent_MakeAvailable(xtensor)
+    FetchContent_GetProperties(xtensor)
+    if(NOT xtensor_POPULATED)
+      FetchContent_Populate(xtensor)
+    endif()
+
+    add_library(xtl INTERFACE)
+    target_include_directories(xtl INTERFACE ${xtl_SOURCE_DIR}/include)
+
+    add_library(xsimd INTERFACE)
+    target_include_directories(xsimd INTERFACE ${xsimd_SOURCE_DIR}/include)
+
+    add_library(xtensor INTERFACE)
+    target_include_directories(xtensor INTERFACE ${xtensor_SOURCE_DIR}/include)
+    target_link_libraries(xtensor INTERFACE xtl xsimd)
   endif()
   target_link_libraries(${PROJECT_NAME} INTERFACE xtensor)
   target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_USE_XTENSOR=1)

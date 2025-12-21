@@ -2,6 +2,8 @@
 
 Compares zerialize vs reflect-cpp.
 
+Also benchmarks zerialize's built-in `Zer` protocol, which is dependency-free and has no reflect-cpp equivalent (so the `Zer` section reports only `Zerialize` rows).
+
 ## Build
 
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../../vcpkg/scripts/buildsystems/vcpkg.cmake

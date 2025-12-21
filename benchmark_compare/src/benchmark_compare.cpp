@@ -8,6 +8,7 @@
 #include <zerialize/protocols/msgpack.hpp>
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/cbor.hpp>
+#include <zerialize/protocols/zer.hpp>
 #include <zerialize/tensor/xtensor.hpp>
 
 #include <xtensor/core/xmath.hpp>
@@ -84,7 +85,8 @@ enum class SerializationType {
     Flex,
     MsgPack,
     Json,
-    CBOR
+    CBOR,
+    Zer
 };
 
 // Test across these data variations
@@ -169,7 +171,16 @@ constexpr string st_to_string() {
     if constexpr (ST == SerializationType::Flex) { return "Flex"; } 
     else if constexpr (ST == SerializationType::MsgPack) { return "MsgPack"; }
     else if constexpr (ST == SerializationType::CBOR) { return "CBOR"; } 
+    else if constexpr (ST == SerializationType::Zer) { return "Zer"; }
     else { return "Json"; }
+}
+
+template <SerializationType ST>
+constexpr bool reflect_supported() {
+    return ST == SerializationType::Flex ||
+           ST == SerializationType::MsgPack ||
+           ST == SerializationType::Json ||
+           ST == SerializationType::CBOR;
 }
 
 template <DataType DT>
@@ -302,6 +313,8 @@ ZBuffer get_zerialized() {
         return get_zerialized_data<zerialize::MsgPack, DT>();
     } else if constexpr (ST == SerializationType::CBOR) {
         return get_zerialized_data<zerialize::CBOR, DT>();
+    } else if constexpr (ST == SerializationType::Zer) {
+        return get_zerialized_data<zerialize::Zer, DT>();
     } else {
         return get_zerialized_data<zerialize::JSON, DT>();
     }
@@ -467,6 +480,9 @@ auto get_zerialize_deserialized(std::span<const uint8_t> buf) {
         return d;
     } else if constexpr (ST == SerializationType::CBOR) {
         typename zerialize::CBOR::Deserializer d(buf);
+        return d;
+    } else if constexpr (ST == SerializationType::Zer) {
+        typename zerialize::Zer::Deserializer d(buf);
         return d;
     } else {
         typename zerialize::JSON::Deserializer d(buf);
@@ -834,7 +850,9 @@ template <SerializationType ST, DataType DT>
 void test_for_data_type() {
     cout << dt_to_string<DT>() << endl;
     test_for_competitor_type<ST, DT, CompetitorType::Zerialize>();
-    test_for_competitor_type<ST, DT, CompetitorType::ReflectCpp>();
+    if constexpr (reflect_supported<ST>()) {
+        test_for_competitor_type<ST, DT, CompetitorType::ReflectCpp>();
+    }
     cout << endl;
 }
 
@@ -872,7 +890,8 @@ int main() {
     test_for_serialization_type<SerializationType::Json>();
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
-    test_for_serialization_type<SerializationType::CBOR>();
+    // test_for_serialization_type<SerializationType::CBOR>();
+    test_for_serialization_type<SerializationType::Zer>();
     std::cout << "\nBenchmark complete!" << std::endl;
     return 0;
 }
