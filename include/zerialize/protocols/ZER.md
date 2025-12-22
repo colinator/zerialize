@@ -9,7 +9,6 @@
 - A “checked reader” that validates offsets/lengths and rejects corrupt buffers.
 
 Implementation: `include/zerialize/protocols/zer.hpp`  
-Implementation-oriented spec used to build it: `include/zerialize/protocols/zer.txt`
 
 ## Data Model
 
