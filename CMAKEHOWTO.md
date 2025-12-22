@@ -2,13 +2,13 @@ Zerialize CMake How‑To
 
 Overview
 - Zerialize is a header‑only C++ library with optional protocol backends and math backends.
-- Zerialize also includes a built-in, dependency-free protocol backend: `Zer` (`include/zerialize/protocols/zer.hpp`).
+- Zerialize also includes a built-in, dependency-free protocol backend: `Zera` (`include/zerialize/protocols/zera.hpp`).
 - Dependencies are reused if your toolchain already provides CMake targets; otherwise they are fetched via FetchContent.
 - You can selectively enable or disable each backend via CMake options.
 - Zerialize optionally supports modules for C++20 and onwards, as module `zerialize`.
 
 Configure Options
-- ZER (zer): Built-in protocol backend with no external dependencies. Always available (no CMake option).
+- ZERA (zera): Built-in protocol backend with no external dependencies. Always available (no CMake option).
 - ZERIALIZE_ENABLE_FLEXBUFFERS: Enable FlexBuffers (via FlatBuffers). Default: ON
 - ZERIALIZE_ENABLE_JSON: Enable JSON (via yyjson). Default: ON
 - ZERIALIZE_ENABLE_CBOR: Enable CBOR (via jsoncons). Default: ON
@@ -26,7 +26,7 @@ How Dependencies Are Resolved
 - Eigen: Tries `Eigen3::Eigen` via find_package; otherwise fetches headers and creates an imported `eigen` interface target.
 
 Compile Definitions Exposed
-- ZERIALIZE_HAS_ZER: Always defined (built-in Zer protocol is available).
+- ZERIALIZE_HAS_ZERA: Always defined (built-in Zera protocol is available).
 - ZERIALIZE_HAS_FLEXBUFFERS: Defined when FlexBuffers support is enabled.
 - ZERIALIZE_HAS_JSON: Defined when JSON support is enabled.
 - ZERIALIZE_HAS_CBOR: Defined when CBOR support is enabled.
@@ -67,7 +67,7 @@ cmake -S . -B build \
   -DZERIALIZE_ENABLE_JSON=OFF \
   -DZERIALIZE_ENABLE_MSGPACK=OFF
 
-# Disable all optional protocols (Zer is still available)
+# Disable all optional protocols (Zera is still available)
 cmake -S . -B build \
   -DZERIALIZE_ENABLE_FLEXBUFFERS=OFF \
   -DZERIALIZE_ENABLE_JSON=OFF \
@@ -91,5 +91,5 @@ cmake -S . -B build \
 Notes
 - Zerialize is header‑only; linking against the target propagates include paths and compile definitions for enabled features.
 - When using your own dependency targets, ensure they are visible before calling `add_subdirectory(zerialize)` so zerialize can reuse them.
-- If you disable all optional protocols, `Zer` remains available; your code can `#ifdef` on the compile definitions accordingly.
+- If you disable all optional protocols, `Zera` remains available; your code can `#ifdef` on the compile definitions accordingly.
 - C++ modules are offered using CMake 3.28 and later. This requires a build generator that supports modules, such as Ninja.

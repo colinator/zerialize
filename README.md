@@ -5,7 +5,7 @@ Zero-copy multi-format serialization/deserialization for c++20.
 ## Goals
 
 1. **Ergonomic and performant** serialization and deserialization of C++ data structures and primitives.
-2. **Support as many dynamic protocols as possible** (ZER, JSON, Flexbuffers, MessagePack, CBOR. More to come).
+2. **Support as many dynamic protocols as possible** (JSON, Flexbuffers, MessagePack, CBOR, ZERA. More to come).
 3. For underlying protocols that support it (FlexBuffers, MessagePack, CBOR, JSON in some cases), provide support for **zero-copy, zero-work, lazy deserialization**. For serialization, minimize copies.
 4. Support **easy conversion between protocols**.
 5. Transparently support serialization and deserialization into **xtensor tensors and eigen matrices**. Do this with zero-copy, if possible.
@@ -13,11 +13,12 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 ## Current Support
 
-*   **ZER** (built-in, dependency-free binary protocol) — see [`include/zerialize/protocols/ZER.md`](include/zerialize/protocols/ZER.md)
+
 *   **JSON** (via yyjson)
 *   **Flexbuffers** (Google's schema-less binary format)
 *   **MessagePack** (compact binary serialization)
 *   **CBOR** (via jsoncons)
+*   **ZERA** (built-in, dependency-free binary protocol) — see [`include/zerialize/protocols/ZERA.md`](include/zerialize/protocols/ZERA.md)
 *   **NOTE:** Zerialize supports the least-common-denominator of serializeable objects: arrays, maps with string keys, and primitives: integers, floats, strings, but also blobs.
 
 ## Building
@@ -29,7 +30,7 @@ If using modules, the module is named `zerialize`.
 See [CMAKEHOWTO.md](CMAKEHOWTO.md) for details.
 
 Protocol docs:
-- `include/zerialize/protocols/ZER.md`
+- `include/zerialize/protocols/ZERA.md`
 
 ## Usage
 
@@ -40,7 +41,7 @@ The basics:
 ```cpp
 #include <iostream>
 #include <zerialize/zerialize.hpp>
-#include <zerialize/protocols/zer.hpp>
+#include <zerialize/protocols/zera.hpp>
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/flex.hpp>
 #include <zerialize/protocols/cbor.hpp>
@@ -51,7 +52,7 @@ namespace z = zerialize;
 int main() {
 
     // Serialize and deserialize a map in Json format. 
-    // Can also be z::Zer, z::Flex, z::MsgPack, z::CBOR, more to come.
+    // Can also be z::Zera, z::Flex, z::MsgPack, z::CBOR, more to come.
 
     // Serialize into a data buffer.
     z::ZBuffer databuf = z::serialize<z::JSON>(

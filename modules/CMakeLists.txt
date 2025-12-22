@@ -8,6 +8,7 @@ set(ZERIALIZE_MODULES
     protocols/flex.cppm
     protocols/json.cppm
     protocols/msgpack.cppm
+    protocols/zera.cppm
     tensor/eigen.cppm
     tensor/utils.cppm
     tensor/xtensor.cppm

@@ -2,7 +2,7 @@
 
 Compares zerialize vs reflect-cpp.
 
-Also benchmarks zerialize's built-in `Zer` protocol, which is dependency-free and has no reflect-cpp equivalent (so the `Zer` section reports only `Zerialize` rows).
+Also benchmarks zerialize's built-in `Zera` protocol, which is dependency-free and has no reflect-cpp equivalent (so the `Zera` section reports only `Zerialize` rows).
 
 ## Build
 
@@ -164,7 +164,7 @@ LargeTensorStruct 3x1024x768 uint8
 
 
 
---- Zer                      Serialize (µs)   Deserialize (µs)          Read (µs)    Deser+Read (µs)      Size (bytes)         (samples)
+--- Zera                     Serialize (µs)   Deserialize (µs)          Read (µs)    Deser+Read (µs)      Size (bytes)         (samples)
 
 SmallStruct
     Zerialize                         0.554              0.004              0.121              0.125               336           1000000

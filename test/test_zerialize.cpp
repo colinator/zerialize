@@ -22,8 +22,8 @@
 #ifdef ZERIALIZE_HAS_CBOR
 #include <zerialize/protocols/cbor.hpp>
 #endif
-#ifdef ZERIALIZE_HAS_ZER
-#include <zerialize/protocols/zer.hpp>
+#ifdef ZERIALIZE_HAS_ZERA
+#include <zerialize/protocols/zera.hpp>
 #endif
 
 #include <xtensor/generators/xbuilder.hpp>
@@ -548,14 +548,14 @@ void test_msgpack_failure_modes() {
 }
 
 void test_zer_specific() {
-    std::cout << "== Zer specific tests ==\n";
+    std::cout << "== Zera specific tests ==\n";
 
-    test_serialization<Zer>("u64 beyond int64 range",
+    test_serialization<Zera>("u64 beyond int64 range",
         [](){
             constexpr std::uint64_t big = (std::uint64_t(1) << 63) + 5;
-            return serialize<Zer>( zmap<"big">(big) );
+            return serialize<Zera>( zmap<"big">(big) );
         },
-        [](const Zer::Deserializer& v){
+        [](const Zera::Deserializer& v){
             if (!v.isMap()) return false;
             auto b = v["big"];
             if (!b.isUInt()) return false;
@@ -565,29 +565,29 @@ void test_zer_specific() {
             });
         });
 
-    test_serialization<Zer>("xtensor blob is zero-copy when aligned",
+    test_serialization<Zera>("xtensor blob is zero-copy when aligned",
         [](){
             xt::xtensor<double, 2> t{{1.0, 2.0}, {3.0, 4.0}};
-            return serialize<Zer>(t);
+            return serialize<Zera>(t);
         },
-        [](const Zer::Deserializer& v){
+        [](const Zera::Deserializer& v){
             auto view = xtensor::asXTensorView<double>(v);
             return view.viewInfo().zero_copy
                 && view.viewInfo().reason == tensor::TensorViewReason::Ok
                 && view.array() == xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}};
         });
 
-    std::cout << "== Zer specific tests passed ==\n\n";
+    std::cout << "== Zera specific tests passed ==\n\n";
 }
 
 void test_tensor_view_alignment() {
     std::cout << "== Tensor view alignment tests ==\n";
 
-    // Serialize a tensor in a format that returns span-backed blobs (Zer),
+    // Serialize a tensor in a format that returns span-backed blobs (Zera),
     // then rebase the buffer at offsets [0..15] to intentionally misalign the blob pointer.
     {
         xt::xtensor<double, 2> expected{{1.0, 2.0}, {3.0, 4.0}};
-        auto zb = serialize<Zer>(expected);
+        auto zb = serialize<Zera>(expected);
         auto orig = zb.buf();
 
         std::size_t zero_copy = 0;
@@ -597,7 +597,7 @@ void test_tensor_view_alignment() {
         for (std::size_t off = 0; off < 16; ++off) {
             std::memcpy(backing.data() + off, orig.data(), orig.size());
             std::span<const std::uint8_t> misaligned{backing.data() + off, orig.size()};
-            Zer::Deserializer rd(misaligned);
+            Zera::Deserializer rd(misaligned);
 
             auto view = xtensor::asXTensorView<double, 2>(rd);
             auto info = view.viewInfo();
@@ -624,7 +624,7 @@ void test_tensor_view_alignment() {
     {
         Eigen::Matrix<double, 3, 2> expected;
         expected << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
-        auto zb = serialize<Zer>(expected);
+        auto zb = serialize<Zera>(expected);
         auto orig = zb.buf();
 
         std::size_t zero_copy = 0;
@@ -634,7 +634,7 @@ void test_tensor_view_alignment() {
         for (std::size_t off = 0; off < 16; ++off) {
             std::memcpy(backing.data() + off, orig.data(), orig.size());
             std::span<const std::uint8_t> misaligned{backing.data() + off, orig.size()};
-            Zer::Deserializer rd(misaligned);
+            Zera::Deserializer rd(misaligned);
 
             auto view = eigen::asEigenMatrixView<double, 3, 2>(rd);
             auto info = view.viewInfo();
@@ -678,8 +678,8 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_protocol_dsl<CBOR>();
     #endif
-    #ifdef ZERIALIZE_HAS_ZER
-    test_protocol_dsl<Zer>();
+    #ifdef ZERIALIZE_HAS_ZERA
+    test_protocol_dsl<Zera>();
     #endif
 
     // Dynamic serialization (runtime-built values)
@@ -695,8 +695,8 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_dynamic_serialization<CBOR>();
     #endif
-    #ifdef ZERIALIZE_HAS_ZER
-    test_dynamic_serialization<Zer>();
+    #ifdef ZERIALIZE_HAS_ZERA
+    test_dynamic_serialization<Zera>();
     #endif
 
     // Custom struct tests
@@ -712,8 +712,8 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_custom_structs<CBOR>();
     #endif
-    #ifdef ZERIALIZE_HAS_ZER
-    test_custom_structs<Zer>();
+    #ifdef ZERIALIZE_HAS_ZERA
+    test_custom_structs<Zera>();
     #endif
 
     // Failure-mode coverage
@@ -731,8 +731,8 @@ int main() {
     #ifdef ZERIALIZE_HAS_CBOR
     test_failure_modes<CBOR>();
     #endif
-    #ifdef ZERIALIZE_HAS_ZER
-    test_failure_modes<Zer>();
+    #ifdef ZERIALIZE_HAS_ZERA
+    test_failure_modes<Zera>();
     test_zer_specific();
     test_tensor_view_alignment();
     #endif
@@ -750,22 +750,22 @@ int main() {
     #endif
     #endif
 
-    // ZER (built-in) ↔ other protocols
-    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_JSON)
-    test_translate_dsl<Zer, JSON>();
-    test_translate_dsl<JSON, Zer>();
+    // ZERA (built-in) ↔ other protocols
+    #if defined(ZERIALIZE_HAS_ZERA) && defined(ZERIALIZE_HAS_JSON)
+    test_translate_dsl<Zera, JSON>();
+    test_translate_dsl<JSON, Zera>();
     #endif
-    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_FLEXBUFFERS)
-    test_translate_dsl<Zer, Flex>();
-    test_translate_dsl<Flex, Zer>();
+    #if defined(ZERIALIZE_HAS_ZERA) && defined(ZERIALIZE_HAS_FLEXBUFFERS)
+    test_translate_dsl<Zera, Flex>();
+    test_translate_dsl<Flex, Zera>();
     #endif
-    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_MSGPACK)
-    test_translate_dsl<Zer, MsgPack>();
-    test_translate_dsl<MsgPack, Zer>();
+    #if defined(ZERIALIZE_HAS_ZERA) && defined(ZERIALIZE_HAS_MSGPACK)
+    test_translate_dsl<Zera, MsgPack>();
+    test_translate_dsl<MsgPack, Zera>();
     #endif
-    #if defined(ZERIALIZE_HAS_ZER) && defined(ZERIALIZE_HAS_CBOR)
-    test_translate_dsl<Zer, CBOR>();
-    test_translate_dsl<CBOR, Zer>();
+    #if defined(ZERIALIZE_HAS_ZERA) && defined(ZERIALIZE_HAS_CBOR)
+    test_translate_dsl<Zera, CBOR>();
+    test_translate_dsl<CBOR, Zera>();
     #endif
 
     #if defined(ZERIALIZE_HAS_FLEXBUFFERS) && defined(ZERIALIZE_HAS_MSGPACK)

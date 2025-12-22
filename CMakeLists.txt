@@ -28,8 +28,8 @@ target_include_directories(${PROJECT_NAME} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-# Built-in protocol: ZER (no external deps)
-target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_ZER=1)
+# Built-in protocol: ZERA (no external deps)
+target_compile_definitions(${PROJECT_NAME} INTERFACE ZERIALIZE_HAS_ZERA=1)
 
 # -------------------
 # Protocol: FlatBuffers/FlexBuffers

@@ -21,10 +21,10 @@
 #include <zerialize/errors.hpp>
 
 namespace zerialize {
-namespace zer {
+namespace zera {
 
 // =============================================================================
-//  ZER v1: Lazy JSON-model envelope + aligned arena (see protocols/zer.txt)
+//  ZERA v1: Lazy JSON-model envelope + aligned arena (see protocols/ZERA.md)
 // =============================================================================
 
 inline constexpr std::uint32_t Magic = 0x564E455A; // 'ZENV' little-endian
@@ -119,7 +119,7 @@ struct HeaderView {
 };
 
 inline HeaderView parse_header(std::span<const std::uint8_t> buf) {
-    if (buf.size() < HeaderSize) throw DeserializationError("zer: truncated header");
+    if (buf.size() < HeaderSize) throw DeserializationError("zera: truncated header");
     HeaderView h{};
     h.magic     = read_u32_le(buf.data() + 0);
     h.version   = read_u16_le(buf.data() + 4);
@@ -130,9 +130,9 @@ inline HeaderView parse_header(std::span<const std::uint8_t> buf) {
     return h;
 }
 
-class ZerValue;
+class ZeraValue;
 
-class ZerViewBase {
+class ZeraViewBase {
 protected:
     const std::uint8_t* buf_ = nullptr;
     std::size_t buf_len_ = 0;
@@ -142,15 +142,15 @@ protected:
     std::size_t arena_len_ = 0;
     const std::uint8_t* vr_ = nullptr; // points to a ValueRef16 byte layout
 
-    ZerViewBase() = default;
+    ZeraViewBase() = default;
 
-    ZerViewBase(const std::uint8_t* buf, std::size_t len,
+    ZeraViewBase(const std::uint8_t* buf, std::size_t len,
                 const std::uint8_t* env, std::size_t env_size,
                 const std::uint8_t* arena, std::size_t arena_len,
                 const std::uint8_t* vr)
         : buf_(buf), buf_len_(len), env_(env), env_size_(env_size), arena_(arena), arena_len_(arena_len), vr_(vr) {}
 
-    ZerViewBase(const ZerViewBase& parent, const std::uint8_t* vr)
+    ZeraViewBase(const ZeraViewBase& parent, const std::uint8_t* vr)
         : buf_(parent.buf_), buf_len_(parent.buf_len_),
           env_(parent.env_), env_size_(parent.env_size_),
           arena_(parent.arena_), arena_len_(parent.arena_len_),
@@ -164,8 +164,8 @@ protected:
     }
 
     void require_vr() const {
-        require(vr_ != nullptr, "zer: null ValueRef");
-        require(vr_ >= env_ && vr_ + 16 <= env_ + env_size_, "zer: ValueRef out of bounds");
+        require(vr_ != nullptr, "zera: null ValueRef");
+        require(vr_ >= env_ && vr_ + 16 <= env_ + env_size_, "zera: ValueRef out of bounds");
     }
 
     Tag tag() const { require_vr(); return Tag(vr_[0]); }
@@ -176,29 +176,29 @@ protected:
     std::uint32_t c() const { require_vr(); return read_u32_le(vr_ + 12); }
 
     std::string_view inline_bytes_view(std::size_t n) const {
-        require(n <= InlineMax, "zer: inline payload too large");
+        require(n <= InlineMax, "zera: inline payload too large");
         require_vr();
         return std::string_view(reinterpret_cast<const char*>(vr_ + 4), n);
     }
 
     std::string_view arena_bytes_view(std::uint32_t ofs, std::uint32_t len) const {
-        require(ofs <= arena_len_, "zer: arena offset out of bounds");
-        require(len <= arena_len_, "zer: arena length out of bounds");
-        require(std::size_t(ofs) + std::size_t(len) <= arena_len_, "zer: arena span out of bounds");
+        require(ofs <= arena_len_, "zera: arena offset out of bounds");
+        require(len <= arena_len_, "zera: arena length out of bounds");
+        require(std::size_t(ofs) + std::size_t(len) <= arena_len_, "zera: arena span out of bounds");
         return std::string_view(reinterpret_cast<const char*>(arena_ + ofs), len);
     }
 
     std::span<const std::byte> arena_blob_view(std::uint32_t ofs, std::uint32_t len) const {
-        require(ofs <= arena_len_, "zer: arena offset out of bounds");
-        require(len <= arena_len_, "zer: arena length out of bounds");
-        require(std::size_t(ofs) + std::size_t(len) <= arena_len_, "zer: arena span out of bounds");
+        require(ofs <= arena_len_, "zera: arena offset out of bounds");
+        require(len <= arena_len_, "zera: arena length out of bounds");
+        require(std::size_t(ofs) + std::size_t(len) <= arena_len_, "zera: arena span out of bounds");
         return std::span<const std::byte>(reinterpret_cast<const std::byte*>(arena_ + ofs), len);
     }
 
     const std::uint8_t* env_ptr_at(std::uint32_t ofs, std::size_t need) const {
-        require(ofs <= env_size_, "zer: envelope offset out of bounds");
-        require(need <= env_size_, "zer: envelope need out of bounds");
-        require(std::size_t(ofs) + need <= env_size_, "zer: envelope span out of bounds");
+        require(ofs <= env_size_, "zera: envelope offset out of bounds");
+        require(need <= env_size_, "zera: envelope need out of bounds");
+        require(std::size_t(ofs) + need <= env_size_, "zera: envelope span out of bounds");
         return env_ + ofs;
     }
 
@@ -206,9 +206,9 @@ protected:
         const auto t = tag();
         const std::uint8_t fl = flags();
         if (t == Tag::String) {
-            require((fl & ~std::uint8_t{1}) == 0, "zer: unknown ValueRef flags");
+            require((fl & ~std::uint8_t{1}) == 0, "zera: unknown ValueRef flags");
         } else {
-            require(fl == 0, "zer: non-string ValueRef has flags set");
+            require(fl == 0, "zera: non-string ValueRef has flags set");
         }
     }
 
@@ -226,38 +226,38 @@ public:
 
     // Scalars
     bool asBool() const {
-        require(tag() == Tag::Bool, "zer: value is not a bool");
+        require(tag() == Tag::Bool, "zera: value is not a bool");
         require_flags_ok();
         auto v = aux();
-        require(v == 0 || v == 1, "zer: invalid bool aux");
+        require(v == 0 || v == 1, "zera: invalid bool aux");
         return v == 1;
     }
 
     std::int64_t asInt64() const {
-        require(tag() == Tag::I64 || tag() == Tag::U64, "zer: value is not an integer");
+        require(tag() == Tag::I64 || tag() == Tag::U64, "zera: value is not an integer");
         require_flags_ok();
         const std::uint64_t bits = std::uint64_t(a()) | (std::uint64_t(b()) << 32);
         if (tag() == Tag::U64) {
-            require(bits <= std::uint64_t(std::numeric_limits<std::int64_t>::max()), "zer: uint64 out of range for int64");
+            require(bits <= std::uint64_t(std::numeric_limits<std::int64_t>::max()), "zera: uint64 out of range for int64");
             return static_cast<std::int64_t>(bits);
         }
         return static_cast<std::int64_t>(bits);
     }
 
     std::uint64_t asUInt64() const {
-        require(tag() == Tag::U64 || tag() == Tag::I64, "zer: value is not an integer");
+        require(tag() == Tag::U64 || tag() == Tag::I64, "zera: value is not an integer");
         require_flags_ok();
         const std::uint64_t bits = std::uint64_t(a()) | (std::uint64_t(b()) << 32);
         if (tag() == Tag::I64) {
             const std::int64_t si = static_cast<std::int64_t>(bits);
-            require(si >= 0, "zer: int64 out of range for uint64");
+            require(si >= 0, "zera: int64 out of range for uint64");
             return static_cast<std::uint64_t>(si);
         }
         return bits;
     }
 
     double asDouble() const {
-        require(tag() == Tag::F64, "zer: value is not a float");
+        require(tag() == Tag::F64, "zera: value is not a float");
         require_flags_ok();
         const std::uint64_t bits = std::uint64_t(a()) | (std::uint64_t(b()) << 32);
         double out;
@@ -271,45 +271,45 @@ public:
     std::int8_t asInt8() const {
         auto v = asInt64();
         if (v < std::numeric_limits<std::int8_t>::min() || v > std::numeric_limits<std::int8_t>::max())
-            throw DeserializationError("zer: int8 out of range");
+            throw DeserializationError("zera: int8 out of range");
         return static_cast<std::int8_t>(v);
     }
     std::int16_t asInt16() const {
         auto v = asInt64();
         if (v < std::numeric_limits<std::int16_t>::min() || v > std::numeric_limits<std::int16_t>::max())
-            throw DeserializationError("zer: int16 out of range");
+            throw DeserializationError("zera: int16 out of range");
         return static_cast<std::int16_t>(v);
     }
     std::int32_t asInt32() const {
         auto v = asInt64();
         if (v < std::numeric_limits<std::int32_t>::min() || v > std::numeric_limits<std::int32_t>::max())
-            throw DeserializationError("zer: int32 out of range");
+            throw DeserializationError("zera: int32 out of range");
         return static_cast<std::int32_t>(v);
     }
 
     std::uint8_t asUInt8() const {
         auto v = asUInt64();
-        if (v > std::numeric_limits<std::uint8_t>::max()) throw DeserializationError("zer: uint8 out of range");
+        if (v > std::numeric_limits<std::uint8_t>::max()) throw DeserializationError("zera: uint8 out of range");
         return static_cast<std::uint8_t>(v);
     }
     std::uint16_t asUInt16() const {
         auto v = asUInt64();
-        if (v > std::numeric_limits<std::uint16_t>::max()) throw DeserializationError("zer: uint16 out of range");
+        if (v > std::numeric_limits<std::uint16_t>::max()) throw DeserializationError("zera: uint16 out of range");
         return static_cast<std::uint16_t>(v);
     }
     std::uint32_t asUInt32() const {
         auto v = asUInt64();
-        if (v > std::numeric_limits<std::uint32_t>::max()) throw DeserializationError("zer: uint32 out of range");
+        if (v > std::numeric_limits<std::uint32_t>::max()) throw DeserializationError("zera: uint32 out of range");
         return static_cast<std::uint32_t>(v);
     }
 
     std::string_view asStringView() const {
-        require(tag() == Tag::String, "zer: value is not a string");
+        require(tag() == Tag::String, "zera: value is not a string");
         require_flags_ok();
         const bool inline_data = (flags() & 1) != 0;
         if (inline_data) {
             const auto len = aux();
-            require(len <= InlineMax, "zer: inline string length too large");
+            require(len <= InlineMax, "zera: inline string length too large");
             return inline_bytes_view(len);
         }
         return arena_bytes_view(a(), b());
@@ -321,23 +321,23 @@ public:
     }
 
     std::span<const std::byte> asBlob() const {
-        require(isBlob(), "zer: value is not a blob");
+        require(isBlob(), "zera: value is not a blob");
         require_flags_ok();
 
         const std::uint32_t shape_ofs = c();
         const auto* sp = env_ptr_at(shape_ofs, 4);
         const std::uint32_t rank = read_u32_le(sp);
-        require(rank <= RankMax, "zer: blob rank too large");
-        require(rank == 1, "zer: blob must be rank 1");
+        require(rank <= RankMax, "zera: blob rank too large");
+        require(rank == 1, "zera: blob must be rank 1");
         (void)env_ptr_at(shape_ofs, 4 + 8 * std::size_t(rank));
         const std::uint64_t dim0 = read_u64_le(env_ + shape_ofs + 4);
-        require(dim0 == b(), "zer: blob shape length mismatch");
+        require(dim0 == b(), "zera: blob shape length mismatch");
 
         return arena_blob_view(a(), b());
     }
 
     std::size_t arraySize() const {
-        require(tag() == Tag::Array, "zer: not an array");
+        require(tag() == Tag::Array, "zera: not an array");
         require_flags_ok();
         const std::uint32_t arr_ofs = a();
         const auto* p = env_ptr_at(arr_ofs, 4);
@@ -348,12 +348,12 @@ public:
 
     // mapKeys() must be a forward range of string_view, zero-alloc.
     struct KeysView {
-        const ZerViewBase* self = nullptr;
+        const ZeraViewBase* self = nullptr;
         const std::uint8_t* p = nullptr;
         std::uint32_t count = 0;
 
         struct iterator {
-            const ZerViewBase* self = nullptr;
+            const ZeraViewBase* self = nullptr;
             const std::uint8_t* cur = nullptr;
             std::uint32_t i = 0;
             std::uint32_t n = 0;
@@ -364,7 +364,7 @@ public:
             using reference         = std::string_view;
 
             reference operator*() const {
-                if (i >= n) ZerViewBase::fail("zer: KeysView deref out of range");
+                if (i >= n) ZeraViewBase::fail("zera: KeysView deref out of range");
                 const auto key_len = read_u16_le(cur);
                 (void)self->env_ptr_at(std::uint32_t(cur - self->env_), 4 + key_len + 16);
                 return std::string_view(reinterpret_cast<const char*>(cur + 4), key_len);
@@ -391,7 +391,7 @@ public:
     };
 
     KeysView mapKeys() const {
-        require(tag() == Tag::Object, "zer: not a map");
+        require(tag() == Tag::Object, "zera: not a map");
         require_flags_ok();
         const std::uint32_t obj_ofs = a();
         const auto* p = env_ptr_at(obj_ofs, 4);
@@ -420,12 +420,12 @@ public:
         return false;
     }
 
-    ZerValue operator[](std::size_t idx) const;
-    ZerValue operator[](std::string_view key) const;
+    ZeraValue operator[](std::size_t idx) const;
+    ZeraValue operator[](std::string_view key) const;
 
     std::string to_string() const {
         std::ostringstream os;
-        os << "Zer(";
+        os << "Zera(";
         const auto t = tag();
         switch (t) {
             case Tag::Null: os << "null"; break;
@@ -444,26 +444,26 @@ public:
     }
 };
 
-class ZerValue final : public ZerViewBase {
+class ZeraValue final : public ZeraViewBase {
 public:
-    ZerValue(const ZerViewBase& parent, const std::uint8_t* vr)
-        : ZerViewBase(parent, vr) {}
+    ZeraValue(const ZeraViewBase& parent, const std::uint8_t* vr)
+        : ZeraViewBase(parent, vr) {}
 };
 
-inline ZerValue ZerViewBase::operator[](std::size_t idx) const {
-    require(tag() == Tag::Array, "zer: not an array");
+inline ZeraValue ZeraViewBase::operator[](std::size_t idx) const {
+    require(tag() == Tag::Array, "zera: not an array");
     require_flags_ok();
     const std::uint32_t arr_ofs = a();
     const auto* p = env_ptr_at(arr_ofs, 4);
     const std::uint32_t count = read_u32_le(p);
-    require(idx < count, "zer: array index out of bounds");
+    require(idx < count, "zera: array index out of bounds");
     const std::size_t elem_ofs = std::size_t(arr_ofs) + 4 + 16 * idx;
     const auto* vr = env_ptr_at(static_cast<std::uint32_t>(elem_ofs), 16);
-    return ZerValue(*this, vr);
+    return ZeraValue(*this, vr);
 }
 
-inline ZerValue ZerViewBase::operator[](std::string_view key) const {
-    require(tag() == Tag::Object, "zer: not a map");
+inline ZeraValue ZeraViewBase::operator[](std::string_view key) const {
+    require(tag() == Tag::Object, "zera: not a map");
     require_flags_ok();
     const std::uint32_t obj_ofs = a();
     const auto* p = env_ptr_at(obj_ofs, 4);
@@ -476,30 +476,30 @@ inline ZerValue ZerViewBase::operator[](std::string_view key) const {
         const auto* key_bytes = env_ptr_at(static_cast<std::uint32_t>(ofs + 4), key_len);
         const auto* value_vr = env_ptr_at(static_cast<std::uint32_t>(ofs + 4 + key_len), 16);
         if (key_len == key.size() && std::memcmp(key_bytes, key.data(), key.size()) == 0) {
-            return ZerValue(*this, value_vr);
+            return ZeraValue(*this, value_vr);
         }
         ofs += 4 + std::size_t(key_len) + 16;
         (void)env_ptr_at(static_cast<std::uint32_t>(ofs), 0);
     }
-    throw DeserializationError("zer: key not found: " + std::string(key));
+    throw DeserializationError("zera: key not found: " + std::string(key));
 }
 
-class ZerDeserializer final : public ZerViewBase {
+class ZeraDeserializer final : public ZeraViewBase {
     std::vector<std::uint8_t> owned_;
     std::span<const std::uint8_t> view_{};
 
     void init_from(std::span<const std::uint8_t> buf) {
         auto h = parse_header(buf);
-        if (h.magic != Magic) throw DeserializationError("zer: bad magic");
-        if (h.version != Version) throw DeserializationError("zer: unsupported version");
-        if (h.flags != 1) throw DeserializationError("zer: flags invalid (expected little-endian bit0)");
+        if (h.magic != Magic) throw DeserializationError("zera: bad magic");
+        if (h.version != Version) throw DeserializationError("zera: unsupported version");
+        if (h.flags != 1) throw DeserializationError("zera: flags invalid (expected little-endian bit0)");
 
-        require(h.env_size <= buf.size(), "zer: env_size out of bounds");
-        require(h.root_ofs < h.env_size, "zer: root_ofs out of bounds");
-        require(h.arena_ofs <= buf.size(), "zer: arena_ofs out of bounds");
-        require((h.arena_ofs % ArenaBaseAlign) == 0, "zer: arena_ofs not aligned");
-        require(h.arena_ofs >= HeaderSize + h.env_size, "zer: arena_ofs overlaps envelope");
-        require(HeaderSize + h.env_size <= h.arena_ofs, "zer: envelope exceeds arena_ofs");
+        require(h.env_size <= buf.size(), "zera: env_size out of bounds");
+        require(h.root_ofs < h.env_size, "zera: root_ofs out of bounds");
+        require(h.arena_ofs <= buf.size(), "zera: arena_ofs out of bounds");
+        require((h.arena_ofs % ArenaBaseAlign) == 0, "zera: arena_ofs not aligned");
+        require(h.arena_ofs >= HeaderSize + h.env_size, "zera: arena_ofs overlaps envelope");
+        require(HeaderSize + h.env_size <= h.arena_ofs, "zera: envelope exceeds arena_ofs");
 
         buf_ = buf.data();
         buf_len_ = buf.size();
@@ -508,58 +508,58 @@ class ZerDeserializer final : public ZerViewBase {
         arena_ = buf_ + h.arena_ofs;
         arena_len_ = buf.size() - h.arena_ofs;
 
-        require(h.root_ofs <= env_size_ - 16, "zer: root ValueRef out of bounds");
+        require(h.root_ofs <= env_size_ - 16, "zera: root ValueRef out of bounds");
         vr_ = env_ + h.root_ofs;
     }
 
 public:
-    ZerDeserializer() = default;
+    ZeraDeserializer() = default;
 
-    explicit ZerDeserializer(const std::vector<std::uint8_t>& buf) : owned_(buf) {
+    explicit ZeraDeserializer(const std::vector<std::uint8_t>& buf) : owned_(buf) {
         view_ = std::span<const std::uint8_t>(owned_.data(), owned_.size());
         init_from(view_);
     }
-    explicit ZerDeserializer(std::vector<std::uint8_t>&& buf) : owned_(std::move(buf)) {
+    explicit ZeraDeserializer(std::vector<std::uint8_t>&& buf) : owned_(std::move(buf)) {
         view_ = std::span<const std::uint8_t>(owned_.data(), owned_.size());
         init_from(view_);
     }
-    explicit ZerDeserializer(std::span<const std::uint8_t> buf) : view_(buf) {
+    explicit ZeraDeserializer(std::span<const std::uint8_t> buf) : view_(buf) {
         init_from(view_);
     }
-    explicit ZerDeserializer(const std::uint8_t* data, std::size_t n) : view_(data, n) {
+    explicit ZeraDeserializer(const std::uint8_t* data, std::size_t n) : view_(data, n) {
         init_from(view_);
     }
-    explicit ZerDeserializer(const std::byte* data, std::size_t n)
-        : ZerDeserializer(reinterpret_cast<const std::uint8_t*>(data), n) {}
+    explicit ZeraDeserializer(const std::byte* data, std::size_t n)
+        : ZeraDeserializer(reinterpret_cast<const std::uint8_t*>(data), n) {}
 
-    using ZerViewBase::isNull;
-    using ZerViewBase::isBool;
-    using ZerViewBase::isInt;
-    using ZerViewBase::isUInt;
-    using ZerViewBase::isFloat;
-    using ZerViewBase::isString;
-    using ZerViewBase::isBlob;
-    using ZerViewBase::isMap;
-    using ZerViewBase::isArray;
-    using ZerViewBase::asInt8;
-    using ZerViewBase::asInt16;
-    using ZerViewBase::asInt32;
-    using ZerViewBase::asInt64;
-    using ZerViewBase::asUInt8;
-    using ZerViewBase::asUInt16;
-    using ZerViewBase::asUInt32;
-    using ZerViewBase::asUInt64;
-    using ZerViewBase::asFloat;
-    using ZerViewBase::asDouble;
-    using ZerViewBase::asString;
-    using ZerViewBase::asStringView;
-    using ZerViewBase::asBool;
-    using ZerViewBase::asBlob;
-    using ZerViewBase::mapKeys;
-    using ZerViewBase::contains;
-    using ZerViewBase::arraySize;
-    using ZerViewBase::operator[];
-    using ZerViewBase::to_string;
+    using ZeraViewBase::isNull;
+    using ZeraViewBase::isBool;
+    using ZeraViewBase::isInt;
+    using ZeraViewBase::isUInt;
+    using ZeraViewBase::isFloat;
+    using ZeraViewBase::isString;
+    using ZeraViewBase::isBlob;
+    using ZeraViewBase::isMap;
+    using ZeraViewBase::isArray;
+    using ZeraViewBase::asInt8;
+    using ZeraViewBase::asInt16;
+    using ZeraViewBase::asInt32;
+    using ZeraViewBase::asInt64;
+    using ZeraViewBase::asUInt8;
+    using ZeraViewBase::asUInt16;
+    using ZeraViewBase::asUInt32;
+    using ZeraViewBase::asUInt64;
+    using ZeraViewBase::asFloat;
+    using ZeraViewBase::asDouble;
+    using ZeraViewBase::asString;
+    using ZeraViewBase::asStringView;
+    using ZeraViewBase::asBool;
+    using ZeraViewBase::asBlob;
+    using ZeraViewBase::mapKeys;
+    using ZeraViewBase::contains;
+    using ZeraViewBase::arraySize;
+    using ZeraViewBase::operator[];
+    using ZeraViewBase::to_string;
 };
 
 // =============================================================================
@@ -586,25 +586,25 @@ struct RootSerializer {
     RootSerializer() = default;
 
     void set_inline_string_threshold(std::uint32_t t) {
-        if (t > InlineMax) throw SerializationError("zer: inline string threshold must be <= 12");
+        if (t > InlineMax) throw SerializationError("zera: inline string threshold must be <= 12");
         inline_threshold_ = t;
     }
 
     ZBuffer finish() {
-        if (!st_.empty()) throw SerializationError("zer: finish() called with unterminated container");
+        if (!st_.empty()) throw SerializationError("zera: finish() called with unterminated container");
         if (!root_ofs_) {
             // Default root = null
             auto vr = make_vr(Tag::Null, 0, 0, 0, 0, 0);
             write_root_vr(vr);
         }
 
-        if (env_.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: envelope too large");
-        if (arena_.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: arena too large");
+        if (env_.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: envelope too large");
+        if (arena_.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: arena too large");
 
         const std::uint32_t env_size = static_cast<std::uint32_t>(env_.size());
         const std::size_t arena_ofs = align_up(HeaderSize + std::size_t(env_size), ArenaBaseAlign);
         if (arena_ofs > std::numeric_limits<std::uint32_t>::max())
-            throw SerializationError("zer: arena_ofs overflow");
+            throw SerializationError("zera: arena_ofs overflow");
 
         std::vector<std::uint8_t> out;
         out.resize(arena_ofs + arena_.size(), 0);
@@ -658,7 +658,7 @@ struct RootSerializer {
 
     std::uint32_t append_env_payload(std::span<const std::uint8_t> bytes) {
         const std::size_t ofs = env_.size();
-        if (ofs > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: envelope offset overflow");
+        if (ofs > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: envelope offset overflow");
         env_.insert(env_.end(), bytes.begin(), bytes.end());
         return static_cast<std::uint32_t>(ofs);
     }
@@ -669,8 +669,8 @@ struct RootSerializer {
         if (aligned > arena_.size()) arena_.resize(aligned, 0);
         const std::size_t ofs = arena_.size();
         arena_.resize(ofs + len, 0);
-        if (ofs > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: arena offset overflow");
-        if (len > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: arena length overflow");
+        if (ofs > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: arena offset overflow");
+        if (len > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: arena length overflow");
         return static_cast<std::uint32_t>(ofs);
     }
 
@@ -682,7 +682,7 @@ struct RootSerializer {
     }
 
     void write_root_vr(const std::array<std::uint8_t, 16>& vr) {
-        if (root_ofs_) throw SerializationError("zer: multiple root values");
+        if (root_ofs_) throw SerializationError("zera: multiple root values");
         root_ofs_ = append_env_payload(vr);
     }
 
@@ -698,10 +698,10 @@ struct RootSerializer {
             return;
         }
         auto* m = std::get_if<MapCtx>(&top);
-        if (!m) throw SerializationError("zer: internal container stack error");
-        if (!m->pending_value_patch) throw SerializationError("zer: map value without key()");
+        if (!m) throw SerializationError("zera: internal container stack error");
+        if (!m->pending_value_patch) throw SerializationError("zera: map value without key()");
         const std::size_t at = *m->pending_value_patch;
-        if (at + 16 > m->payload.size()) throw SerializationError("zer: internal map patch out of bounds");
+        if (at + 16 > m->payload.size()) throw SerializationError("zera: internal map patch out of bounds");
         std::memcpy(m->payload.data() + at, vr.data(), 16);
         m->pending_value_patch.reset();
     }
@@ -746,13 +746,13 @@ struct Serializer {
             r->deliver_vr(out);
             return;
         }
-        if (sv.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: string too large");
+        if (sv.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: string too large");
         const auto ofs = r->arena_alloc(sv.size(), 1);
         if (!sv.empty()) std::memcpy(r->arena_.data() + ofs, sv.data(), sv.size());
         r->deliver_vr(RootSerializer::make_vr(Tag::String, 0, 0, ofs, static_cast<std::uint32_t>(sv.size()), 0));
     }
     void binary(std::span<const std::byte> b) {
-        if (b.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: blob too large");
+        if (b.size() > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: blob too large");
         const std::uint32_t byte_len = static_cast<std::uint32_t>(b.size());
         const std::uint32_t arena_ofs = r->arena_alloc(byte_len, ArenaBaseAlign);
         if (byte_len) std::memcpy(r->arena_.data() + arena_ofs, b.data(), byte_len);
@@ -770,10 +770,10 @@ struct Serializer {
     }
     void end_array() {
         if (r->st_.empty() || !std::holds_alternative<RootSerializer::ArrayCtx>(r->st_.back()))
-            throw SerializationError("zer: end_array outside array");
+            throw SerializationError("zera: end_array outside array");
         auto ctx = std::move(std::get<RootSerializer::ArrayCtx>(r->st_.back()));
         r->st_.pop_back();
-        if (ctx.count > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zer: array too large");
+        if (ctx.count > std::numeric_limits<std::uint32_t>::max()) throw SerializationError("zera: array too large");
         write_u32_le_at(ctx.payload, 0, ctx.count);
         const std::uint32_t payload_ofs = r->append_env_payload(ctx.payload);
         r->deliver_vr(RootSerializer::make_vr(Tag::Array, 0, 0, payload_ofs, 0, 0));
@@ -787,9 +787,9 @@ struct Serializer {
     }
     void end_map() {
         if (r->st_.empty() || !std::holds_alternative<RootSerializer::MapCtx>(r->st_.back()))
-            throw SerializationError("zer: end_map outside map");
+            throw SerializationError("zera: end_map outside map");
         auto ctx = std::move(std::get<RootSerializer::MapCtx>(r->st_.back()));
-        if (ctx.pending_value_patch) throw SerializationError("zer: end_map with dangling key()");
+        if (ctx.pending_value_patch) throw SerializationError("zera: end_map with dangling key()");
         r->st_.pop_back();
         write_u32_le_at(ctx.payload, 0, ctx.count);
         const std::uint32_t payload_ofs = r->append_env_payload(ctx.payload);
@@ -798,10 +798,10 @@ struct Serializer {
 
     void key(std::string_view k) {
         if (r->st_.empty() || !std::holds_alternative<RootSerializer::MapCtx>(r->st_.back()))
-            throw SerializationError("zer: key() outside map");
+            throw SerializationError("zera: key() outside map");
         auto& ctx = std::get<RootSerializer::MapCtx>(r->st_.back());
-        if (ctx.pending_value_patch) throw SerializationError("zer: key() called twice without value");
-        if (k.size() > std::numeric_limits<std::uint16_t>::max()) throw SerializationError("zer: key too long");
+        if (ctx.pending_value_patch) throw SerializationError("zera: key() called twice without value");
+        if (k.size() > std::numeric_limits<std::uint16_t>::max()) throw SerializationError("zera: key too long");
         append_u16_le(ctx.payload, static_cast<std::uint16_t>(k.size()));
         append_u16_le(ctx.payload, 0);
         ctx.payload.insert(ctx.payload.end(), k.begin(), k.end());
@@ -812,13 +812,13 @@ struct Serializer {
     }
 };
 
-} // namespace zer
+} // namespace zera
 
-struct Zer {
-    static inline constexpr const char* Name = "Zer";
-    using Deserializer   = zer::ZerDeserializer;
-    using RootSerializer = zer::RootSerializer;
-    using Serializer     = zer::Serializer;
+struct Zera {
+    static inline constexpr const char* Name = "Zera";
+    using Deserializer   = zera::ZeraDeserializer;
+    using RootSerializer = zera::RootSerializer;
+    using Serializer     = zera::Serializer;
 };
 
 } // namespace zerialize

@@ -8,6 +8,7 @@ export import :cbor;
 export import :flex;
 export import :json;
 export import :msgpack;
+export import :zera;
 export import :eigen;
 export import :utils;
 export import :xtensor;

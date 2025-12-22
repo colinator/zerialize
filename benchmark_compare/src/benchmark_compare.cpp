@@ -8,7 +8,7 @@
 #include <zerialize/protocols/msgpack.hpp>
 #include <zerialize/protocols/json.hpp>
 #include <zerialize/protocols/cbor.hpp>
-#include <zerialize/protocols/zer.hpp>
+#include <zerialize/protocols/zera.hpp>
 #include <zerialize/tensor/xtensor.hpp>
 
 #include <xtensor/core/xmath.hpp>
@@ -124,7 +124,7 @@ enum class SerializationType {
     MsgPack,
     Json,
     CBOR,
-    Zer
+    Zera
 };
 
 // Test across these data variations
@@ -308,7 +308,7 @@ constexpr string st_to_string() {
     if constexpr (ST == SerializationType::Flex) { return "Flex"; } 
     else if constexpr (ST == SerializationType::MsgPack) { return "MsgPack"; }
     else if constexpr (ST == SerializationType::CBOR) { return "CBOR"; } 
-    else if constexpr (ST == SerializationType::Zer) { return "Zer"; }
+    else if constexpr (ST == SerializationType::Zera) { return "Zera"; }
     else { return "Json"; }
 }
 
@@ -450,8 +450,8 @@ ZBuffer get_zerialized() {
         return get_zerialized_data<zerialize::MsgPack, DT>();
     } else if constexpr (ST == SerializationType::CBOR) {
         return get_zerialized_data<zerialize::CBOR, DT>();
-    } else if constexpr (ST == SerializationType::Zer) {
-        return get_zerialized_data<zerialize::Zer, DT>();
+    } else if constexpr (ST == SerializationType::Zera) {
+        return get_zerialized_data<zerialize::Zera, DT>();
     } else {
         return get_zerialized_data<zerialize::JSON, DT>();
     }
@@ -659,8 +659,8 @@ auto get_zerialize_deserialized(std::span<const uint8_t> buf) {
     } else if constexpr (ST == SerializationType::CBOR) {
         typename zerialize::CBOR::Deserializer d(buf);
         return d;
-    } else if constexpr (ST == SerializationType::Zer) {
-        typename zerialize::Zer::Deserializer d(buf);
+    } else if constexpr (ST == SerializationType::Zera) {
+        typename zerialize::Zera::Deserializer d(buf);
         return d;
     } else {
         typename zerialize::JSON::Deserializer d(buf);
@@ -1334,7 +1334,7 @@ int main() {
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
     test_for_serialization_type<SerializationType::CBOR>();
-    test_for_serialization_type<SerializationType::Zer>();
+    test_for_serialization_type<SerializationType::Zera>();
 
     if (g_msgpack_tensor_alignment_na) {
         std::cout << "* could not find requested tensor alignment mode for MsgPack payloads." << std::endl;
