@@ -43,7 +43,6 @@ enum class Tag : std::uint8_t {
     Array     = 5,
     Object    = 6,
     TypedArray= 7,
-    // Extension (not in zer.txt): preserve unsigned 64-bit values.
     U64       = 8,
 };
 
