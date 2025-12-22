@@ -216,8 +216,18 @@ public:
     // ---- ctors ----
     MsgPackDeserializer() = default;
 
+    // Non-owning view constructor (zero-copy): caller must keep `bytes` alive.
     explicit MsgPackDeserializer(std::span<const uint8_t> bytes)
+      : view_(bytes) {}
+
+    // Owning constructor: makes an internal copy of `bytes` so views remain valid.
+    struct CopyTag {};
+    explicit MsgPackDeserializer(std::span<const uint8_t> bytes, CopyTag)
       : owned_(bytes.begin(), bytes.end()), view_(owned_) {}
+
+    static MsgPackDeserializer copy_from(std::span<const uint8_t> bytes) {
+        return MsgPackDeserializer(bytes, CopyTag{});
+    }
 
     explicit MsgPackDeserializer(const std::vector<uint8_t>& buf)
       : owned_(buf), view_(owned_) {}
