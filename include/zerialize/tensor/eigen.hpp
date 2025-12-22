@@ -6,10 +6,10 @@
 #include <optional>
 #include <span>
 #include <type_traits>
-//#include <zerialize/zerialize.hpp>
 #include <Eigen/Dense>
 #include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/utils.hpp>
+#include <zerialize/tensor/view_info.hpp>
 #include <zerialize/zbuilders.hpp>
 
 namespace Eigen {
@@ -53,15 +53,16 @@ public:
     using MapType = Eigen::Map<const MatrixType, Eigen::Unaligned>;
 
     // Construct a non-owning view over raw bytes. The caller must ensure the bytes outlive this object.
-    explicit EigenMatrixView(std::span<const std::byte> bytes, std::size_t rows, std::size_t cols)
-        : bytes_(bytes), rows_(rows), cols_(cols) {}
+    explicit EigenMatrixView(std::span<const std::byte> bytes, std::size_t rows, std::size_t cols, tensor::TensorViewInfo info)
+        : info_(info), bytes_(bytes), rows_(rows), cols_(cols) {}
 
     // Construct an owning view by taking ownership of a fully materialized matrix.
-    explicit EigenMatrixView(MatrixType owned, std::size_t rows, std::size_t cols)
-        : owned_(std::move(owned)), rows_(rows), cols_(cols) {}
+    explicit EigenMatrixView(MatrixType owned, std::size_t rows, std::size_t cols, tensor::TensorViewInfo info)
+        : info_(info), owned_(std::move(owned)), rows_(rows), cols_(cols) {}
 
     std::size_t rows() const { return rows_; }
     std::size_t cols() const { return cols_; }
+    const tensor::TensorViewInfo& viewInfo() const { return info_; }
 
     // Returns an `Eigen::Map` that views the underlying storage.
     // This is always safe to call: if the view is not zero-copy, it maps the owned matrix storage.
@@ -94,6 +95,7 @@ private:
         return reinterpret_cast<const T*>(bytes_.data());
     }
 
+    tensor::TensorViewInfo info_{};
     std::optional<MatrixType> owned_;
     std::span<const std::byte> bytes_{};
     std::size_t rows_ = 0;
@@ -160,14 +162,20 @@ EigenMatrixView<T, NRows, NCols, Options> asEigenMatrixView(const Reader auto& b
     }
 
     auto make_copy = [&] {
+        tensor::TensorViewInfo info{};
+        info.zero_copy = false;
+        info.reason = tensor::TensorViewReason::NotSpanBacked;
+        info.required_alignment = alignof(T);
+        info.address = reinterpret_cast<std::uintptr_t>(bytes.data());
+        info.byte_size = bytes.size();
         if constexpr (NRows == Eigen::Dynamic || NCols == Eigen::Dynamic) {
             MatrixType copy(static_cast<Eigen::Index>(rows), static_cast<Eigen::Index>(cols));
             std::memcpy(copy.data(), bytes.data(), bytes.size());
-            return ViewType(std::move(copy), rows, cols);
+            return ViewType(std::move(copy), rows, cols, info);
         } else {
             MatrixType copy;
             std::memcpy(copy.data(), bytes.data(), bytes.size());
-            return ViewType(std::move(copy), rows, cols);
+            return ViewType(std::move(copy), rows, cols, info);
         }
     };
 
@@ -176,9 +184,26 @@ EigenMatrixView<T, NRows, NCols, Options> asEigenMatrixView(const Reader auto& b
         return make_copy();
     } else {
         // For non-owning blobs, only take the view if the data meets Eigen's scalar alignment needs.
-        std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(bytes.data());
-        if ((addr % alignof(T)) != 0) return make_copy();
-        return ViewType(bytes, rows, cols);
+        tensor::TensorViewInfo info{};
+        info.required_alignment = alignof(T);
+        info.address = reinterpret_cast<std::uintptr_t>(bytes.data());
+        info.byte_size = bytes.size();
+        if ((info.address % alignof(T)) != 0) {
+            info.zero_copy = false;
+            info.reason = tensor::TensorViewReason::Misaligned;
+            if constexpr (NRows == Eigen::Dynamic || NCols == Eigen::Dynamic) {
+                MatrixType copy(static_cast<Eigen::Index>(rows), static_cast<Eigen::Index>(cols));
+                std::memcpy(copy.data(), bytes.data(), bytes.size());
+                return ViewType(std::move(copy), rows, cols, info);
+            } else {
+                MatrixType copy;
+                std::memcpy(copy.data(), bytes.data(), bytes.size());
+                return ViewType(std::move(copy), rows, cols, info);
+            }
+        }
+        info.zero_copy = true;
+        info.reason = tensor::TensorViewReason::Ok;
+        return ViewType(bytes, rows, cols, info);
     }
 }
 

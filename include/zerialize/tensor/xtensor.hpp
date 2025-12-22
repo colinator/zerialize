@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <type_traits>
+#include <cstdint>
 #include <xtensor/containers/xtensor.hpp>
 #include <xtensor/containers/xadapt.hpp>
 #include <xtensor/containers/xarray.hpp>
@@ -13,6 +14,7 @@
 #include <xtensor/core/xexpression.hpp>
 #include <zerialize/zerialize.hpp>
 #include <zerialize/tensor/utils.hpp>
+#include <zerialize/tensor/view_info.hpp>
 #include <zerialize/zbuilders.hpp>
 
 namespace xt {
@@ -47,15 +49,15 @@ class XTensorView {
 public:
     using ArrayType = xt::xarray<T>;
 
-    explicit XTensorView(std::span<const std::byte> bytes, TensorShape shape, std::size_t element_count)
-        : bytes_(bytes), shape_(std::move(shape)), element_count_(element_count) {}
+    explicit XTensorView(std::span<const std::byte> bytes, TensorShape shape, std::size_t element_count, tensor::TensorViewInfo info)
+        : info_(info), bytes_(bytes), shape_(std::move(shape)), element_count_(element_count) {}
 
-    explicit XTensorView(ArrayType owned, TensorShape shape, std::size_t element_count)
-        : owned_(std::move(owned)), shape_(std::move(shape)), element_count_(element_count) {}
+    explicit XTensorView(ArrayType owned, TensorShape shape, std::size_t element_count, tensor::TensorViewInfo info)
+        : info_(info), owned_(std::move(owned)), shape_(std::move(shape)), element_count_(element_count) {}
 
     std::size_t rank() const { return shape_.size(); }
     const TensorShape& shape() const { return shape_; }
-    bool is_zero_copy() const { return !owned_.has_value(); }
+    const tensor::TensorViewInfo& viewInfo() const { return info_; }
 
     // Returns an xtensor adaptor that views the underlying storage.
     // If the view is not zero-copy, it adapts the owned array storage.
@@ -80,6 +82,7 @@ private:
         return out;
     }
 
+    tensor::TensorViewInfo info_{};
     std::optional<ArrayType> owned_;
     std::span<const std::byte> bytes_{};
     TensorShape shape_{};
@@ -160,7 +163,13 @@ XTensorView<T> asXTensorView(const Reader auto& buf) {
             return s;
         }());
         std::memcpy(out.data(), bytes.data(), bytes.size());
-        return XTensorView<T>(std::move(out), std::move(vshape), element_count);
+        tensor::TensorViewInfo info{};
+        info.zero_copy = false;
+        info.reason = tensor::TensorViewReason::NotSpanBacked;
+        info.required_alignment = alignof(T);
+        info.address = reinterpret_cast<std::uintptr_t>(bytes.data());
+        info.byte_size = bytes.size();
+        return XTensorView<T>(std::move(out), std::move(vshape), element_count, info);
     };
 
     if constexpr (!std::is_same_v<decltype(blob), std::span<const std::byte>>) {
@@ -171,9 +180,25 @@ XTensorView<T> asXTensorView(const Reader auto& buf) {
         // Turning those bytes into a `T*` view (which xt::adapt eventually does) is only well-defined if
         // `bytes.data()` is aligned to `alignof(T)`. If it's not, element access becomes undefined behavior
         // on many platforms/compilers. So: view when aligned, copy when not.
-        std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(bytes.data());
-        if ((addr % alignof(T)) != 0) return make_copy();
-        return XTensorView<T>(bytes, std::move(vshape), element_count);
+        tensor::TensorViewInfo info{};
+        info.required_alignment = alignof(T);
+        info.address = reinterpret_cast<std::uintptr_t>(bytes.data());
+        info.byte_size = bytes.size();
+        if ((info.address % alignof(T)) != 0) {
+            info.zero_copy = false;
+            info.reason = tensor::TensorViewReason::Misaligned;
+            xt::xarray<T> out = xt::xarray<T>::from_shape([&] {
+                std::vector<std::size_t> s;
+                s.reserve(vshape.size());
+                for (auto d : vshape) s.push_back(static_cast<std::size_t>(d));
+                return s;
+            }());
+            std::memcpy(out.data(), bytes.data(), bytes.size());
+            return XTensorView<T>(std::move(out), std::move(vshape), element_count, info);
+        }
+        info.zero_copy = true;
+        info.reason = tensor::TensorViewReason::Ok;
+        return XTensorView<T>(bytes, std::move(vshape), element_count, info);
     }
 }
 
