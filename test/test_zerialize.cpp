@@ -572,10 +572,92 @@ void test_zer_specific() {
         },
         [](const Zer::Deserializer& v){
             auto view = xtensor::asXTensorView<double>(v);
-            return view.is_zero_copy() && view.array() == xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}};
+            return view.viewInfo().zero_copy
+                && view.viewInfo().reason == tensor::TensorViewReason::Ok
+                && view.array() == xt::xtensor<double, 2>{{1.0, 2.0}, {3.0, 4.0}};
         });
 
     std::cout << "== Zer specific tests passed ==\n\n";
+}
+
+void test_tensor_view_alignment() {
+    std::cout << "== Tensor view alignment tests ==\n";
+
+    // Serialize a tensor in a format that returns span-backed blobs (Zer),
+    // then rebase the buffer at offsets [0..15] to intentionally misalign the blob pointer.
+    {
+        xt::xtensor<double, 2> expected{{1.0, 2.0}, {3.0, 4.0}};
+        auto zb = serialize<Zer>(expected);
+        auto orig = zb.buf();
+
+        std::size_t zero_copy = 0;
+        std::size_t copied = 0;
+
+        std::vector<std::uint8_t> backing(orig.size() + 16);
+        for (std::size_t off = 0; off < 16; ++off) {
+            std::memcpy(backing.data() + off, orig.data(), orig.size());
+            std::span<const std::uint8_t> misaligned{backing.data() + off, orig.size()};
+            Zer::Deserializer rd(misaligned);
+
+            auto view = xtensor::asXTensorView<double, 2>(rd);
+            auto info = view.viewInfo();
+
+            if (info.zero_copy) {
+                ++zero_copy;
+                if (info.reason != tensor::TensorViewReason::Ok) throw std::runtime_error("xtensor: expected Ok");
+                if ((info.address % alignof(double)) != 0) throw std::runtime_error("xtensor: expected aligned address");
+            } else {
+                ++copied;
+                if (info.reason != tensor::TensorViewReason::Misaligned) throw std::runtime_error("xtensor: expected Misaligned");
+                if ((info.address % alignof(double)) == 0) throw std::runtime_error("xtensor: expected misaligned address");
+            }
+
+            if (view.array() != expected) throw std::runtime_error("xtensor: tensor mismatch");
+            if (info.required_alignment != alignof(double)) throw std::runtime_error("xtensor: wrong required_alignment");
+            if (info.byte_size != expected.size() * sizeof(double)) throw std::runtime_error("xtensor: wrong byte_size");
+        }
+
+        if (!(zero_copy == 2 && copied == 14)) throw std::runtime_error("xtensor alignment sweep: unexpected counts");
+    }
+
+    // Same idea for Eigen.
+    {
+        Eigen::Matrix<double, 3, 2> expected;
+        expected << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0;
+        auto zb = serialize<Zer>(expected);
+        auto orig = zb.buf();
+
+        std::size_t zero_copy = 0;
+        std::size_t copied = 0;
+
+        std::vector<std::uint8_t> backing(orig.size() + 16);
+        for (std::size_t off = 0; off < 16; ++off) {
+            std::memcpy(backing.data() + off, orig.data(), orig.size());
+            std::span<const std::uint8_t> misaligned{backing.data() + off, orig.size()};
+            Zer::Deserializer rd(misaligned);
+
+            auto view = eigen::asEigenMatrixView<double, 3, 2>(rd);
+            auto info = view.viewInfo();
+
+            if (info.zero_copy) {
+                ++zero_copy;
+                if (info.reason != tensor::TensorViewReason::Ok) throw std::runtime_error("eigen: expected Ok");
+                if ((info.address % alignof(double)) != 0) throw std::runtime_error("eigen: expected aligned address");
+            } else {
+                ++copied;
+                if (info.reason != tensor::TensorViewReason::Misaligned) throw std::runtime_error("eigen: expected Misaligned");
+                if ((info.address % alignof(double)) == 0) throw std::runtime_error("eigen: expected misaligned address");
+            }
+
+            if (!view.matrix().isApprox(expected)) throw std::runtime_error("eigen: matrix mismatch");
+            if (info.required_alignment != alignof(double)) throw std::runtime_error("eigen: wrong required_alignment");
+            if (info.byte_size != expected.size() * sizeof(double)) throw std::runtime_error("eigen: wrong byte_size");
+        }
+
+        if (!(zero_copy == 2 && copied == 14)) throw std::runtime_error("eigen alignment sweep: unexpected counts");
+    }
+
+    std::cout << "== Tensor view alignment tests passed ==\n\n";
 }
 
 } // namespace zerialize
@@ -652,6 +734,7 @@ int main() {
     #ifdef ZERIALIZE_HAS_ZER
     test_failure_modes<Zer>();
     test_zer_specific();
+    test_tensor_view_alignment();
     #endif
  
     // Translate cross-protocol (both directions) built with the same DSL
