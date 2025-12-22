@@ -6,9 +6,9 @@ Zero-copy multi-format serialization/deserialization for c++20.
 
 1. **Ergonomic and performant** serialization and deserialization of C++ data structures and primitives.
 2. **Support as many dynamic protocols as possible** (JSON, Flexbuffers, MessagePack, CBOR, ZERA. More to come).
-3. For underlying protocols that support it (FlexBuffers, MessagePack, CBOR, JSON in some cases), provide support for **zero-copy, zero-work, lazy deserialization**. For serialization, minimize copies.
+3. For underlying protocols that support it (FlexBuffers, MessagePack, CBOR, ZERA, JSON in some cases), provide support for **zero-copy, zero-work, lazy deserialization**. For serialization, minimize copies.
 4. Support **easy conversion between protocols**.
-5. Transparently support serialization and deserialization into **xtensor tensors and eigen matrices**. Do this with zero-copy, if possible.
+5. Transparently support serialization and deserialization into **xtensor tensors and eigen matrices**. Do this with zero-copy, when possible.
 6. Still to come: support serialization and deserialization into 'statically-typed' formats, such as Protobuf and Flatbuffers.
 
 ## Current Support
@@ -158,6 +158,10 @@ Blobs are stored as 'blobs' in protocols that support this (flex, msgpack). Prot
 ### Working with Tensors (xtensor)
 
 Zerialize has first-class support for xtensor with zero-copy where possible.
+
+Zero-copy tensor *views* require the backing message buffer to be aligned (at least `alignof(T)`; 16 bytes is a good default). If the blob isn’t properly aligned, zerialize will fall back to copying into aligned storage. Use `zerialize::xtensor::asXTensorView(...)` and check `viewInfo()` to see whether the view is truly zero-copy.
+
+For **ZERA**, tensor payload bytes are stored in a 16-byte–aligned arena and each arena allocation is aligned, so if the message buffer itself is properly aligned then tensor views will also be aligned (and therefore zero-copy when size/type checks pass).
 
 Tensors (both xtensor and eigen) are stored as arrays of size 3, where the type code is the numpy-compatible primitive type code. See include/zerialize/tensor/utils.hpp.
 
