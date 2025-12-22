@@ -1333,7 +1333,7 @@ int main() {
     test_for_serialization_type<SerializationType::Json>();
     test_for_serialization_type<SerializationType::Flex>();
     test_for_serialization_type<SerializationType::MsgPack>();
-    //test_for_serialization_type<SerializationType::CBOR>();
+    test_for_serialization_type<SerializationType::CBOR>();
     test_for_serialization_type<SerializationType::Zer>();
 
     if (g_msgpack_tensor_alignment_na) {
